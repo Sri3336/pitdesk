@@ -190,7 +190,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Header — PitDesk logo */}
         <SidebarHeader className="border-b border-border px-4 py-3">
           <div className="flex items-center gap-2">
-            <PitDeskLogo size={32} />
+            <PitDeskLogo size={40} />
             <div>
               <div className="font-bold text-sm leading-tight">PitDesk</div>
               <div className="text-[10px] text-muted-foreground leading-tight">Trading Intelligence</div>

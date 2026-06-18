@@ -89,7 +89,9 @@ export default function SignIn() {
       {/* Left branding panel */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
         <div className="flex items-center gap-3">
-          <PitDeskLogo size={40} />
+          <div className="bg-white rounded-xl p-1.5 shadow-lg">
+            <PitDeskLogo size={52} />
+          </div>
           <span className="text-xl font-bold tracking-tight">PitDesk</span>
         </div>
 
@@ -129,7 +131,7 @@ export default function SignIn() {
         <div className="w-full max-w-md space-y-6">
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-3 mb-8">
-            <PitDeskLogo size={40} />
+            <PitDeskLogo size={44} />
             <span className="text-xl font-bold tracking-tight">PitDesk</span>
           </div>
 
