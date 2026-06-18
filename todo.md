@@ -70,9 +70,18 @@
 - [x] Add Google OAuth redirect URI to Google Cloud Console (trading.akulaz.ai/api/auth/google/callback) — manual step for owner (documented in delivery)
 
 ## Phase 8: Intraday Scanner (9-Criteria Weighted Scorecard)
-- [ ] Build server/intradayScanner.ts — 9-criteria engine (Daily Trend 1.5, EMA Stack 15m 1.5, VWAP 1.0, RVOL 1.5, RSI 1.0, Price Structure 1.0, Entry Quality 1.0, Candle Confirm 1.5, ATR Expansion 1.0)
-- [ ] Add intraday.scan tRPC procedure to routers.ts
-- [ ] Build client/src/pages/IntradayScanner.tsx — scorecard table, grade badge, direction, scan controls
-- [ ] Add Intraday Scanner nav item to sidebar (Strategies section)
-- [ ] Add /intraday-scanner route to App.tsx
-- [ ] Write vitest tests for intradayScanner.ts
+- [x] Build server/intradayScanner.ts — 9-criteria engine (Daily Trend 1.5, EMA Stack 15m 1.5, VWAP 1.0, RVOL 1.5, RSI 1.0, Price Structure 1.0, Entry Quality 1.0, Candle Confirm 1.5, ATR Expansion 1.0)
+- [x] Add intraday.scan tRPC procedure to routers.ts
+- [x] Build client/src/pages/IntradayScanner.tsx — scorecard table, grade badge, direction, scan controls
+- [x] Add Intraday Scanner nav item to sidebar (Strategies section)
+- [x] Add /intraday-scanner route to App.tsx
+- [x] Write vitest tests for intradayScanner.ts (11 tests, 39 total passing)
+
+## Phase 9: Intraday Scanner — Scheduled Scan + 50 Tickers + Email Alerts
+- [x] Define 50-ticker watchlist across sectors in shared/intradayTickers.ts
+- [x] Add intraday scan results DB table (intraday_scan_results) for history/dedup (+ currentPrice/vwap/atr columns)
+- [x] Set up 15-min heartbeat cron (market hours 9:30 AM–4 PM ET) via manus-heartbeat CLI → /api/scheduled/intraday-scan
+- [x] Email alert to akulasridhar@gmail.com when any ticker grades A (include full scorecard)
+- [x] Add intraday.runFullScan + intraday.getLastScan + intraday.score tRPC procedures
+- [x] Update IntradayScanner.tsx — on-demand scan button, last-scan from DB, 50-ticker results table, grade filters, single ticker scorer, auto-scan info banner, watchlist display
+- [x] Update PITDESK_CONTEXT.md with scheduled scan details

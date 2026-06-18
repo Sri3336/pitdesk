@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  char,
   decimal,
   float,
   int,
@@ -9,6 +10,7 @@ import {
   mysqlTable,
   text,
   timestamp,
+  tinyint,
   varchar,
 } from "drizzle-orm/mysql-core";
 
@@ -106,3 +108,21 @@ export const fibEmaAlertHistory = mysqlTable("fib_ema_alert_history", {
 });
 
 export type FibEmaAlertHistory = typeof fibEmaAlertHistory.$inferSelect;
+
+// Intraday scanner scan results (history + dedup for A-grade email alerts)
+export const intradayScanResults = mysqlTable("intraday_scan_results", {
+  id: bigint("id", { mode: "number" }).primaryKey().autoincrement(),
+  scannedAt: bigint("scanned_at", { mode: "number" }).notNull(),
+  symbol: varchar("symbol", { length: 10 }).notNull(),
+  score: decimal("score", { precision: 5, scale: 2 }).notNull(),
+  grade: char("grade", { length: 1 }).notNull(),
+  direction: varchar("direction", { length: 10 }).notNull(),
+  criteriaJson: text("criteria_json").notNull(),
+  currentPrice: decimal("current_price", { precision: 10, scale: 4 }).default("0"),
+  vwap: decimal("vwap", { precision: 10, scale: 4 }).default("0"),
+  atr: decimal("atr", { precision: 10, scale: 4 }).default("0"),
+  alerted: tinyint("alerted").notNull().default(0),
+});
+
+export type IntradayScanResult = typeof intradayScanResults.$inferSelect;
+export type InsertIntradayScanResult = typeof intradayScanResults.$inferInsert;

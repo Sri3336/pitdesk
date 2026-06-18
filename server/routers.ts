@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { PCR_TICKERS } from "@shared/tickers";
+import { INTRADAY_TICKER_SYMBOLS } from "@shared/intradayTickers";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -45,6 +46,10 @@ import {
 import { runVelezDailyScanner, runVelezIntradayScanner } from "./velezScanner";
 import { notifyOwner } from "./_core/notification";
 import { callDataApi } from "./_core/dataApi";
+import { getDb } from "./db";
+import { intradayScanResults } from "../drizzle/schema";
+import { and, desc, eq, gte } from "drizzle-orm";
+import type { CriterionResult } from "./intradayScanner";
 
 const OWNER_EMAIL = "akulasridhar@gmail.com";
 
@@ -638,7 +643,7 @@ const intradayRouter = router({
     .query(async ({ input }) => {
       return scoreIntradayTicker(input.ticker);
     }),
-  // Scan a list of tickers (defaults to all 60 PCR tickers)
+  // Scan the 50-ticker intraday watchlist
   scan: protectedProcedure
     .input(
       z.object({
@@ -646,8 +651,67 @@ const intradayRouter = router({
       }).optional()
     )
     .query(async ({ input }) => {
-      const tickers = input?.tickers ?? [...PCR_TICKERS];
+      const tickers = input?.tickers ?? INTRADAY_TICKER_SYMBOLS;
       return runIntradayScan(tickers);
+    }),
+  // On-demand full scan — runs the 50-ticker scan and returns results immediately
+  runFullScan: protectedProcedure
+    .mutation(async () => {
+      const results = await runIntradayScan(INTRADAY_TICKER_SYMBOLS);
+      // Persist to DB for history
+      const db = await getDb();
+      if (db && results.length > 0) {
+        const scanBatch = Math.floor(Date.now() / 1000);
+        await db.insert(intradayScanResults).values(
+          results.map((r) => ({
+            scannedAt: scanBatch,
+            symbol: r.ticker,
+            score: String(r.score),
+            grade: r.grade,
+            direction: r.direction,
+            criteriaJson: JSON.stringify(r.criteria),
+            currentPrice: String(r.currentPrice ?? 0),
+            vwap: String(r.vwap ?? 0),
+            atr: String(r.atr ?? 0),
+            alerted: 0 as const,
+          }))
+        );
+      }
+      return {
+        scannedAt: Date.now(),
+        results,
+        gradeA: results.filter((r) => r.grade === "A").length,
+        total: results.length,
+      };
+    }),
+  // Get the last scheduled scan results from DB
+  getLastScan: protectedProcedure
+    .query(async () => {
+      const db = await getDb();
+      if (!db) return { results: [], scannedAt: null };
+      const rows = await db
+        .select()
+        .from(intradayScanResults)
+        .orderBy(desc(intradayScanResults.scannedAt))
+        .limit(100);
+      if (rows.length === 0) return { results: [], scannedAt: null };
+      const latestBatch = rows[0].scannedAt;
+      const batchRows = rows.filter((r) => r.scannedAt === latestBatch);
+      return {
+        scannedAt: latestBatch * 1000,
+        results: batchRows.map((r) => ({
+          ticker: r.symbol,
+          score: parseFloat(r.score),
+          grade: r.grade,
+          direction: r.direction,
+          criteria: JSON.parse(r.criteriaJson) as CriterionResult[],
+          currentPrice: parseFloat(r.currentPrice ?? "0"),
+          vwap: parseFloat(r.vwap ?? "0"),
+          atr: parseFloat(r.atr ?? "0"),
+          maxScore: 11,
+          error: null,
+        })),
+      };
     }),
 });
 

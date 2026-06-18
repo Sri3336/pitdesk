@@ -15,6 +15,13 @@
       "when": 1781671763509,
       "tag": "0001_curly_turbo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1781823153299,
+      "tag": "0002_new_excalibur",
+      "breakpoints": true
     }
   ]
 }
