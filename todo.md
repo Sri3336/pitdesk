@@ -85,3 +85,12 @@
 - [x] Add intraday.runFullScan + intraday.getLastScan + intraday.score tRPC procedures
 - [x] Update IntradayScanner.tsx — on-demand scan button, last-scan from DB, 50-ticker results table, grade filters, single ticker scorer, auto-scan info banner, watchlist display
 - [x] Update PITDESK_CONTEXT.md with scheduled scan details
+
+## Phase 10: Enhancements — Charts, Trade Log, Intraday History
+- [x] CandlestickChart.tsx: Add RSI-14 panel below main chart (overbought 70 / oversold 30 reference lines)
+- [x] CandlestickChart.tsx: Add MACD panel below RSI (histogram + signal line, color-coded bars)
+- [x] CandlestickChart.tsx: Collapsible indicator panels (toggle RSI / MACD on/off)
+- [x] TradeLog.tsx: Ticker in trade list is a clickable link → opens /charts?ticker=SYMBOL
+- [x] IntradayScanner.tsx: Add "History" tab showing last 8 scan batches with timestamps and grade summaries
+- [x] Update options-trading-analyzer-builder skill with latest PitDesk context
+- [x] Add intraday.getScanHistory tRPC procedure (group by batch, return grade counts + topA tickers)

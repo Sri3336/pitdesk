@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc";
 import {
+  BarChart2,
   BookOpen,
   CheckCircle,
   ClipboardList,
@@ -36,6 +37,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import { Link } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -522,7 +524,16 @@ function TradeRow({
       <tr className="border-b border-border hover:bg-accent/30 transition-colors">
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-sm">{trade.ticker}</span>
+            <Link
+              href={`/charts?ticker=${trade.ticker}`}
+              className="font-bold text-sm text-green-700 hover:underline hover:text-green-800 transition-colors"
+              title={`Open ${trade.ticker} chart`}
+            >
+              {trade.ticker}
+            </Link>
+            <Link href={`/charts?ticker=${trade.ticker}`} title="Open chart">
+              <BarChart2 className="h-3 w-3 text-muted-foreground hover:text-green-600 transition-colors" />
+            </Link>
             <Badge
               variant="outline"
               className={`text-[10px] px-1.5 py-0 ${

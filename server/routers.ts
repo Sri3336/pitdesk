@@ -684,6 +684,45 @@ const intradayRouter = router({
         total: results.length,
       };
     }),
+  // Get scan history — last N scan batches with grade summaries
+  getScanHistory: protectedProcedure
+    .input(z.object({ limit: z.number().min(1).max(20).default(5) }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { batches: [] };
+      const limit = input?.limit ?? 5;
+      // Get distinct scan batches ordered by most recent
+      const allRows = await db
+        .select()
+        .from(intradayScanResults)
+        .orderBy(desc(intradayScanResults.scannedAt))
+        .limit(limit * 60); // fetch enough rows to cover N batches
+      if (allRows.length === 0) return { batches: [] };
+      // Group by scannedAt batch
+      const batchMap = new Map<number, typeof allRows>();
+      for (const row of allRows) {
+        if (!batchMap.has(row.scannedAt)) batchMap.set(row.scannedAt, []);
+        batchMap.get(row.scannedAt)!.push(row);
+      }
+      const batches = Array.from(batchMap.entries())
+        .slice(0, limit)
+        .map(([scannedAt, rows]) => {
+          const gradeCounts = { A: 0, B: 0, C: 0, D: 0 };
+          for (const r of rows) {
+            if (r.grade in gradeCounts) gradeCounts[r.grade as keyof typeof gradeCounts]++;
+          }
+          const topA = rows
+            .filter((r) => r.grade === "A")
+            .map((r) => ({ ticker: r.symbol, score: parseFloat(r.score), direction: r.direction }));
+          return {
+            scannedAt: scannedAt * 1000,
+            total: rows.length,
+            gradeCounts,
+            topA,
+          };
+        });
+      return { batches };
+    }),
   // Get the last scheduled scan results from DB
   getLastScan: protectedProcedure
     .query(async () => {
