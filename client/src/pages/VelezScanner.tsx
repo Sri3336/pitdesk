@@ -1,6 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +31,7 @@ import {
   ChevronRight,
   Info,
   RefreshCw,
+  Shield,
   Sparkles,
   TrendingDown,
   TrendingUp,
@@ -279,15 +282,17 @@ function SignalRow({ signal }: { signal: DailySignal }) {
 export default function VelezScanner() {
   const [tab, setTab] = useState<"daily" | "intraday">("daily");
   const [thresholdPct, setThresholdPct] = useState(1.0);
+  const [minPrice, setMinPrice] = useState(10);
+  const [excludeOtc, setExcludeOtc] = useState(true);
   const [enabled, setEnabled] = useState(false);
 
   const dailyQuery = trpc.velez.scanDaily.useQuery(
-    { thresholdPct },
+    { thresholdPct, minPrice, excludeOtc },
     { enabled: enabled && tab === "daily", staleTime: 5 * 60 * 1000 }
   );
 
   const intradayQuery = trpc.velez.scanIntraday.useQuery(
-    { thresholdPct },
+    { thresholdPct, minPrice, excludeOtc },
     { enabled: enabled && tab === "intraday", staleTime: 60 * 1000 }
   );
 
@@ -334,6 +339,7 @@ export default function VelezScanner() {
       <Card>
         <CardContent className="pt-4 pb-3">
           <div className="flex flex-wrap items-center gap-6">
+            {/* Confluence threshold */}
             <div className="flex items-center gap-3 min-w-48">
               <label className="text-sm font-medium whitespace-nowrap">
                 Confluence Threshold
@@ -352,9 +358,49 @@ export default function VelezScanner() {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Info className="h-3.5 w-3.5" />
-              Price must be within this % of both a Fib level AND an EMA simultaneously to flag as confluence
+
+            <div className="w-px h-8 bg-border hidden sm:block" />
+
+            {/* Min price filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium whitespace-nowrap">Min Price</label>
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={10000}
+                  step={1}
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(Number(e.target.value) || 0)}
+                  className="w-20 pl-6 h-8 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="w-px h-8 bg-border hidden sm:block" />
+
+            {/* Exclude OTC toggle */}
+            <div className="flex items-center gap-2">
+              <Switch
+                id="exclude-otc"
+                checked={excludeOtc}
+                onCheckedChange={setExcludeOtc}
+              />
+              <label htmlFor="exclude-otc" className="flex items-center gap-1.5 text-sm font-medium cursor-pointer">
+                <Shield className="h-3.5 w-3.5 text-blue-500" />
+                Exclude OTC / Pink Sheets
+              </label>
+              {excludeOtc && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-300 text-blue-700 bg-blue-50">
+                  Active
+                </Badge>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground ml-auto">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              <span>Confluence = price within threshold % of both a Fib level AND an EMA simultaneously</span>
             </div>
           </div>
         </CardContent>

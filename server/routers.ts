@@ -38,11 +38,15 @@ const velezRouter = router({
       z.object({
         tickers: z.array(z.string()).optional(),
         thresholdPct: z.number().min(0.1).max(5).default(1.0),
+        minPrice: z.number().min(0).max(10000).default(10),
+        excludeOtc: z.boolean().default(true),
       })
     )
     .query(async ({ input }) => {
       const tickers = input.tickers ?? [...PCR_TICKERS];
-      return runVelezDailyScanner(tickers, input.thresholdPct);
+      // When excludeOtc is false, pass minPrice=0 to bypass price gate too
+      const effectiveMinPrice = input.excludeOtc ? input.minPrice : 0;
+      return runVelezDailyScanner(tickers, input.thresholdPct, effectiveMinPrice);
     }),
 
   scanIntraday: protectedProcedure
@@ -50,11 +54,14 @@ const velezRouter = router({
       z.object({
         tickers: z.array(z.string()).optional(),
         thresholdPct: z.number().min(0.1).max(5).default(1.0),
+        minPrice: z.number().min(0).max(10000).default(10),
+        excludeOtc: z.boolean().default(true),
       })
     )
     .query(async ({ input }) => {
       const tickers = input.tickers ?? [...PCR_TICKERS];
-      return runVelezIntradayScanner(tickers, input.thresholdPct);
+      const effectiveMinPrice = input.excludeOtc ? input.minPrice : 0;
+      return runVelezIntradayScanner(tickers, input.thresholdPct, effectiveMinPrice);
     }),
 
   // Fetch Fib levels for a single ticker on demand

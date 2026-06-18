@@ -69,6 +69,52 @@ export interface VelezIntradaySignal {
   hasConfluence: boolean;
 }
 
+// ─── Exchange / Quality Filter ───────────────────────────────────────────────
+
+/**
+ * Returns true if the ticker passes quality gates:
+ *  - Price >= minPrice (default $10) — excludes penny/sub-dollar stocks
+ *  - Exchange is a major listed exchange (NYSE, NASDAQ, AMEX) — excludes OTC/Pink Sheets
+ *
+ * We derive exchange from Yahoo Finance's quoteType endpoint. If the call fails we
+ * default to PASSING the filter so a network error doesn't silently drop real tickers.
+ */
+async function passesQualityFilter(
+  ticker: string,
+  currentPrice: number,
+  minPrice = 10
+): Promise<boolean> {
+  // Price gate — fast, no extra API call needed
+  if (currentPrice < minPrice) return false;
+
+  // Exchange gate — fetch quote summary
+  try {
+    const result = await callDataApi("YahooFinance/get_stock_quote", {
+      query: { symbol: ticker },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any = result;
+    const quote = data?.quoteResponse?.result?.[0] ?? data?.result?.[0] ?? data;
+    const exchange: string = (quote?.exchange ?? quote?.fullExchangeName ?? "").toUpperCase();
+    const quoteType: string = (quote?.quoteType ?? "").toUpperCase();
+
+    // Block OTC/Pink Sheet exchanges
+    const OTC_EXCHANGES = ["OTC", "PINK", "OTCBB", "OTCMKTS", "GREY", "EXPERT"];
+    if (OTC_EXCHANGES.some((otc) => exchange.includes(otc))) return false;
+
+    // Block non-equity quote types that slip through (e.g. MUTUALFUND, INDEX)
+    if (quoteType && !["EQUITY", "ETF", ""].includes(quoteType)) {
+      // Allow EQUITY and ETF; block everything else
+      if (quoteType !== "EQUITY" && quoteType !== "ETF") return false;
+    }
+
+    return true;
+  } catch {
+    // Network/API error — default to passing so we don't silently drop real tickers
+    return true;
+  }
+}
+
 async function fetchPriceHistory(
   ticker: string,
   interval: "1d" | "5m" = "1d",
@@ -105,7 +151,8 @@ function calcAvgVolume(bars: PriceBar[], lookback = 20): number {
 
 export async function runVelezDailyScanner(
   tickers: string[],
-  thresholdPct = 1.0
+  thresholdPct = 1.0,
+  minPrice = 10
 ): Promise<VelezDailySignal[]> {
   const signals: VelezDailySignal[] = [];
 
@@ -133,6 +180,10 @@ export async function runVelezDailyScanner(
       const avgVolume = calcAvgVolume(bars);
       const volumeRatio = avgVolume > 0 ? curr.volume / avgVolume : 0;
       if (volumeRatio < 1.2) return;
+
+      // ── Quality filter: exclude OTC/Pink Sheet and sub-$10 stocks ──────────────
+      const qualifies = await passesQualityFilter(ticker, curr.close, minPrice);
+      if (!qualifies) return;
 
       // Fibonacci calculations
       const highs = bars.map((b) => b.high);
@@ -193,7 +244,8 @@ export async function runVelezDailyScanner(
 
 export async function runVelezIntradayScanner(
   tickers: string[],
-  thresholdPct = 1.0
+  thresholdPct = 1.0,
+  minPrice = 10
 ): Promise<VelezIntradaySignal[]> {
   const signals: VelezIntradaySignal[] = [];
 
@@ -208,6 +260,10 @@ export async function runVelezIntradayScanner(
 
       const dropPct = ((prev.close - curr.close) / prev.close) * 100;
       if (dropPct < 0.5) return;
+
+      // ── Quality filter: exclude OTC/Pink Sheet and sub-$10 stocks ──────────────
+      const qualifies = await passesQualityFilter(ticker, curr.close, minPrice);
+      if (!qualifies) return;
 
       const closes = bars.map((b) => b.close);
       const highs = bars.map((b) => b.high);
