@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async () => {
@@ -57,7 +59,14 @@ export default function SignIn() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    loginMutation.mutate({ email, password });
+    // Read directly from DOM to handle browser autofill which bypasses React onChange
+    const emailVal = emailRef.current?.value ?? email;
+    const passwordVal = passwordRef.current?.value ?? password;
+    if (!emailVal || !passwordVal) {
+      setError("Please enter your email and password.");
+      return;
+    }
+    loginMutation.mutate({ email: emailVal, password: passwordVal });
   };
 
   const handleGoogleSignIn = () => {
@@ -147,11 +156,11 @@ export default function SignIn() {
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
+                    ref={emailRef}
                     type="email"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    required
                     autoComplete="email"
                     className="h-11"
                   />
@@ -170,11 +179,11 @@ export default function SignIn() {
                   <div className="relative">
                     <Input
                       id="password"
+                      ref={passwordRef}
                       type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      required
                       autoComplete="current-password"
                       className="h-11 pr-10"
                     />

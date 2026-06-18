@@ -16,10 +16,13 @@ async function createSessionToken(userId: number): Promise<string> {
 }
 
 // Build Google OAuth authorization URL
-export function getGoogleAuthUrl(state?: string): string {
+export function getGoogleAuthUrl(baseUrl?: string, state?: string): string {
+  const callbackUrl = baseUrl
+    ? `${baseUrl}/api/auth/google/callback`
+    : getGoogleCallbackUrl();
   const params = new URLSearchParams({
     client_id: ENV.googleClientId,
-    redirect_uri: getGoogleCallbackUrl(),
+    redirect_uri: callbackUrl,
     response_type: "code",
     scope: "openid email profile",
     access_type: "offline",
@@ -36,14 +39,23 @@ function getGoogleCallbackUrl(): string {
   return "http://localhost:3000/api/auth/google/callback";
 }
 
+export function getBaseUrl(req: { protocol: string; headers: Record<string, string | string[] | undefined> }): string {
+  const host = req.headers["x-forwarded-host"] ?? req.headers["host"] ?? "localhost:3000";
+  const proto = req.headers["x-forwarded-proto"] ?? req.protocol ?? "http";
+  return `${proto}://${host}`;
+}
+
 // Exchange code for tokens and get user info from Google
-async function exchangeCodeForUser(code: string): Promise<{
+async function exchangeCodeForUser(code: string, baseUrl?: string): Promise<{
   googleId: string;
   email: string;
   name: string;
 } | null> {
   try {
     // Exchange authorization code for tokens
+    const callbackUrl = baseUrl
+      ? `${baseUrl}/api/auth/google/callback`
+      : getGoogleCallbackUrl();
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -51,7 +63,7 @@ async function exchangeCodeForUser(code: string): Promise<{
         code,
         client_id: ENV.googleClientId,
         client_secret: ENV.googleClientSecret,
-        redirect_uri: getGoogleCallbackUrl(),
+        redirect_uri: callbackUrl,
         grant_type: "authorization_code",
       }),
     });
@@ -93,8 +105,9 @@ async function exchangeCodeForUser(code: string): Promise<{
 
 export function registerGoogleAuthRoutes(app: Express) {
   // Redirect to Google OAuth
-  app.get("/api/auth/google", (_req: Request, res: Response) => {
-    const url = getGoogleAuthUrl();
+  app.get("/api/auth/google", (req: Request, res: Response) => {
+    const base = getBaseUrl(req as unknown as Parameters<typeof getBaseUrl>[0]);
+    const url = getGoogleAuthUrl(base);
     res.redirect(url);
   });
 
@@ -108,7 +121,8 @@ export function registerGoogleAuthRoutes(app: Express) {
     }
 
     try {
-      const googleUser = await exchangeCodeForUser(code);
+      const base = getBaseUrl(req as unknown as Parameters<typeof getBaseUrl>[0]);
+      const googleUser = await exchangeCodeForUser(code, base);
       if (!googleUser) {
         return res.redirect("/signin?error=google_auth_failed");
       }
