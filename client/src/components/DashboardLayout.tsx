@@ -4,6 +4,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -36,6 +37,8 @@ import {
   Home,
   LineChart,
   LogOut,
+  Settings,
+  Shield,
   PanelLeft,
   Radio,
   Scan,
@@ -127,6 +130,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   });
   const [refOpen, setRefOpen] = useState(false);
   const { loading, user, logout } = useAuth();
+  const [, navigate] = useLocation();
   const isMobile = useIsMobile();
   const isDragging = useRef(false);
   const startX = useRef(0);
@@ -258,7 +262,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-56">
+              {/* User info header */}
+              <div className="px-2 py-1.5 border-b border-border mb-1">
+                <div className="text-xs font-semibold truncate">{user.name ?? "Sridhar"}</div>
+                <div className="text-[10px] text-muted-foreground truncate">{user.email ?? ""}</div>
+                {user.role === "admin" && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <Shield className="h-3 w-3 text-green-600" />
+                    <span className="text-[10px] font-medium text-green-600 uppercase tracking-wide">Admin</span>
+                  </div>
+                )}
+              </div>
+              {user.role === "admin" && (
+                <>
+                  <DropdownMenuItem onClick={() => navigate("/admin/users")} className="cursor-pointer">
+                    <Shield className="h-4 w-4 mr-2 text-green-600" />
+                    User Management
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem onClick={() => navigate("/profile")} className="cursor-pointer">
+                <Settings className="h-4 w-4 mr-2" />
+                Account Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-red-600 cursor-pointer">
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign out
