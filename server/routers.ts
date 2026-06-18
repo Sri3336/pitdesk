@@ -84,7 +84,7 @@ const velezRouter = router({
     .input(z.object({ ticker: z.string(), lookback: z.number().default(50) }))
     .query(async ({ input }) => {
       const result = await callDataApi("YahooFinance/get_stock_chart", {
-        query: { ticker: input.ticker, interval: "1d", range: "3mo" },
+        query: { symbol: input.ticker.toUpperCase(), region: "US", interval: "1d", range: "3mo" },
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = result;
@@ -275,7 +275,7 @@ const fibAlertsRouter = router({
         tickers.map(async (ticker) => {
           try {
             const result = await callDataApi("YahooFinance/get_stock_chart", {
-              query: { ticker, interval: "1d", range: "3mo" },
+              query: { symbol: ticker.toUpperCase(), region: "US", interval: "1d", range: "3mo" },
             });
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const data: any = result;
@@ -535,7 +535,12 @@ const chartRouter = router({
     )
     .query(async ({ input }) => {
       const result = await callDataApi("YahooFinance/get_stock_chart", {
-        query: { ticker: input.ticker.toUpperCase(), interval: input.interval, range: input.range },
+        query: {
+          symbol: input.ticker.toUpperCase(),
+          region: "US",
+          interval: input.interval,
+          range: input.range,
+        },
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = result;
