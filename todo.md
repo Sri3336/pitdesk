@@ -68,3 +68,11 @@
 
 ## Pending
 - [x] Add Google OAuth redirect URI to Google Cloud Console (trading.akulaz.ai/api/auth/google/callback) — manual step for owner (documented in delivery)
+
+## Phase 8: Intraday Scanner (9-Criteria Weighted Scorecard)
+- [ ] Build server/intradayScanner.ts — 9-criteria engine (Daily Trend 1.5, EMA Stack 15m 1.5, VWAP 1.0, RVOL 1.5, RSI 1.0, Price Structure 1.0, Entry Quality 1.0, Candle Confirm 1.5, ATR Expansion 1.0)
+- [ ] Add intraday.scan tRPC procedure to routers.ts
+- [ ] Build client/src/pages/IntradayScanner.tsx — scorecard table, grade badge, direction, scan controls
+- [ ] Add Intraday Scanner nav item to sidebar (Strategies section)
+- [ ] Add /intraday-scanner route to App.tsx
+- [ ] Write vitest tests for intradayScanner.ts

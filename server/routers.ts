@@ -1,4 +1,6 @@
 import { TRPCError } from "@trpc/server";
+import { runIntradayScan, scoreIntradayTicker } from "./intradayScanner";
+
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
@@ -627,6 +629,28 @@ const profileRouter = router({
 });
 
 // ─── App Router ───────────────────────────────────────────────────────────────
+
+// ─── Intraday Scanner Router ──────────────────────────────────────────────────
+const intradayRouter = router({
+  // Score a single ticker with the 9-criteria scorecard
+  score: protectedProcedure
+    .input(z.object({ ticker: z.string().min(1).max(10).toUpperCase() }))
+    .query(async ({ input }) => {
+      return scoreIntradayTicker(input.ticker);
+    }),
+  // Scan a list of tickers (defaults to all 60 PCR tickers)
+  scan: protectedProcedure
+    .input(
+      z.object({
+        tickers: z.array(z.string()).optional(),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      const tickers = input?.tickers ?? [...PCR_TICKERS];
+      return runIntradayScan(tickers);
+    }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   auth: authRouter,
@@ -634,6 +658,7 @@ export const appRouter = router({
   profile: profileRouter,
   chart: chartRouter,
   velez: velezRouter,
+  intraday: intradayRouter,
   trades: tradesRouter,
   fibAlerts: fibAlertsRouter,
   pcr: pcrRouter,

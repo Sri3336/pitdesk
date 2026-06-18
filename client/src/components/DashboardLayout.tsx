@@ -74,6 +74,7 @@ const strategyItems = [
   { icon: TrendingUp, label: "PCR Strategy", path: "/pcr-strategy" },
   { icon: GitMerge, label: "VCP Strategy", path: "/vcp-strategy" },
   { icon: LineChart, label: "Velez Scanner", path: "/velez-scanner" },
+  { icon: Activity, label: "Intraday Scanner", path: "/intraday-scanner" },
   { icon: Zap, label: "Catalyst Watch", path: "/catalyst-watch" },
 ];
 
