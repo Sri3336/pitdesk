@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { PitDeskLogo } from "./PitDeskLogo";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -187,9 +188,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Header — PitDesk logo */}
         <SidebarHeader className="border-b border-border px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center shrink-0">
-              <TrendingUp className="h-4 w-4 text-white" />
-            </div>
+            <PitDeskLogo size={32} />
             <div>
               <div className="font-bold text-sm leading-tight">PitDesk</div>
               <div className="text-[10px] text-muted-foreground leading-tight">Trading Intelligence</div>

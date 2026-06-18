@@ -11,6 +11,7 @@ import {
   closeTrade,
   createPasswordResetToken,
   createUser,
+  deleteUserById,
   deleteFibEmaAlert,
   getFibEmaAlertHistory,
   getFibEmaAlertsByUser,
@@ -20,10 +21,13 @@ import {
   getUserById,
   insertFibEmaAlertHistory,
   insertManualTrade,
+  listAllUsers,
   markPasswordResetTokenUsed,
   updateLastSignedIn,
   updateTradeNotes,
   updateUserPassword,
+  updateUserProfile,
+  updateUserRole,
   upsertFibEmaAlert,
 } from "./db";
 import { getGoogleAuthUrl } from "./_core/googleAuth";
@@ -519,10 +523,63 @@ const authRouter = router({
     }),
 });
 
+// ─── Admin Router ───────────────────────────────────────────────────────────
+const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+  return next({ ctx });
+});
+
+const adminRouter = router({
+  listUsers: adminProcedure.query(async () => {
+    return listAllUsers();
+  }),
+  updateRole: adminProcedure
+    .input(z.object({ userId: z.number(), role: z.enum(["admin", "user"]) }))
+    .mutation(async ({ input, ctx }) => {
+      if (input.userId === ctx.user.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot change your own role" });
+      await updateUserRole(input.userId, input.role);
+      return { success: true };
+    }),
+  deleteUser: adminProcedure
+    .input(z.object({ userId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      if (input.userId === ctx.user.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete your own account" });
+      await deleteUserById(input.userId);
+      return { success: true };
+    }),
+});
+
+// ─── Profile Router ───────────────────────────────────────────────────────────
+const profileRouter = router({
+  update: protectedProcedure
+    .input(z.object({ name: z.string().min(1).max(100).trim() }))
+    .mutation(async ({ input, ctx }) => {
+      await updateUserProfile(ctx.user.id, { name: input.name });
+      return { success: true };
+    }),
+  changePassword: protectedProcedure
+    .input(z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(8).max(128),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const user = await getUserById(ctx.user.id);
+      if (!user) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!user.passwordHash) throw new TRPCError({ code: "BAD_REQUEST", message: "Account uses social login — set a password via Forgot Password" });
+      const valid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+      if (!valid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Current password is incorrect" });
+      const newHash = await bcrypt.hash(input.newPassword, 12);
+      await updateUserPassword(ctx.user.id, newHash);
+      return { success: true };
+    }),
+});
+
 // ─── App Router ───────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
   auth: authRouter,
+  admin: adminRouter,
+  profile: profileRouter,
   velez: velezRouter,
   trades: tradesRouter,
   fibAlerts: fibAlertsRouter,

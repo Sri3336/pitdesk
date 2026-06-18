@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { TrendingUp, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { PitDeskLogo } from "@/components/PitDeskLogo";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function SignIn() {
@@ -88,9 +89,7 @@ export default function SignIn() {
       {/* Left branding panel */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-green-500 flex items-center justify-center shadow-lg">
-            <TrendingUp className="h-5 w-5 text-white" />
-          </div>
+          <PitDeskLogo size={40} />
           <span className="text-xl font-bold tracking-tight">PitDesk</span>
         </div>
 
@@ -130,9 +129,7 @@ export default function SignIn() {
         <div className="w-full max-w-md space-y-6">
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-green-500 flex items-center justify-center shadow-lg">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
+            <PitDeskLogo size={40} />
             <span className="text-xl font-bold tracking-tight">PitDesk</span>
           </div>
 

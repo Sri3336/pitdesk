@@ -21,6 +21,8 @@ const TradeLog = lazy(() => import("./pages/TradeLog"));
 const FibEmaAlerts = lazy(() => import("./pages/FibEmaAlerts"));
 const PCRDashboard = lazy(() => import("./pages/PCRDashboard"));
 const Analyzer = lazy(() => import("./pages/Analyzer"));
+const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const Profile = lazy(() => import("./pages/Profile"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -65,6 +67,8 @@ function Router() {
                 <Route path="/fib-ema-alerts" component={FibEmaAlerts} />
                 <Route path="/pcr-dashboard" component={PCRDashboard} />
                 <Route path="/analyzer" component={Analyzer} />
+                <Route path="/admin/users" component={AdminUsers} />
+                <Route path="/profile" component={Profile} />
                 {/* Stub routes — coming soon */}
                 <Route path="/pcr-strategy" component={() => <ComingSoon title="PCR Strategy" />} />
                 <Route path="/vcp-strategy" component={() => <ComingSoon title="VCP Strategy" />} />
