@@ -30,6 +30,7 @@ import {
   BarChart2,
   Bell,
   BookOpen,
+  CandlestickChart,
   ChevronDown,
   ChevronRight,
   ClipboardList,
@@ -62,6 +63,7 @@ const MAX_WIDTH = 380;
 const analysisItems = [
   { icon: Home, label: "Dashboard", path: "/" },
   { icon: BarChart2, label: "PCR Dashboard", path: "/pcr-dashboard" },
+  { icon: CandlestickChart, label: "Charts", path: "/charts" },
   { icon: Scan, label: "Scan All", path: "/scan-all" },
   { icon: Activity, label: "Options Analyzer", path: "/analyzer" },
   { icon: ClipboardList, label: "Watchlist", path: "/watchlist" },

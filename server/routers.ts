@@ -523,6 +523,53 @@ const authRouter = router({
     }),
 });
 
+// ─── Candlestick Chart Router ───────────────────────────────────────────────
+const chartRouter = router({
+  candles: protectedProcedure
+    .input(
+      z.object({
+        ticker: z.string().min(1).max(16),
+        interval: z.enum(["1m", "5m", "15m", "30m", "1h", "1d", "1wk", "1mo"]).default("1d"),
+        range: z.enum(["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y"]).default("3mo"),
+      })
+    )
+    .query(async ({ input }) => {
+      const result = await callDataApi("YahooFinance/get_stock_chart", {
+        query: { ticker: input.ticker.toUpperCase(), interval: input.interval, range: input.range },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = result;
+      const chart = data?.chart?.result?.[0];
+      if (!chart) throw new TRPCError({ code: "NOT_FOUND", message: `No data for ${input.ticker}` });
+
+      const timestamps: number[] = chart.timestamp ?? [];
+      const q = chart.indicators?.quote?.[0] ?? {};
+      const adjClose: number[] = chart.indicators?.adjclose?.[0]?.adjclose ?? [];
+
+      const candles = timestamps
+        .map((ts: number, i: number) => ({
+          time: ts as number,
+          open: q.open?.[i] as number,
+          high: q.high?.[i] as number,
+          low: q.low?.[i] as number,
+          close: q.close?.[i] as number,
+          volume: q.volume?.[i] as number,
+          adjClose: adjClose[i] as number,
+        }))
+        .filter((c) => c.open != null && c.high != null && c.low != null && c.close != null);
+
+      const meta = chart.meta ?? {};
+      return {
+        ticker: input.ticker.toUpperCase(),
+        currency: meta.currency ?? "USD",
+        exchangeName: meta.exchangeName ?? "",
+        regularMarketPrice: meta.regularMarketPrice ?? null,
+        previousClose: meta.previousClose ?? meta.chartPreviousClose ?? null,
+        candles,
+      };
+    }),
+});
+
 // ─── Admin Router ───────────────────────────────────────────────────────────
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
@@ -580,6 +627,7 @@ export const appRouter = router({
   auth: authRouter,
   admin: adminRouter,
   profile: profileRouter,
+  chart: chartRouter,
   velez: velezRouter,
   trades: tradesRouter,
   fibAlerts: fibAlertsRouter,

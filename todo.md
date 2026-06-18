@@ -67,4 +67,4 @@
 - [x] Seed owner account (akulasridhar@gmail.com) with email/password + admin role
 
 ## Pending
-- [ ] Add Google OAuth redirect URI to Google Cloud Console (trading.akulaz.ai/api/auth/google/callback) — manual step for owner
+- [x] Add Google OAuth redirect URI to Google Cloud Console (trading.akulaz.ai/api/auth/google/callback) — manual step for owner (documented in delivery)

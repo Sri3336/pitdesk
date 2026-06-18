@@ -23,6 +23,7 @@ const PCRDashboard = lazy(() => import("./pages/PCRDashboard"));
 const Analyzer = lazy(() => import("./pages/Analyzer"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const Profile = lazy(() => import("./pages/Profile"));
+const CandlestickChart = lazy(() => import("./pages/CandlestickChart"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -69,6 +70,7 @@ function Router() {
                 <Route path="/analyzer" component={Analyzer} />
                 <Route path="/admin/users" component={AdminUsers} />
                 <Route path="/profile" component={Profile} />
+                <Route path="/charts" component={CandlestickChart} />
                 {/* Stub routes — coming soon */}
                 <Route path="/pcr-strategy" component={() => <ComingSoon title="PCR Strategy" />} />
                 <Route path="/vcp-strategy" component={() => <ComingSoon title="VCP Strategy" />} />
