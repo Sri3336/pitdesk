@@ -1,21 +1,32 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { COOKIE_NAME } from "@shared/const";
+import bcrypt from "bcryptjs";
+import { SignJWT, jwtVerify } from "jose";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { PCR_TICKERS } from "@shared/tickers";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   closeTrade,
+  createPasswordResetToken,
+  createUser,
   deleteFibEmaAlert,
   getFibEmaAlertHistory,
   getFibEmaAlertsByUser,
   getManualTradesByUser,
+  getValidPasswordResetToken,
+  getUserByEmail,
+  getUserById,
   insertFibEmaAlertHistory,
   insertManualTrade,
+  markPasswordResetTokenUsed,
+  updateLastSignedIn,
   updateTradeNotes,
+  updateUserPassword,
   upsertFibEmaAlert,
 } from "./db";
+import { getGoogleAuthUrl } from "./_core/googleAuth";
 import { sendEmail, buildFibEmaAlertEmail } from "./email";
 import {
   calcFibExtensions,
@@ -405,17 +416,113 @@ const pcrRouter = router({
   }),
 });
 
+// ─── JWT helpers ─────────────────────────────────────────────────────────────
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? "fallback-dev-secret");
+const SESSION_MAX_AGE = ONE_YEAR_MS;
+
+async function createSessionToken(userId: number): Promise<string> {
+  return new SignJWT({ sub: String(userId) })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("365d")
+    .sign(JWT_SECRET);
+}
+
+async function verifySessionToken(token: string): Promise<number | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    return payload.sub ? parseInt(payload.sub, 10) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Auth Router ─────────────────────────────────────────────────────────────
+const authRouter = router({
+  register: publicProcedure
+    .input(z.object({
+      name: z.string().min(1).max(100).trim(),
+      email: z.string().email().toLowerCase(),
+      password: z.string().min(8).max(128),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const existing = await getUserByEmail(input.email);
+      if (existing) throw new TRPCError({ code: "BAD_REQUEST", message: "An account with this email already exists." });
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      const user = await createUser({ name: input.name, email: input.email, passwordHash });
+      if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create account." });
+      const token = await createSessionToken(user.id);
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: SESSION_MAX_AGE });
+      return { id: user.id, name: user.name, email: user.email, role: user.role };
+    }),
+
+  login: publicProcedure
+    .input(z.object({ email: z.string().email().toLowerCase(), password: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const user = await getUserByEmail(input.email);
+      if (!user || !user.passwordHash) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+      const valid = await bcrypt.compare(input.password, user.passwordHash);
+      if (!valid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+      await updateLastSignedIn(user.id);
+      const token = await createSessionToken(user.id);
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: SESSION_MAX_AGE });
+      return { id: user.id, name: user.name, email: user.email, role: user.role };
+    }),
+
+  logout: publicProcedure.mutation(({ ctx }) => {
+    ctx.res.clearCookie(COOKIE_NAME, { ...getSessionCookieOptions(ctx.req), maxAge: -1 });
+    return { success: true } as const;
+  }),
+
+  me: publicProcedure.query(async ({ ctx }) => {
+    const token = ctx.req.cookies?.[COOKIE_NAME];
+    if (!token) return null;
+    const userId = await verifySessionToken(token);
+    if (!userId) return null;
+    const user = await getUserById(userId);
+    if (!user) return null;
+    return { id: user.id, name: user.name, email: user.email, role: user.role, createdAt: user.createdAt };
+  }),
+
+  googleAuthUrl: publicProcedure.query(() => {
+    return { url: getGoogleAuthUrl() };
+  }),
+
+  requestPasswordReset: publicProcedure
+    .input(z.object({ email: z.string().email().toLowerCase() }))
+    .mutation(async ({ input }) => {
+      const user = await getUserByEmail(input.email);
+      if (!user) return { success: true }; // anti-enumeration
+      const { randomBytes } = await import("crypto");
+      const tokenBytes = randomBytes(32).toString("hex");
+      await createPasswordResetToken(user.id, tokenBytes);
+      const appOrigin = process.env.NODE_ENV === "production"
+        ? "https://trading.akulaz.ai"
+        : "http://localhost:3000";
+      const resetUrl = `${appOrigin}/reset-password?token=${tokenBytes}`;
+      await notifyOwner({
+        title: `Password Reset — ${user.email}`,
+        content: `Reset link for ${user.name ?? user.email} (${user.email}):\n${resetUrl}\n\nExpires in 1 hour.`,
+      }).catch(() => console.warn("[PasswordReset] Notification failed"));
+      return { success: true };
+    }),
+
+  resetPassword: publicProcedure
+    .input(z.object({ token: z.string().min(1), password: z.string().min(8).max(128) }))
+    .mutation(async ({ input }) => {
+      const record = await getValidPasswordResetToken(input.token);
+      if (!record) throw new TRPCError({ code: "BAD_REQUEST", message: "This reset link is invalid or has expired." });
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      await updateUserPassword(record.userId, passwordHash);
+      await markPasswordResetTokenUsed(input.token);
+      return { success: true };
+    }),
+});
+
 // ─── App Router ───────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
-  auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
-    }),
-  }),
+  auth: authRouter,
   velez: velezRouter,
   trades: tradesRouter,
   fibAlerts: fibAlertsRouter,

@@ -44,3 +44,27 @@
 - [x] auth.logout.test.ts: 1 test (passing)
 - [x] TypeScript check: 0 errors
 - [x] Checkpoint save
+
+## Phase 7: Custom Auth (Manus OAuth Replacement)
+- [x] DB migration: add passwordHash, googleId to users table; create passwordResetTokens table
+- [x] Update drizzle/schema.ts to reflect new columns
+- [x] Add auth DB helpers: createUser, getUserByEmail, getUserById, updateLastSignedIn, upsertGoogleUser, createPasswordResetToken, getValidPasswordResetToken, markPasswordResetTokenUsed, updateUserPassword
+- [x] Update context.ts to use JWT cookie verification (remove Manus OAuth dependency)
+- [x] Create googleAuth.ts with Google OAuth callback route
+- [x] Register Google auth routes in server index.ts
+- [x] Replace auth router with full custom auth (register, login, logout, me, googleAuthUrl, requestPasswordReset, resetPassword)
+- [x] Update useAuth hook (remove Manus OAuth redirect)
+- [x] Update main.tsx (redirect to /signin instead of Manus portal)
+- [x] Create AuthGuard component
+- [x] Update DashboardLayout (remove Manus login CTA)
+- [x] Create SignIn page (split-panel, email/password + Google OAuth)
+- [x] Create Register page (password strength indicator)
+- [x] Create ForgotPassword page (anti-enumeration)
+- [x] Create ResetPassword page (token from URL)
+- [x] Update App.tsx routing (public auth routes + protected routes with AuthGuard)
+- [x] Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET secrets
+- [x] Write vitest tests for all auth procedures (28 tests passing)
+- [x] Seed owner account (akulasridhar@gmail.com) with email/password + admin role
+
+## Pending
+- [ ] Add Google OAuth redirect URI to Google Cloud Console (trading.akulaz.ai/api/auth/google/callback)

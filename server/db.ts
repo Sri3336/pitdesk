@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   FibEmaAlert,
@@ -6,9 +6,11 @@ import {
   InsertManualTrade,
   InsertUser,
   ManualTrade,
+  PasswordResetToken,
   fibEmaAlertHistory,
   fibEmaAlerts,
   manualTrades,
+  passwordResetTokens,
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -27,7 +29,7 @@ export async function getDb() {
   return _db;
 }
 
-// ─── Users ───────────────────────────────────────────────────────────────────
+// ─── Users (legacy Manus OAuth) ──────────────────────────────────────────────
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
@@ -67,6 +69,156 @@ export async function getUserByOpenId(openId: string) {
   if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+// ─── Users (custom email/password auth) ──────────────────────────────────────
+
+export async function createUser(data: {
+  name: string;
+  email: string;
+  passwordHash: string;
+  role?: "user" | "admin";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(users).values({
+    name: data.name,
+    email: data.email.toLowerCase(),
+    passwordHash: data.passwordHash,
+    loginMethod: "email",
+    role: data.role ?? "user",
+    lastSignedIn: new Date(),
+  });
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, data.email.toLowerCase()))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email.toLowerCase()))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function updateLastSignedIn(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, id));
+}
+
+// ─── Users (Google OAuth) ─────────────────────────────────────────────────────
+
+export async function getUserByGoogleId(googleId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.googleId, googleId))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+export async function upsertGoogleUser(data: {
+  googleId: string;
+  name: string;
+  email: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check if user exists by googleId
+  const existing = await getUserByGoogleId(data.googleId);
+  if (existing) {
+    await db
+      .update(users)
+      .set({ lastSignedIn: new Date(), name: data.name })
+      .where(eq(users.id, existing.id));
+    return existing;
+  }
+
+  // Check if user exists by email (link accounts)
+  const byEmail = await getUserByEmail(data.email);
+  if (byEmail) {
+    await db
+      .update(users)
+      .set({ googleId: data.googleId, lastSignedIn: new Date() })
+      .where(eq(users.id, byEmail.id));
+    return byEmail;
+  }
+
+  // Create new user
+  await db.insert(users).values({
+    googleId: data.googleId,
+    name: data.name,
+    email: data.email.toLowerCase(),
+    loginMethod: "google",
+    role: "user",
+    lastSignedIn: new Date(),
+  });
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, data.email.toLowerCase()))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+// ─── Password reset helpers ───────────────────────────────────────────────────
+
+export async function createPasswordResetToken(userId: number, token: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  await db.insert(passwordResetTokens).values({ userId, token, expiresAt });
+}
+
+export async function getValidPasswordResetToken(token: string): Promise<PasswordResetToken | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const now = new Date();
+  const rows = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(
+      and(
+        eq(passwordResetTokens.token, token),
+        gt(passwordResetTokens.expiresAt, now),
+        isNull(passwordResetTokens.usedAt)
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function markPasswordResetTokenUsed(token: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(passwordResetTokens)
+    .set({ usedAt: new Date() })
+    .where(eq(passwordResetTokens.token, token));
+}
+
+export async function updateUserPassword(userId: number, passwordHash: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
 }
 
 // ─── Manual Trades ────────────────────────────────────────────────────────────

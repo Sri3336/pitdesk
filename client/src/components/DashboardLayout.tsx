@@ -21,7 +21,6 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   Activity,
@@ -47,7 +46,6 @@ import {
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
-import { Button } from "./ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 
 const SIDEBAR_WIDTH_KEY = "pitdesk-sidebar-width";
@@ -169,28 +167,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (loading) return <DashboardLayoutSkeleton />;
 
   if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-green-500 flex items-center justify-center shadow-lg">
-              <TrendingUp className="h-8 w-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-center">PitDesk</h1>
-            <p className="text-sm text-muted-foreground text-center">
-              Your personal trading intelligence platform. Sign in to access your dashboard.
-            </p>
-          </div>
-          <Button
-            onClick={() => { window.location.href = getLoginUrl(); }}
-            size="lg"
-            className="w-full bg-green-500 hover:bg-green-600 text-white shadow-lg"
-          >
-            Sign in to PitDesk
-          </Button>
-        </div>
-      </div>
-    );
+    // AuthGuard handles redirect; show skeleton while redirecting
+    return <DashboardLayoutSkeleton />;
   }
 
   const initials = user.name
