@@ -292,13 +292,15 @@ function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void
           </DialogTitle>
         </DialogHeader>
         <div className="px-5 pb-5">
-          <video
-            src="/manus-storage/velez_howto_final_6c15f5cc.mp4"
-            controls
-            autoPlay
-            className="w-full rounded-lg bg-slate-900"
-            style={{ maxHeight: "60vh" }}
-          />
+          <div className="relative w-full rounded-lg overflow-hidden bg-slate-900" style={{ aspectRatio: "16/9" }}>
+            <iframe
+              src="https://www.youtube.com/embed/6rSI7Ibws_o?autoplay=1&rel=0"
+              title="PitDesk: How to Use the Velez Scanner"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full border-0"
+            />
+          </div>
           <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
             <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
               <div className="font-semibold text-slate-700 mb-1">The Method</div>

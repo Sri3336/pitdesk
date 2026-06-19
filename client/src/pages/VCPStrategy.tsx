@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -291,13 +291,9 @@ function VCPRow({ item, tickerInfo }: { item: VCPBatchItem; tickerInfo?: TickerI
 // ─── VCP Explainer Video Section ────────────────────────────────────────────
 function VCPExplainerSection() {
   const [open, setOpen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   const handleToggle = () => {
-    setOpen(prev => {
-      if (prev && videoRef.current) videoRef.current.pause();
-      return !prev;
-    });
+    setOpen(prev => !prev);
   };
 
   return (
@@ -333,15 +329,15 @@ function VCPExplainerSection() {
 
         {open && (
           <div className="mt-4">
-            <video
-              ref={videoRef}
-              src="/manus-storage/vcp_howto_final_5bccba3e.mp4"
-              poster="https://d2xsxph8kpxj0f.cloudfront.net/118490340/4ziQjLcBuBgPL6xfwF5uaR/vcp_frame1_title_new-5XsDeweQJKLtG3yBpKBRoG.webp"
-              controls
-              autoPlay
-              className="w-full rounded-lg shadow-md max-h-[420px] bg-slate-900"
-              style={{ aspectRatio: "16/9" }}
-            />
+            <div className="relative w-full rounded-lg overflow-hidden bg-slate-900" style={{ aspectRatio: "16/9" }}>
+              <iframe
+                src="https://www.youtube.com/embed/MCxRAOXzUF4?autoplay=1&rel=0"
+                title="PitDesk: How to Use the VCP Strategy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="absolute inset-0 w-full h-full border-0"
+              />
+            </div>
             {/* Share button */}
             <div className="mt-2 flex justify-end">
               <button
