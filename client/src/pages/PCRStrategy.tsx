@@ -666,9 +666,13 @@ function ScanDetailTab() {
 
 // ─── Main Page — Signal Board ─────────────────────────────────────────────────
 // ─── How-To Video Modal ──────────────────────────────────────────────────────
+const PCR_YT_ID = "RH7NaNRD1L8";
 function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [playing, setPlaying] = useState(false);
+  // Reset to thumbnail when modal closes
+  const handleOpenChange = (v: boolean) => { if (!v) setPlaying(false); onClose(); };
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
         <DialogHeader className="px-5 pt-4 pb-2">
           <DialogTitle className="flex items-center gap-2 text-base">
@@ -677,14 +681,35 @@ function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void
           </DialogTitle>
         </DialogHeader>
         <div className="px-5 pb-5">
-          <div className="relative w-full rounded-lg overflow-hidden bg-slate-900" style={{ aspectRatio: "16/9" }}>
-            <iframe
-              src="https://www.youtube.com/embed/RH7NaNRD1L8?autoplay=1&rel=0"
-              title="PitDesk: How to Use the PCR Signal Board"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="absolute inset-0 w-full h-full border-0"
-            />
+          <div
+            className="relative w-full rounded-lg overflow-hidden bg-slate-900 cursor-pointer"
+            style={{ aspectRatio: "16/9" }}
+            onClick={() => !playing && setPlaying(true)}
+          >
+            {playing ? (
+              <iframe
+                src={`https://www.youtube.com/embed/${PCR_YT_ID}?autoplay=1&rel=0`}
+                title="PitDesk: How to Use the PCR Signal Board"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="absolute inset-0 w-full h-full border-0"
+              />
+            ) : (
+              <>
+                <img
+                  src={`https://img.youtube.com/vi/${PCR_YT_ID}/maxresdefault.jpg`}
+                  alt="PCR Strategy How-To thumbnail"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${PCR_YT_ID}/hqdefault.jpg`; }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-600/90 text-white shadow-lg hover:scale-105 transition-transform">
+                    <svg className="w-7 h-7 ml-1" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+                  </div>
+                </div>
+                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded font-medium">2:41</div>
+              </>
+            )}
           </div>
           <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
             <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
@@ -706,7 +731,7 @@ function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void
             <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
               <div className="font-semibold text-slate-700 mb-1">Workflow</div>
               <div className="space-y-1 text-muted-foreground">
-                <div>1. Run <span className="font-medium">11:30 Scan</span> intraday</div>
+                <div>1. Run <span className="font-medium">Intraday Scan</span> at 11:30 AM</div>
                 <div>2. Check Signal Board for setups</div>
                 <div>3. Confirm with RSI + price action</div>
               </div>
@@ -954,7 +979,7 @@ export default function PCRStrategy() {
                 disabled={triggerIntraday.isPending}
               >
                 <Play className="h-3.5 w-3.5 mr-1" />
-                {triggerIntraday.isPending ? "Scanning…" : "Run 11:30 Scan"}
+                {triggerIntraday.isPending ? "Scanning…" : "Intraday Scan"}
               </Button>
             </>
           )}
