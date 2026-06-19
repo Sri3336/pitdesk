@@ -1098,6 +1098,58 @@ const recommendationsRouter = router({
       await updateTrackedRecommendationNotes(input.id, ctx.user.id, input.notes);
       return { success: true };
     }),
+  add: protectedProcedure
+    .input(z.object({
+      ticker: z.string().min(1).max(10),
+      strategy: z.string().min(1).max(64),
+      entryDate: z.string(),
+      expiryDate: z.string(),
+      entryPrice: z.number().positive(),
+      netCredit: z.number(),
+      bpRequired: z.number().positive(),
+      maxProfit: z.number().optional(),
+      maxLoss: z.number().optional(),
+      compositeScore: z.number().min(0).max(100).default(50),
+      pop: z.number().min(0).max(1).default(0.5),
+      exitPrice: z.number().optional(),
+      actualPnl: z.number().optional(),
+      outcome: z.enum(["win", "loss", "breakeven"]).optional(),
+      notes: z.string().max(512).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const isResolved = input.outcome != null;
+      const dte = Math.max(0, Math.round(
+        (new Date(input.expiryDate).getTime() - new Date(input.entryDate).getTime()) / 86400000
+      ));
+      const pnlPct = input.actualPnl != null && input.bpRequired > 0
+        ? String((input.actualPnl / input.bpRequired) * 100)
+        : null;
+      await saveTrackedRecommendation({
+        userId: ctx.user.id,
+        ticker: input.ticker.toUpperCase(),
+        strategy: input.strategy,
+        targetDte: dte,
+        entryDate: new Date(input.entryDate),
+        expiryDate: new Date(input.expiryDate),
+        entryPrice: String(input.entryPrice),
+        netCredit: String(input.netCredit),
+        maxProfit: input.maxProfit != null ? String(input.maxProfit) : null,
+        maxLoss: input.maxLoss != null ? String(input.maxLoss) : null,
+        breakevens: "[]",
+        legsJson: "[]",
+        compositeScore: String(input.compositeScore),
+        pop: String(input.pop),
+        bpRequired: String(input.bpRequired),
+        status: isResolved ? "resolved" : "open",
+        exitPrice: input.exitPrice != null ? String(input.exitPrice) : null,
+        actualPnl: input.actualPnl != null ? String(input.actualPnl / 100) : null,
+        actualPnlPct: pnlPct,
+        outcome: input.outcome ?? null,
+        resolvedAt: isResolved ? new Date() : null,
+        notes: input.notes ?? null,
+      });
+      return { success: true };
+    }),
 });
 
 // ─── IVR Alerts Router ────────────────────────────────────────────────────────

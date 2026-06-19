@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -15,7 +17,7 @@ import {
 import { toast } from "sonner";
 import {
   TrendingUp, TrendingDown, Minus, Trash2, RefreshCw,
-  Download, Search, Filter, CheckSquare, Square, BarChart3,
+  Download, Search, BarChart3, Plus,
   Target, Clock, DollarSign, Percent, StickyNote, ChevronDown, ChevronUp, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -460,6 +462,132 @@ function RecRow({
   );
 }
 
+// ─── Log Trade Dialog ─────────────────────────────────────────────────────────
+
+const STRATEGIES = [
+  "Iron Condor", "Short Strangle", "Naked Put", "Naked Call",
+  "Bull Put Spread", "Bear Call Spread", "Bull Call Spread", "Bear Put Spread",
+  "Long Straddle", "Long Strangle", "Cash-Secured Put", "Covered Call", "Butterfly Spread",
+];
+
+function LogTradeDialog({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
+  const utils = trpc.useUtils();
+  const addMutation = trpc.recommendations.add.useMutation({
+    onSuccess: () => {
+      utils.recommendations.list.invalidate();
+      toast.success("Trade logged to Performance Tracker");
+      onSaved();
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const today = new Date().toISOString().split("T")[0];
+  const [ticker, setTicker] = useState("");
+  const [strategy, setStrategy] = useState(STRATEGIES[0]);
+  const [entryDate, setEntryDate] = useState(today);
+  const [expiryDate, setExpiryDate] = useState("");
+  const [entryPrice, setEntryPrice] = useState("");
+  const [netCredit, setNetCredit] = useState("");
+  const [bpRequired, setBpRequired] = useState("");
+  const [exitPrice, setExitPrice] = useState("");
+  const [actualPnl, setActualPnl] = useState("");
+  const [outcome, setOutcome] = useState<"" | "win" | "loss" | "breakeven">("win");
+  const [notes, setNotes] = useState("");
+
+  const handleSubmit = () => {
+    if (!ticker || !expiryDate || !entryPrice || !bpRequired) {
+      toast.error("Ticker, expiry date, entry price, and BP required are mandatory");
+      return;
+    }
+    addMutation.mutate({
+      ticker,
+      strategy,
+      entryDate,
+      expiryDate,
+      entryPrice: parseFloat(entryPrice),
+      netCredit: parseFloat(netCredit || "0"),
+      bpRequired: parseFloat(bpRequired),
+      exitPrice: exitPrice ? parseFloat(exitPrice) : undefined,
+      actualPnl: actualPnl ? parseFloat(actualPnl) : undefined,
+      outcome: outcome || undefined,
+      notes: notes || undefined,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Log Trade Manually</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3 py-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Ticker *</Label>
+            <Input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} placeholder="AAPL" className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Strategy *</Label>
+            <Select value={strategy} onValueChange={setStrategy}>
+              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>{STRATEGIES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Entry Date *</Label>
+            <Input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Expiry Date *</Label>
+            <Input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Entry Price (per share) *</Label>
+            <Input type="number" step="0.01" value={entryPrice} onChange={e => setEntryPrice(e.target.value)} placeholder="2.50" className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Net Credit (per share)</Label>
+            <Input type="number" step="0.01" value={netCredit} onChange={e => setNetCredit(e.target.value)} placeholder="1.80" className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">BP Required ($) *</Label>
+            <Input type="number" step="1" value={bpRequired} onChange={e => setBpRequired(e.target.value)} placeholder="5000" className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Outcome</Label>
+            <Select value={outcome} onValueChange={(v: any) => setOutcome(v)}>
+              <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Still open" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="win">Win</SelectItem>
+                <SelectItem value="loss">Loss</SelectItem>
+                <SelectItem value="breakeven">Breakeven</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Exit Price (per share)</Label>
+            <Input type="number" step="0.01" value={exitPrice} onChange={e => setExitPrice(e.target.value)} placeholder="0.20" className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Actual P&L ($, total)</Label>
+            <Input type="number" step="1" value={actualPnl} onChange={e => setActualPnl(e.target.value)} placeholder="160" className="h-8 text-sm" />
+          </div>
+          <div className="col-span-2 space-y-1">
+            <Label className="text-xs">Notes</Label>
+            <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Setup notes, lessons learned..." className="text-sm h-16 resize-none" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={handleSubmit} disabled={addMutation.isPending}>
+            {addMutation.isPending ? "Saving..." : "Log Trade"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Performance() {
@@ -493,6 +621,7 @@ export default function Performance() {
   });
 
   const [selected, setSelected] = useState<number[]>([]);
+  const [showLogDialog, setShowLogDialog] = useState(false);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "open" | "resolved" | "expired">("all");
   const [filterStrategy, setFilterStrategy] = useState("all");
@@ -620,6 +749,10 @@ export default function Performance() {
           <p className="text-sm text-slate-500 mt-0.5">{isAdmin ? "All users' tracked recommendations and outcomes." : "Track every recommendation against actual market outcomes"}</p>
         </div>
         <div className="flex gap-2">
+          <Button size="sm" onClick={() => setShowLogDialog(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Plus className="w-4 h-4 mr-1.5" />
+            Log Trade
+          </Button>
           <Button variant="outline" size="sm" onClick={resolveAllOpen} disabled={resolveMutation.isPending}>
             <RefreshCw className={`w-4 h-4 mr-1.5 ${resolveMutation.isPending ? "animate-spin" : ""}`} />
             Resolve All Open
@@ -630,6 +763,13 @@ export default function Performance() {
           </Button>
         </div>
       </div>
+
+      {/* Log Trade Dialog */}
+      <LogTradeDialog
+        open={showLogDialog}
+        onClose={() => setShowLogDialog(false)}
+        onSaved={() => utils.recommendations.list.invalidate()}
+      />
 
       {/* Stats */}
       {!isLoading && (recs as Rec[]).length > 0 && <StatsSummary recs={recs as Rec[]} />}

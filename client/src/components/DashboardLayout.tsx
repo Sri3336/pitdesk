@@ -30,10 +30,12 @@ import {
   BarChart2,
   Bell,
   BookOpen,
+  Building2,
   CandlestickChart,
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  Database,
   GitMerge,
   HelpCircle,
   Home,
@@ -88,6 +90,12 @@ const executionItems = [
   { icon: Zap, label: "AI Agent", path: "/agent" },
   { icon: ClipboardList, label: "Trade Log", path: "/trade-log" },
   { icon: BarChart2, label: "Performance", path: "/performance" },
+  { icon: BookOpen, label: "Trade Proposals", path: "/trade-proposals" },
+];
+
+const dataItems = [
+  { icon: Database, label: "COT Dashboard", path: "/cot-dashboard" },
+  { icon: Building2, label: "Broker Settings", path: "/broker-settings" },
 ];
 
 const referenceItems = [
@@ -229,6 +237,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <SidebarGroupLabel>Execution</SidebarGroupLabel>
             <SidebarGroupContent>
               <NavGroup items={executionItems} />
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          {/* DATA */}
+          <SidebarGroup>
+            <SidebarGroupLabel>Data &amp; Settings</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <NavGroup items={dataItems} />
             </SidebarGroupContent>
           </SidebarGroup>
 
