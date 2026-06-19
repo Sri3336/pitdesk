@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +35,12 @@ import {
   Zap,
   Bell,
   History,
+  BarChart2,
+  SlidersHorizontal,
+  RotateCcw,
+  Save,
 } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { INTRADAY_TICKER_SYMBOLS } from "@shared/intradayTickers";
 
@@ -313,15 +318,311 @@ function ResultsTable({
   );
 }
 
+// ─── Backtest Stats Panel ───────────────────────────────────────────────────────
+
+function BacktestStatsPanel() {
+  const { data, isLoading } = trpc.intraday.getBacktestStats.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <Skeleton key={i} className="h-32 w-full rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  const byGrade = (data?.byGrade ?? []) as any[];
+  const byDirection = (data?.byDirection ?? []) as any[];
+
+  if (byGrade.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <BarChart2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 font-medium">No backtest data yet</p>
+          <p className="text-sm text-gray-400 mt-1">
+            Record trade outcomes after scans to build backtest statistics.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* By Grade */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-green-600" />
+            Win Rate by Grade
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead>Grade</TableHead>
+                <TableHead className="text-right">Trades</TableHead>
+                <TableHead className="text-right">Wins</TableHead>
+                <TableHead className="text-right">Losses</TableHead>
+                <TableHead className="text-right">Win Rate</TableHead>
+                <TableHead className="text-right">Avg P&L %</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {byGrade.map((row: any) => {
+                const total = Number(row.total) || 0;
+                const wins = Number(row.wins) || 0;
+                const losses = Number(row.losses) || 0;
+                const winRate = total > 0 ? (wins / total) * 100 : 0;
+                const avgPnl = Number(row.avgPnlPct) || 0;
+                return (
+                  <TableRow key={row.grade}>
+                    <TableCell>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
+                        row.grade === 'A' ? 'bg-green-100 text-green-800 border-green-300' :
+                        row.grade === 'B' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                        row.grade === 'C' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                        'bg-red-100 text-red-800 border-red-300'
+                      }`}>{row.grade}</span>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">{total}</TableCell>
+                    <TableCell className="text-right font-mono text-green-700">{wins}</TableCell>
+                    <TableCell className="text-right font-mono text-red-600">{losses}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      <span className={winRate >= 60 ? 'text-green-700 font-semibold' : winRate >= 40 ? 'text-yellow-700' : 'text-red-600'}>
+                        {winRate.toFixed(1)}%
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      <span className={avgPnl >= 0 ? 'text-green-700' : 'text-red-600'}>
+                        {avgPnl >= 0 ? '+' : ''}{avgPnl.toFixed(2)}%
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* By Direction */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Activity className="w-4 h-4 text-blue-600" />
+            Win Rate by Direction
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead>Direction</TableHead>
+                <TableHead className="text-right">Trades</TableHead>
+                <TableHead className="text-right">Wins</TableHead>
+                <TableHead className="text-right">Win Rate</TableHead>
+                <TableHead className="text-right">Avg P&L %</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {byDirection.map((row: any) => {
+                const total = Number(row.total) || 0;
+                const wins = Number(row.wins) || 0;
+                const winRate = total > 0 ? (wins / total) * 100 : 0;
+                const avgPnl = Number(row.avgPnlPct) || 0;
+                return (
+                  <TableRow key={row.direction}>
+                    <TableCell className="capitalize">
+                      {row.direction === 'bullish' ? <span className="flex items-center gap-1 text-green-700"><TrendingUp className="w-3.5 h-3.5" /> Bullish</span> :
+                       row.direction === 'bearish' ? <span className="flex items-center gap-1 text-red-600"><TrendingDown className="w-3.5 h-3.5" /> Bearish</span> :
+                       <span className="flex items-center gap-1 text-gray-500"><Minus className="w-3.5 h-3.5" /> Neutral</span>}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">{total}</TableCell>
+                    <TableCell className="text-right font-mono text-green-700">{wins}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      <span className={winRate >= 60 ? 'text-green-700 font-semibold' : winRate >= 40 ? 'text-yellow-700' : 'text-red-600'}>
+                        {winRate.toFixed(1)}%
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      <span className={avgPnl >= 0 ? 'text-green-700' : 'text-red-600'}>
+                        {avgPnl >= 0 ? '+' : ''}{avgPnl.toFixed(2)}%
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Weight Sliders Panel ─────────────────────────────────────────────────────
+
+const CRITERIA_META: { name: string; description: string }[] = [
+  { name: "Daily Trend", description: "Price above/below 20-day SMA" },
+  { name: "EMA Stack 15m", description: "9 EMA > 20 EMA > 50 EMA on 15-min chart" },
+  { name: "VWAP", description: "Price above VWAP" },
+  { name: "RVOL", description: "Relative volume > 1.5x average" },
+  { name: "RSI", description: "RSI 14 between 40–70 (bullish) or 30–60 (bearish)" },
+  { name: "Price Structure", description: "Higher highs/lows (bullish) or lower highs/lows (bearish)" },
+  { name: "Entry Quality", description: "Within 0.5% of key level (Fib, VWAP, EMA)" },
+  { name: "Candle Confirm", description: "Bullish/bearish engulfing or pin bar on 5-min" },
+  { name: "ATR Expansion", description: "Current ATR > 1.2x 10-day average ATR" },
+];
+
+function WeightSlidersPanel() {
+  const utils = trpc.useUtils();
+  const { data: weights, isLoading } = trpc.intraday.getWeights.useQuery(undefined, {
+    staleTime: 60 * 1000,
+  });
+  const [localWeights, setLocalWeights] = useState<Record<string, number>>({});
+  const [dirty, setDirty] = useState(false);
+
+  // Sync from server on load
+  const prevWeightsRef = useRef<Record<string, number> | null>(null);
+  useEffect(() => {
+    if (weights && prevWeightsRef.current !== weights) {
+      prevWeightsRef.current = weights;
+      setLocalWeights({ ...(weights as Record<string, number>) });
+      setDirty(false);
+    }
+  }, [weights]);
+
+  const updateWeights = trpc.intraday.updateWeights.useMutation({
+    onSuccess: () => {
+      toast.success("Weights saved");
+      setDirty(false);
+      void utils.intraday.getWeights.invalidate();
+    },
+    onError: (err) => toast.error("Save failed", { description: err.message }),
+  });
+
+  function handleSlider(name: string, val: number[]) {
+    setLocalWeights((prev) => ({ ...prev, [name]: val[0] }));
+    setDirty(true);
+  }
+
+  function handleReset() {
+    if (weights) {
+      setLocalWeights({ ...(weights as Record<string, number>) });
+      setDirty(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Skeleton key={i} className="h-16 w-full rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-green-600" />
+            Criteria Weights
+          </CardTitle>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              disabled={!dirty}
+              className="gap-1.5 h-7 text-xs"
+            >
+              <RotateCcw className="w-3 h-3" /> Reset
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => updateWeights.mutate(localWeights)}
+              disabled={!dirty || updateWeights.isPending}
+              className="gap-1.5 h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Save className="w-3 h-3" /> Save Weights
+            </Button>
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Adjust how much each criterion contributes to the final score. Range: 0.1 (minimal) to 5.0 (critical).
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {CRITERIA_META.map(({ name, description }) => {
+          const val = localWeights[name] ?? 1.0;
+          return (
+            <div key={name}>
+              <div className="flex items-center justify-between mb-1.5">
+                <div>
+                  <span className="text-sm font-semibold text-gray-800">{name}</span>
+                  <span className="text-xs text-gray-400 ml-2">{description}</span>
+                </div>
+                <span className="text-sm font-mono font-bold text-green-700 w-10 text-right">
+                  {val.toFixed(1)}x
+                </span>
+              </div>
+              <Slider
+                min={0.1}
+                max={5}
+                step={0.1}
+                value={[val]}
+                onValueChange={(v) => handleSlider(name, v)}
+                className="w-full"
+              />
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Scan History Panel ───────────────────────────────────────────────────────
 
 function ScanHistoryPanel() {
-  const { data, isLoading, refetch } = trpc.intraday.getScanHistory.useQuery(
-    { limit: 8 },
-    { staleTime: 2 * 60 * 1000 }
-  );
+  // getHistory requires a ticker — use a batch-level history approach via getLatestScans
+  // For the history tab, we use getLatestScans and group by scannedAt
+  const { data: historyRaw, isLoading, refetch } = trpc.intraday.getLatestScans.useQuery(undefined, {
+    staleTime: 2 * 60 * 1000,
+  });
 
-  const batches = (data?.batches ?? []) as ScanBatch[];
+  // Build synthetic batches from the raw data (group by scannedAt rounded to minute)
+  const batches: ScanBatch[] = (() => {
+    if (!historyRaw || historyRaw.length === 0) return [];
+    const batchMap = new Map<string, { scannedAt: number; rows: any[] }>();
+    for (const r of historyRaw as any[]) {
+      const ts = new Date(r.scannedAt);
+      const key = `${ts.getFullYear()}-${ts.getMonth()}-${ts.getDate()}-${ts.getHours()}-${Math.floor(ts.getMinutes() / 15)}`;
+      if (!batchMap.has(key)) batchMap.set(key, { scannedAt: ts.getTime(), rows: [] });
+      batchMap.get(key)!.rows.push(r);
+    }
+    return Array.from(batchMap.values()).slice(0, 8).map(({ scannedAt, rows }) => {
+      const gradeCounts = { A: 0, B: 0, C: 0, D: 0 };
+      for (const r of rows) {
+        const g = r.grade as keyof typeof gradeCounts;
+        if (g in gradeCounts) gradeCounts[g]++;
+      }
+      const topA = rows
+        .filter((r: any) => r.grade === "A")
+        .map((r: any) => ({ ticker: r.ticker, score: parseFloat(r.weightedScore ?? "0"), direction: r.direction }));
+      return { scannedAt, total: rows.length, gradeCounts, topA };
+    });
+  })();
 
   if (isLoading) {
     return (
@@ -435,25 +736,53 @@ export default function IntradayScanner() {
   const utils = trpc.useUtils();
 
   // Last scheduled scan from DB
-  const { data: lastScan, isFetching: lastScanLoading, refetch: refetchLastScan } = trpc.intraday.getLastScan.useQuery(undefined, {
+  const { data: lastScanRaw, isFetching: lastScanLoading, refetch: refetchLastScan } = trpc.intraday.getLatestScans.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
   });
+  // Normalize getLatestScans output to match the shape IntradayScorecard expects
+  const lastScan = lastScanRaw ? {
+    results: lastScanRaw.map((r: any) => ({
+      ticker: r.ticker,
+      score: parseFloat(r.weightedScore ?? "0"),
+      grade: r.grade,
+      direction: r.direction,
+      criteria: r.criteria ?? {},
+      currentPrice: parseFloat(r.price ?? "0"),
+      vwap: parseFloat(r.vwap ?? "0"),
+      atr: parseFloat(r.atr ?? "0"),
+      maxScore: parseFloat(r.maxScore ?? "11"),
+      error: null,
+    })),
+    scannedAt: lastScanRaw[0] ? new Date(lastScanRaw[0].scannedAt).getTime() : null,
+  } : null;
 
   // On-demand full scan mutation
-  const runScan = trpc.intraday.runFullScan.useMutation({
+  const runScan = trpc.intraday.runScan.useMutation({
     onSuccess: (data) => {
-      setLiveResults(data.results as IntradayScorecard[]);
-      setLiveScannedAt(data.scannedAt);
-      void utils.intraday.getLastScan.invalidate();
-      void utils.intraday.getScanHistory.invalidate();
-      const gradeA = data.gradeA;
+      const normalized = data.results.map((r: any) => ({
+        ticker: r.ticker,
+        score: r.score,
+        grade: r.grade,
+        direction: r.direction,
+        criteria: {},
+        currentPrice: 0,
+        vwap: 0,
+        atr: 0,
+        maxScore: 11,
+        error: null,
+      }));
+      setLiveResults(normalized as any as IntradayScorecard[]);
+      setLiveScannedAt(Date.now());
+      void utils.intraday.getLatestScans.invalidate();
+      void utils.intraday.getLatestScans.invalidate();
+      const gradeA = data.results.filter((r: any) => r.grade === "A").length;
       if (gradeA > 0) {
         toast.success(`Scan complete — ${gradeA} Grade A signal${gradeA > 1 ? "s" : ""} found!`, {
-          description: `${data.total} tickers scanned`,
+          description: `${data.scanned} tickers scanned`,
         });
       } else {
         toast.info(`Scan complete — no Grade A signals`, {
-          description: `${data.total} tickers scanned · Best grades: B/C`,
+          description: `${data.scanned} tickers scanned · Best grades: B/C`,
         });
       }
     },
@@ -463,7 +792,7 @@ export default function IntradayScanner() {
   });
 
   // Single ticker score
-  const { data: singleData, isFetching: singleLoading, refetch: refetchSingle } = trpc.intraday.score.useQuery(
+  const { data: singleData, isFetching: singleLoading, refetch: refetchSingle } = trpc.intraday.getScanResult.useQuery(
     { ticker: singleTicker.toUpperCase() },
     { enabled: singleEnabled && singleTicker.length >= 1, staleTime: 60 * 1000 }
   );
@@ -513,7 +842,7 @@ export default function IntradayScanner() {
           </Button>
           <Button
             size="sm"
-            onClick={() => runScan.mutate()}
+            onClick={() => runScan.mutate({})}
             disabled={runScan.isPending}
             className="gap-1.5 bg-green-600 hover:bg-green-700 text-white"
           >
@@ -534,7 +863,7 @@ export default function IntradayScanner() {
         </div>
       </div>
 
-      {/* Tabs: Scanner / History */}
+      {/* Tabs: Scanner / History / Backtest / Weights */}
       <Tabs defaultValue="scanner">
         <TabsList className="mb-4">
           <TabsTrigger value="scanner" className="gap-1.5">
@@ -543,11 +872,27 @@ export default function IntradayScanner() {
           <TabsTrigger value="history" className="gap-1.5">
             <History className="w-3.5 h-3.5" /> History
           </TabsTrigger>
+          <TabsTrigger value="backtest" className="gap-1.5">
+            <BarChart2 className="w-3.5 h-3.5" /> Backtest Stats
+          </TabsTrigger>
+          <TabsTrigger value="weights" className="gap-1.5">
+            <SlidersHorizontal className="w-3.5 h-3.5" /> Weight Tuning
+          </TabsTrigger>
         </TabsList>
 
         {/* ── History Tab ── */}
         <TabsContent value="history" className="mt-0">
           <ScanHistoryPanel />
+        </TabsContent>
+
+        {/* ── Backtest Stats Tab ── */}
+        <TabsContent value="backtest" className="mt-0">
+          <BacktestStatsPanel />
+        </TabsContent>
+
+        {/* ── Weight Tuning Tab ── */}
+        <TabsContent value="weights" className="mt-0">
+          <WeightSlidersPanel />
         </TabsContent>
 
         {/* ── Scanner Tab ── */}
@@ -686,7 +1031,7 @@ export default function IntradayScanner() {
                   or wait for the auto-scan at the next 15-min mark during market hours.
                 </p>
                 <Button
-                  onClick={() => runScan.mutate()}
+                  onClick={() => runScan.mutate({})}
                   disabled={runScan.isPending}
                   className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
                 >

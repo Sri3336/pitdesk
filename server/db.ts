@@ -1,16 +1,33 @@
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
+  AnalysisRun,
+  CriteriaWeight,
   FibEmaAlert,
+  InsertAnalysisRun,
   InsertFibEmaAlert,
   InsertManualTrade,
+  InsertPcrAlertSetting,
+  InsertPcrOiSnapshot,
+  InsertPcrScheduledResult,
+  InsertScanOutcome,
   InsertUser,
   ManualTrade,
   PasswordResetToken,
+  PcrAlertSetting,
+  PcrOiSnapshot,
+  PcrScheduledResult,
+  ScanOutcome,
+  analysisRuns,
+  criteriaWeights,
   fibEmaAlertHistory,
   fibEmaAlerts,
   manualTrades,
   passwordResetTokens,
+  pcrAlertSettings,
+  pcrOiSnapshots,
+  pcrScheduledResults,
+  scanOutcomes,
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -361,4 +378,158 @@ export async function insertFibEmaAlertHistory(entry: {
     fibPrice: String(entry.fibPrice),
     emaPrice: String(entry.emaPrice),
   });
+}
+
+// ─── Analysis Runs ───────────────────────────────────────────────────────────
+
+export async function saveAnalysisRun(data: Omit<InsertAnalysisRun, "id" | "createdAt">): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const [result] = await db.insert(analysisRuns).values(data);
+  return (result as any).insertId as number;
+}
+
+export async function getAnalysisRunsByUser(userId: number, limit = 50): Promise<AnalysisRun[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(analysisRuns)
+    .where(eq(analysisRuns.userId, userId))
+    .orderBy(desc(analysisRuns.createdAt))
+    .limit(limit);
+}
+
+export async function deleteAnalysisRun(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(analysisRuns).where(and(eq(analysisRuns.id, id), eq(analysisRuns.userId, userId)));
+}
+
+// ─── PCR OI Snapshots ────────────────────────────────────────────────────────
+
+export async function savePcrOiSnapshot(data: Omit<InsertPcrOiSnapshot, "id" | "createdAt">): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(pcrOiSnapshots).values(data);
+}
+
+export async function getLatestPcrOiSnapshot(ticker: string): Promise<PcrOiSnapshot | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(pcrOiSnapshots)
+    .where(eq(pcrOiSnapshots.ticker, ticker))
+    .orderBy(desc(pcrOiSnapshots.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getAllLatestPcrSnapshots(): Promise<PcrOiSnapshot[]> {
+  const db = await getDb();
+  if (!db) return [];
+  // Get the most recent snapshot per ticker
+  return db.select().from(pcrOiSnapshots)
+    .orderBy(desc(pcrOiSnapshots.createdAt))
+    .limit(200);
+}
+
+// ─── PCR Scheduled Results ───────────────────────────────────────────────────
+
+export async function savePcrScheduledResult(data: InsertPcrScheduledResult): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(pcrScheduledResults).values(data);
+}
+
+export async function getLatestPcrResults(limit = 120): Promise<PcrScheduledResult[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pcrScheduledResults)
+    .orderBy(desc(pcrScheduledResults.createdAt))
+    .limit(limit);
+}
+
+// ─── PCR Alert Settings ──────────────────────────────────────────────────────
+
+export async function getPcrAlertSettings(userId: number): Promise<PcrAlertSetting[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pcrAlertSettings).where(eq(pcrAlertSettings.userId, userId));
+}
+
+export async function upsertPcrAlertSetting(data: InsertPcrAlertSetting): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(pcrAlertSettings).values(data);
+}
+
+export async function deletePcrAlertSetting(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(pcrAlertSettings).where(and(eq(pcrAlertSettings.id, id), eq(pcrAlertSettings.userId, userId)));
+}
+
+// ─── Scan Outcomes (self-learning) ───────────────────────────────────────────
+
+export async function insertScanOutcome(data: InsertScanOutcome): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(scanOutcomes).values(data);
+}
+
+export async function getScanOutcomes(limit = 500): Promise<ScanOutcome[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(scanOutcomes).orderBy(desc(scanOutcomes.createdAt)).limit(limit);
+}
+
+export async function resolveScanOutcome(id: number, exitPrice: number, outcome: "win" | "loss" | "neutral", pnlPct: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(scanOutcomes).set({
+    exitPrice: String(exitPrice),
+    outcome,
+    pnlPct: String(pnlPct),
+    evaluatedAt: new Date(),
+  }).where(eq(scanOutcomes.id, id));
+}
+
+// ─── Criteria Weights ────────────────────────────────────────────────────────
+
+const DEFAULT_WEIGHTS: Record<string, number> = {
+  "Daily Trend": 1.5,
+  "EMA Stack 15m": 1.5,
+  "VWAP": 1.0,
+  "RVOL": 1.5,
+  "RSI": 1.0,
+  "Price Structure": 1.0,
+  "Entry Quality": 1.0,
+  "Candle Confirm": 1.5,
+  "ATR Expansion": 1.0,
+};
+
+export async function getCriteriaWeights(userId: number): Promise<Record<string, number>> {
+  const db = await getDb();
+  if (!db) return DEFAULT_WEIGHTS;
+  const rows = await db.select().from(criteriaWeights).where(eq(criteriaWeights.userId, userId));
+  if (rows.length === 0) return DEFAULT_WEIGHTS;
+  const result: Record<string, number> = { ...DEFAULT_WEIGHTS };
+  for (const row of rows) {
+    result[row.criterionName] = parseFloat(row.weight);
+  }
+  return result;
+}
+
+export async function updateCriteriaWeight(userId: number, criterionName: string, weight: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  // Upsert: delete existing then insert
+  await db.delete(criteriaWeights).where(
+    and(eq(criteriaWeights.userId, userId), eq(criteriaWeights.criterionName, criterionName))
+  );
+  await db.insert(criteriaWeights).values({ userId, criterionName, weight: String(weight) });
+}
+
+export async function resetCriteriaWeights(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(criteriaWeights).where(eq(criteriaWeights.userId, userId));
 }

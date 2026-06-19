@@ -1,6 +1,10 @@
 import { TRPCError } from "@trpc/server";
 import { runIntradayScan, scoreIntradayTicker } from "./intradayScanner";
-
+import { intradayScannerRouter } from "./routers/intradayScanner";
+import { runAnalysis } from "./analysisEngine";
+import type { PriceBar, OptionLeg, EarningsInfo } from "./analysisEngine";
+import { generateExcelReport } from "./excelExport";
+import { fetchEventImpact } from "./eventImpact";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
@@ -26,12 +30,19 @@ import {
   insertManualTrade,
   listAllUsers,
   markPasswordResetTokenUsed,
+  saveAnalysisRun,
+  getAnalysisRunsByUser,
+  deleteAnalysisRun,
   updateLastSignedIn,
   updateTradeNotes,
   updateUserPassword,
   updateUserProfile,
   updateUserRole,
   upsertFibEmaAlert,
+  getCriteriaWeights,
+  updateCriteriaWeight,
+  resetCriteriaWeights,
+  getScanOutcomes,
 } from "./db";
 import { getGoogleAuthUrl } from "./_core/googleAuth";
 import { sendEmail, buildFibEmaAlertEmail } from "./email";
@@ -44,6 +55,24 @@ import {
   calcAllEmas,
 } from "./fibEngine";
 import { runVelezDailyScanner, runVelezIntradayScanner } from "./velezScanner";
+import {
+  getLatestScheduledResults,
+  getLatestOiSnapshots,
+  runEodSnapshot,
+  runIntradayScan as runPcrIntradayScan,
+  countSnapshotDays,
+  getMissingTickers,
+  runEodSnapshotForTickers,
+  getEodHistory,
+  getHistoricalResults,
+  getPCRHistoryForTicker,
+  getBiggestMovers,
+  getScanRunDates,
+  getScanRunDetail,
+  getDailyLandingTable,
+  savePCRRecommendation,
+  getPCRSavedRecommendations,
+} from "./pcrScheduler";
 import { notifyOwner } from "./_core/notification";
 import { callDataApi } from "./_core/dataApi";
 import { getDb } from "./db";
@@ -52,6 +81,182 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import type { CriterionResult } from "./intradayScanner";
 
 const OWNER_EMAIL = "akulasridhar@gmail.com";
+
+// ─── Analysis Engine Helpers ──────────────────────────────────────────────────
+
+async function fetchPriceHistory(symbol: string): Promise<PriceBar[]> {
+  const res: any = await callDataApi("YahooFinance/get_stock_chart", {
+    query: {
+      symbol,
+      region: "US",
+      interval: "1d",
+      range: "1y",
+      includeAdjustedClose: "true",
+    },
+  });
+  const result = res?.chart?.result?.[0];
+  if (!result) throw new Error(`No price data for ${symbol}`);
+  const { timestamp, indicators } = result;
+  const quote = indicators.quote[0];
+  const bars: PriceBar[] = [];
+  for (let i = 0; i < timestamp.length; i++) {
+    if (!quote.close[i]) continue;
+    const d = new Date(timestamp[i] * 1000);
+    bars.push({
+      date: d.toISOString().split("T")[0],
+      open: quote.open[i] ?? quote.close[i],
+      high: quote.high[i] ?? quote.close[i],
+      low: quote.low[i] ?? quote.close[i],
+      close: quote.close[i],
+      volume: quote.volume[i] ?? 0,
+    });
+  }
+  return bars;
+}
+
+function buildSyntheticOptionChain(
+  lastPrice: number,
+  rv20: number,
+  targetDte: number,
+  meta: { fiftyTwoWeekHigh: number; fiftyTwoWeekLow: number }
+): OptionLeg[] {
+  const r = 0.045;
+  const dte = Math.max(targetDte, 1);
+  const T = dte / 365;
+  const atmIV = rv20 * 1.2;
+  const erf = (x: number) => {
+    const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+    const sign = x<0?-1:1; const ax=Math.abs(x);
+    const t=1/(1+p*ax);
+    return sign*(1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-ax*ax));
+  };
+  const normCdf = (x: number) => 0.5*(1+erf(x/Math.SQRT2));
+  const normPdf = (x: number) => Math.exp(-0.5*x*x)/Math.sqrt(2*Math.PI);
+  const bsPrice = (S: number, K: number, sigma: number, type: "call"|"put") => {
+    if (T<=0) return Math.max(0, type==="call"?S-K:K-S);
+    const sqrtT=Math.sqrt(T);
+    const d1=(Math.log(S/K)+(r+0.5*sigma*sigma)*T)/(sigma*sqrtT);
+    const d2=d1-sigma*sqrtT;
+    if (type==="call") return S*normCdf(d1)-K*Math.exp(-r*T)*normCdf(d2);
+    return K*Math.exp(-r*T)*normCdf(-d2)-S*normCdf(-d1);
+  };
+  const bsGreeks = (S: number, K: number, sigma: number, type: "call"|"put") => {
+    if (T<=0) return { delta: type==="call"?(S>K?1:0):(S<K?-1:0), gamma:0, theta:0, vega:0, rho:0 };
+    const sqrtT=Math.sqrt(T);
+    const d1=(Math.log(S/K)+(r+0.5*sigma*sigma)*T)/(sigma*sqrtT);
+    const d2=d1-sigma*sqrtT;
+    const nd1=normPdf(d1);
+    const Nd2=normCdf(d2);
+    const delta = type==="call"?normCdf(d1):normCdf(d1)-1;
+    const gamma = nd1/(S*sigma*sqrtT);
+    const theta = (-(S*nd1*sigma)/(2*sqrtT)-r*K*Math.exp(-r*T)*(type==="call"?Nd2:normCdf(-d2)))/365;
+    const vega = S*nd1*sqrtT/100;
+    const rho = type==="call"
+      ? K*T*Math.exp(-r*T)*Nd2/100
+      : -K*T*Math.exp(-r*T)*normCdf(-d2)/100;
+    return { delta, gamma, theta, vega, rho };
+  };
+  const legs: OptionLeg[] = [];
+  const sqrtT = Math.sqrt(T);
+  const d1_20delta = 0.842;
+  const lnSK_20d = d1_20delta * atmIV * sqrtT - (r + 0.5 * atmIV * atmIV) * T;
+  const requiredHalfRange = lastPrice * (Math.exp(Math.abs(lnSK_20d)) - 1) * 1.6;
+  const strikeStep = Math.max(0.5, lastPrice * 0.005);
+  const numStrikes = Math.max(60, Math.ceil(requiredHalfRange / strikeStep) + 5);
+  for (let i = -numStrikes; i <= numStrikes; i++) {
+    const K = Math.round((lastPrice + i * strikeStep) * 100) / 100;
+    if (K <= 0) continue;
+    const moneyness = Math.log(K / lastPrice);
+    const skew = moneyness < 0 ? -moneyness * 0.3 : moneyness * 0.1;
+    const iv = Math.max(0.05, atmIV + skew);
+    for (const type of ["call", "put"] as const) {
+      const mid = bsPrice(lastPrice, K, iv, type);
+      const spread = Math.max(0.01, mid * 0.04);
+      const bid = Math.max(0.01, mid - spread / 2);
+      const ask = mid + spread / 2;
+      const greeks = bsGreeks(lastPrice, K, iv, type);
+      const oi = Math.round(Math.max(100, 5000 * Math.exp(-Math.abs(moneyness) * 10)));
+      legs.push({
+        strike: K,
+        expiry: new Date(Date.now() + dte * 86400000).toISOString().split("T")[0],
+        type,
+        bid: Math.round(bid * 100) / 100,
+        ask: Math.round(ask * 100) / 100,
+        mid: Math.round(mid * 100) / 100,
+        iv,
+        delta: Math.round(greeks.delta * 10000) / 10000,
+        gamma: Math.round(greeks.gamma * 10000) / 10000,
+        theta: Math.round(greeks.theta * 10000) / 10000,
+        vega: Math.round(greeks.vega * 10000) / 10000,
+        rho: Math.round(greeks.rho * 10000) / 10000,
+        openInterest: oi,
+        volume: Math.round(oi * 0.1),
+        dte,
+      });
+    }
+  }
+  return legs;
+}
+
+async function fetchOptionChain(symbol: string, targetDte: number, priceHistory: PriceBar[]): Promise<OptionLeg[]> {
+  const closes = priceHistory.map(b => b.close);
+  const n = Math.min(20, closes.length - 1);
+  let sumSq = 0;
+  for (let i = closes.length - n; i < closes.length; i++) {
+    const ret = Math.log(closes[i] / closes[i - 1]);
+    sumSq += ret * ret;
+  }
+  const rv20 = Math.sqrt((sumSq / n) * 252);
+  const lastPrice = closes[closes.length - 1];
+  const hi52 = Math.max(...closes);
+  const lo52 = Math.min(...closes);
+  return buildSyntheticOptionChain(lastPrice, rv20, targetDte, { fiftyTwoWeekHigh: hi52, fiftyTwoWeekLow: lo52 });
+}
+
+async function fetchEarningsInfo(symbol: string, priceHistory: PriceBar[], medianIV: number): Promise<EarningsInfo | null> {
+  try {
+    const res: any = await callDataApi("YahooFinance/get_stock_chart", {
+      query: { symbol, region: "US", interval: "1d", range: "2y", includeAdjustedClose: "true", events: "earnings" },
+    });
+    const result = res?.chart?.result?.[0];
+    const earningsEvents = result?.events?.earnings;
+    if (!earningsEvents) return null;
+    const now = Date.now() / 1000;
+    const futureEarnings = Object.values(earningsEvents as Record<string, any>)
+      .filter((e: any) => e.date > now)
+      .sort((a: any, b: any) => a.date - b.date);
+    if (futureEarnings.length === 0) return null;
+    const nextEarnings = futureEarnings[0] as any;
+    const nextEarningsDate = new Date(nextEarnings.date * 1000).toISOString().split("T")[0];
+    const daysToEarnings = Math.ceil((nextEarnings.date - now) / 86400);
+    const closes = priceHistory.map(b => b.close);
+    const pastEarnings = Object.values(earningsEvents as Record<string, any>)
+      .filter((e: any) => e.date < now)
+      .sort((a: any, b: any) => b.date - a.date)
+      .slice(0, 8);
+    const historicalMoves: number[] = [];
+    for (const e of pastEarnings) {
+      const idx = priceHistory.findIndex(b => new Date(b.date).getTime() / 1000 >= e.date);
+      if (idx > 0) {
+        const move = Math.abs((closes[idx] - closes[idx - 1]) / closes[idx - 1]);
+        historicalMoves.push(move);
+      }
+    }
+    const avgHistoricalMove = historicalMoves.length > 0
+      ? historicalMoves.reduce((a, b) => a + b, 0) / historicalMoves.length
+      : 0.05;
+    const expectedEarningsMove = Math.max(avgHistoricalMove, medianIV * Math.sqrt(daysToEarnings / 365));
+    return {
+      nextEarningsDate,
+      daysToEarnings,
+      expectedEarningsMove,
+      avgHistoricalMove,
+      historicalEarningsMoves: historicalMoves,
+    };
+  } catch {
+    return null;
+  }
+}
 
 // ─── Velez Scanner Router ─────────────────────────────────────────────────────
 const velezRouter = router({
@@ -636,121 +841,136 @@ const profileRouter = router({
 // ─── App Router ───────────────────────────────────────────────────────────────
 
 // ─── Intraday Scanner Router ──────────────────────────────────────────────────
-const intradayRouter = router({
-  // Score a single ticker with the 9-criteria scorecard
-  score: protectedProcedure
+// Delegates to the full intradayScannerRouter (server/routers/intradayScanner.ts)
+// which uses the rich schema with self-learning weights, backtest stats, etc.
+const intradayRouter = intradayScannerRouter;
+
+// ─── PCR Scheduled Router ─────────────────────────────────────────────────────────────
+
+const pcrScheduledRouter = router({
+  getIntradayResults: protectedProcedure
+    .input(z.object({ runDate: z.string().optional() }))
+    .query(async ({ input }) => getLatestScheduledResults("intraday_scan", input.runDate)),
+  getEodSnapshot: protectedProcedure
+    .input(z.object({ snapshotDate: z.string().optional() }))
+    .query(async ({ input }) => getLatestOiSnapshots(input.snapshotDate)),
+  triggerEodSnapshot: adminProcedure
+    .mutation(async () => runEodSnapshot()),
+  triggerIntradayScan: adminProcedure
+    .mutation(async () => runPcrIntradayScan()),
+  countSnapshotDays: protectedProcedure
+    .query(async () => { const days = await countSnapshotDays(); return { days }; }),
+  getMissingTickers: protectedProcedure
+    .input(z.object({ snapshotDate: z.string().optional() }))
+    .query(async ({ input }) => { const missing = await getMissingTickers(input.snapshotDate); return { missing, count: missing.length }; }),
+  getHistoricalResults: protectedProcedure
+    .input(z.object({ days: z.number().optional() }))
+    .query(async ({ input }) => getHistoricalResults(input.days ?? 30)),
+  getEodHistory: protectedProcedure
+    .input(z.object({ ticker: z.string(), days: z.number().optional() }))
+    .query(async ({ input }) => getEodHistory(input.ticker, input.days ?? 30)),
+  getPCRHistory: protectedProcedure
+    .input(z.object({ ticker: z.string(), days: z.number().optional() }))
+    .query(async ({ input }) => getPCRHistoryForTicker(input.ticker, input.days ?? 7)),
+  getBiggestMovers: protectedProcedure
+    .input(z.object({ runDate: z.string().optional() }))
+    .query(async ({ input }) => getBiggestMovers(input.runDate)),
+  getScanRunDates: protectedProcedure
+    .query(async () => getScanRunDates()),
+  getScanRunDetail: protectedProcedure
+    .input(z.object({ runDate: z.string() }))
+    .query(async ({ input }) => getScanRunDetail(input.runDate)),
+  retryMissingTickers: adminProcedure
+    .input(z.object({ snapshotDate: z.string().optional() }))
+    .mutation(async ({ input }) => {
+      const missing = await getMissingTickers(input.snapshotDate);
+      if (!missing.length) return { saved: 0, errors: 0, stillMissing: [], message: "No missing tickers" };
+      return runEodSnapshotForTickers(missing);
+    }),
+  getDailyLandingTable: protectedProcedure
+    .input(z.object({ runDate: z.string().optional() }))
+    .query(async ({ input }) => getDailyLandingTable(input.runDate)),
+  savePCRRecommendation: protectedProcedure
+    .input(z.object({
+      ticker: z.string().min(1).max(10).toUpperCase(),
+      signal: z.string(),
+      strategyHint: z.string(),
+      recommendation: z.string(),
+      pcr: z.string(),
+      pcrDeltaVsPrior: z.string().nullable(),
+      priorSignal: z.string().nullable(),
+      runDate: z.string(),
+      closingPrice: z.string().nullable(),
+    }))
+    .mutation(async ({ input, ctx }) => savePCRRecommendation({ ...input, userId: ctx.user.id })),
+  getPCRSavedRecommendations: protectedProcedure
+    .input(z.object({ ticker: z.string().optional() }))
+    .query(async ({ input, ctx }) => getPCRSavedRecommendations(ctx.user.id, input.ticker)),
+});
+
+// ─── Analysis Router ────────────────────────────────────────────────────────────────
+
+const analysisRouter = router({
+  run: protectedProcedure
+    .input(z.object({
+      ticker: z.string().min(1).max(10).toUpperCase(),
+      targetDte: z.number().int().min(1).max(365).default(30),
+      accountSize: z.number().min(1000).max(10_000_000).default(50000),
+      minCredit: z.number().min(0).max(10000).optional(),
+      strategyCategory: z.enum(["all", "credit", "debit"]).default("all"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { ticker, targetDte, accountSize, minCredit, strategyCategory } = input;
+      const priceHistory = await fetchPriceHistory(ticker);
+      if (priceHistory.length < 20) throw new Error(`Insufficient price history for ${ticker}`);
+      const optionChain = await fetchOptionChain(ticker, targetDte, priceHistory);
+      if (optionChain.length < 4) throw new Error(`Insufficient option chain data for ${ticker}`);
+      const closes = priceHistory.map(b => b.close);
+      const n20 = Math.min(20, closes.length - 1);
+      let sumSq20 = 0;
+      for (let i = closes.length - n20; i < closes.length; i++) {
+        const ret = Math.log(closes[i] / closes[i - 1]);
+        sumSq20 += ret * ret;
+      }
+      const rv20forEarnings = Math.sqrt((sumSq20 / n20) * 252);
+      const medianIVforEarnings = rv20forEarnings * 1.2;
+      const earningsInfo = await fetchEarningsInfo(ticker, priceHistory, medianIVforEarnings);
+      const result = runAnalysis(ticker, targetDte, accountSize, priceHistory, optionChain, minCredit, strategyCategory, earningsInfo);
+      try {
+        await saveAnalysisRun({
+          userId: ctx.user.id,
+          ticker,
+          analysisJson: JSON.stringify(result),
+          topStrategy: result.recommendation?.name ?? null,
+          score: result.recommendation?.compositeScore != null ? String(result.recommendation.compositeScore) : null,
+        });
+      } catch (e) {
+        console.warn("[Analysis] Failed to save run:", e);
+      }
+      return result;
+    }),
+  history: protectedProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional())
+    .query(async ({ ctx, input }) => {
+      return getAnalysisRunsByUser(ctx.user.id, input?.limit ?? 50);
+    }),
+  deleteOne: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await deleteAnalysisRun(input.id, ctx.user.id);
+      return { success: true };
+    }),
+  exportExcel: protectedProcedure
+    .input(z.object({ resultJson: z.string() }))
+    .mutation(async ({ input }) => {
+      const result = JSON.parse(input.resultJson);
+      const base64 = await generateExcelReport(result);
+      return { base64 };
+    }),
+  getEvents: protectedProcedure
     .input(z.object({ ticker: z.string().min(1).max(10).toUpperCase() }))
     .query(async ({ input }) => {
-      return scoreIntradayTicker(input.ticker);
-    }),
-  // Scan the 50-ticker intraday watchlist
-  scan: protectedProcedure
-    .input(
-      z.object({
-        tickers: z.array(z.string()).optional(),
-      }).optional()
-    )
-    .query(async ({ input }) => {
-      const tickers = input?.tickers ?? INTRADAY_TICKER_SYMBOLS;
-      return runIntradayScan(tickers);
-    }),
-  // On-demand full scan — runs the 50-ticker scan and returns results immediately
-  runFullScan: protectedProcedure
-    .mutation(async () => {
-      const results = await runIntradayScan(INTRADAY_TICKER_SYMBOLS);
-      // Persist to DB for history
-      const db = await getDb();
-      if (db && results.length > 0) {
-        const scanBatch = Math.floor(Date.now() / 1000);
-        await db.insert(intradayScanResults).values(
-          results.map((r) => ({
-            scannedAt: scanBatch,
-            symbol: r.ticker,
-            score: String(r.score),
-            grade: r.grade,
-            direction: r.direction,
-            criteriaJson: JSON.stringify(r.criteria),
-            currentPrice: String(r.currentPrice ?? 0),
-            vwap: String(r.vwap ?? 0),
-            atr: String(r.atr ?? 0),
-            alerted: 0 as const,
-          }))
-        );
-      }
-      return {
-        scannedAt: Date.now(),
-        results,
-        gradeA: results.filter((r) => r.grade === "A").length,
-        total: results.length,
-      };
-    }),
-  // Get scan history — last N scan batches with grade summaries
-  getScanHistory: protectedProcedure
-    .input(z.object({ limit: z.number().min(1).max(20).default(5) }).optional())
-    .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { batches: [] };
-      const limit = input?.limit ?? 5;
-      // Get distinct scan batches ordered by most recent
-      const allRows = await db
-        .select()
-        .from(intradayScanResults)
-        .orderBy(desc(intradayScanResults.scannedAt))
-        .limit(limit * 60); // fetch enough rows to cover N batches
-      if (allRows.length === 0) return { batches: [] };
-      // Group by scannedAt batch
-      const batchMap = new Map<number, typeof allRows>();
-      for (const row of allRows) {
-        if (!batchMap.has(row.scannedAt)) batchMap.set(row.scannedAt, []);
-        batchMap.get(row.scannedAt)!.push(row);
-      }
-      const batches = Array.from(batchMap.entries())
-        .slice(0, limit)
-        .map(([scannedAt, rows]) => {
-          const gradeCounts = { A: 0, B: 0, C: 0, D: 0 };
-          for (const r of rows) {
-            if (r.grade in gradeCounts) gradeCounts[r.grade as keyof typeof gradeCounts]++;
-          }
-          const topA = rows
-            .filter((r) => r.grade === "A")
-            .map((r) => ({ ticker: r.symbol, score: parseFloat(r.score), direction: r.direction }));
-          return {
-            scannedAt: scannedAt * 1000,
-            total: rows.length,
-            gradeCounts,
-            topA,
-          };
-        });
-      return { batches };
-    }),
-  // Get the last scheduled scan results from DB
-  getLastScan: protectedProcedure
-    .query(async () => {
-      const db = await getDb();
-      if (!db) return { results: [], scannedAt: null };
-      const rows = await db
-        .select()
-        .from(intradayScanResults)
-        .orderBy(desc(intradayScanResults.scannedAt))
-        .limit(100);
-      if (rows.length === 0) return { results: [], scannedAt: null };
-      const latestBatch = rows[0].scannedAt;
-      const batchRows = rows.filter((r) => r.scannedAt === latestBatch);
-      return {
-        scannedAt: latestBatch * 1000,
-        results: batchRows.map((r) => ({
-          ticker: r.symbol,
-          score: parseFloat(r.score),
-          grade: r.grade,
-          direction: r.direction,
-          criteria: JSON.parse(r.criteriaJson) as CriterionResult[],
-          currentPrice: parseFloat(r.currentPrice ?? "0"),
-          vwap: parseFloat(r.vwap ?? "0"),
-          atr: parseFloat(r.atr ?? "0"),
-          maxScore: 11,
-          error: null,
-        })),
-      };
+      return fetchEventImpact(input.ticker);
     }),
 });
 
@@ -765,6 +985,8 @@ export const appRouter = router({
   trades: tradesRouter,
   fibAlerts: fibAlertsRouter,
   pcr: pcrRouter,
+  analysis: analysisRouter,
+  pcrScheduled: pcrScheduledRouter,
 });
 
 export type AppRouter = typeof appRouter;

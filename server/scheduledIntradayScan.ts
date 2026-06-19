@@ -2,16 +2,16 @@
  * Scheduled Intraday Scanner Handler
  *
  * Called by the Manus heartbeat cron every 15 minutes during market hours.
- * - Scans all 50 tickers using the 9-criteria scoring engine
- * - Persists results to intraday_scan_results table
+ * - Scans all 50 tickers using the 9-criteria scoring engine (intradayScorer)
+ * - Persists results to intraday_scan_results table (rich schema)
  * - Sends email to akulasridhar@gmail.com for any ticker that grades A
  *   (deduped: only alerts once per ticker per 60-min window)
  */
-
 import type { Request, Response } from "express";
 import { getDb } from "./db";
 import { intradayScanResults } from "../drizzle/schema";
-import { runIntradayScan } from "./intradayScanner";
+import { scoreTicker } from "./lib/intradayScorer";
+import { loadWeights } from "./routers/intradayScanner";
 import { INTRADAY_TICKER_SYMBOLS } from "../shared/intradayTickers";
 import { sdk } from "./_core/sdk";
 import { sendEmail } from "./email";
@@ -22,91 +22,52 @@ const OWNER_EMAIL = "akulasridhar@gmail.com";
 /** Check if market is open (Mon–Fri 9:30 AM – 4:00 PM ET) */
 function isMarketOpen(): boolean {
   const now = new Date();
-  // Convert to ET (UTC-4 in summer / EDT, UTC-5 in winter / EST)
   const etOffset = isDST(now) ? -4 : -5;
   const etMs = now.getTime() + etOffset * 60 * 60 * 1000;
   const et = new Date(etMs);
-
-  const day = et.getUTCDay(); // 0=Sun, 6=Sat
+  const day = et.getUTCDay();
   if (day === 0 || day === 6) return false;
-
   const hour = et.getUTCHours();
   const minute = et.getUTCMinutes();
   const minuteOfDay = hour * 60 + minute;
-
-  // 9:30 AM = 570 min, 4:00 PM = 960 min
   return minuteOfDay >= 570 && minuteOfDay < 960;
 }
 
-/** Rough DST check for US Eastern Time */
 function isDST(date: Date): boolean {
   const jan = new Date(date.getFullYear(), 0, 1).getTimezoneOffset();
   const jul = new Date(date.getFullYear(), 6, 1).getTimezoneOffset();
   return Math.max(jan, jul) !== date.getTimezoneOffset();
 }
 
-/** Send grade-A alert email via Manus notification API */
+/** Send grade-A alert email */
 async function sendGradeAAlertEmail(alerts: Array<{
-  symbol: string;
-  score: number;
+  ticker: string;
   grade: string;
   direction: string;
-  criteria: Array<{ name: string; passed: boolean; value: string; weight: number }>;
+  weightedScore: number;
+  maxScore: number;
+  price: number;
+  trapDetected: boolean;
 }>) {
-  const subject = `🚨 PitDesk Intraday Alert — ${alerts.length} Grade A Signal${alerts.length > 1 ? "s" : ""}`;
-
-  const rows = alerts.map((a) => {
-    const passed = a.criteria.filter((c) => c.passed).length;
-    const total = a.criteria.length;
-    const criteriaRows = a.criteria
-      .map((c) => `<tr>
-        <td style="padding:4px 8px;border-bottom:1px solid #eee;">${c.passed ? "✅" : "❌"}</td>
-        <td style="padding:4px 8px;border-bottom:1px solid #eee;">${c.name}</td>
-        <td style="padding:4px 8px;border-bottom:1px solid #eee;">${c.value}</td>
-        <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;">${c.weight.toFixed(1)}</td>
-      </tr>`)
-      .join("");
-
-    return `
-      <div style="margin-bottom:24px;border:2px solid #22c55e;border-radius:8px;overflow:hidden;">
-        <div style="background:#22c55e;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:20px;font-weight:700;">${a.symbol}</span>
-          <span style="font-size:16px;">Grade <strong>${a.grade}</strong> · ${a.score.toFixed(1)}/11.0 pts · ${a.direction.toUpperCase()}</span>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead>
-            <tr style="background:#f9fafb;">
-              <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e5e7eb;">Pass</th>
-              <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e5e7eb;">Criterion</th>
-              <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e5e7eb;">Value</th>
-              <th style="padding:6px 8px;text-align:right;border-bottom:2px solid #e5e7eb;">Weight</th>
-            </tr>
-          </thead>
-          <tbody>${criteriaRows}</tbody>
-        </table>
-        <div style="padding:8px 16px;background:#f0fdf4;font-size:13px;color:#166534;">
-          ${passed}/${total} criteria passed
-        </div>
-      </div>`;
-  }).join("");
-
+  const subject = `🚨 PitDesk A-Setup Alert: ${alerts.map(a => a.ticker).join(", ")}`;
   const html = `
-    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
-      <h2 style="color:#1e293b;">PitDesk Intraday Scanner Alert</h2>
-      <p style="color:#64748b;">The following tickers just scored Grade A on the 9-criteria intraday momentum scorecard:</p>
-      ${rows}
-      <p style="color:#94a3b8;font-size:12px;margin-top:24px;">
-        Scanned at ${new Date().toLocaleString("en-US", { timeZone: "America/New_York" })} ET<br>
-        <a href="https://trading.akulaz.ai/intraday-scanner" style="color:#22c55e;">View full scanner →</a>
-      </p>
+    <div style="font-family:sans-serif;max-width:600px">
+      <h2 style="color:#22c55e">PitDesk Intraday A-Setup Alert</h2>
+      <p>${alerts.length} ticker(s) just scored Grade A:</p>
+      ${alerts.map(a => `
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:8px 0">
+          <strong style="font-size:18px">${a.ticker}</strong>
+          <span style="background:#22c55e;color:white;padding:2px 8px;border-radius:4px;margin-left:8px">Grade A</span>
+          <br/>
+          <span style="color:#6b7280">Direction: ${a.direction} | Score: ${a.weightedScore.toFixed(1)}/${a.maxScore.toFixed(1)} | Price: $${a.price.toFixed(2)}</span>
+          ${a.trapDetected ? '<br/><span style="color:#ef4444">⚠️ Institutional trap detected — use caution</span>' : ''}
+        </div>
+      `).join("")}
+      <p style="color:#6b7280;font-size:12px">Sent by PitDesk Intraday Scanner at ${new Date().toLocaleString("en-US", { timeZone: "America/New_York" })} ET</p>
     </div>`;
 
   try {
-    await sendEmail({
-      to: OWNER_EMAIL,
-      subject,
-      html,
-    });
+    await sendEmail({ to: OWNER_EMAIL, subject, html });
   } catch (err) {
     console.error("[IntradayScan] Email send failed:", err);
   }
@@ -120,7 +81,6 @@ export async function intradayScanHandler(req: Request, res: Response) {
       return res.status(403).json({ error: "cron-only" });
     }
 
-    // Skip if market is closed
     if (!isMarketOpen()) {
       return res.json({ ok: true, skipped: "market-closed", time: new Date().toISOString() });
     }
@@ -130,100 +90,112 @@ export async function intradayScanHandler(req: Request, res: Response) {
       return res.status(500).json({ error: "database-unavailable" });
     }
 
-    const now = Date.now();
-    const scanBatch = Math.floor(now / 1000);
+    // Load current criteria weights from DB
+    const weights = await loadWeights();
 
-    // Run the full 50-ticker scan
+    // Score all tickers
     console.log("[IntradayScan] Starting scheduled scan of", INTRADAY_TICKER_SYMBOLS.length, "tickers");
-    const results = await runIntradayScan(INTRADAY_TICKER_SYMBOLS);
+    const results = await Promise.allSettled(
+      INTRADAY_TICKER_SYMBOLS.map(ticker => scoreTicker(ticker, weights))
+    );
+
+    const valid = results
+      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof scoreTicker>>> =>
+        r.status === "fulfilled" && r.value !== null)
+      .map(r => r.value!);
 
     // Persist all results
-    const inserts = results.map((r) => ({
-      scannedAt: scanBatch,
-      symbol: r.ticker,
-      score: String(r.score),
-      grade: r.grade,
-      direction: r.direction,
-      criteriaJson: JSON.stringify(r.criteria),
-      currentPrice: String(r.currentPrice ?? 0),
-      vwap: String(r.vwap ?? 0),
-      atr: String(r.atr ?? 0),
-      alerted: 0 as const,
-    }));
-
-    if (inserts.length > 0) {
+    if (valid.length > 0) {
+      const inserts = valid.map((r) => ({
+        ticker: r.ticker,
+        grade: r.grade as "A" | "B" | "C" | "none",
+        direction: r.direction as "bullish" | "bearish" | "neutral",
+        weightedScore: String(r.weightedScore),
+        maxScore: String(r.maxScore),
+        price: String(r.price),
+        vwap: r.vwap != null ? String(r.vwap) : null,
+        rvol: r.rvol != null ? String(r.rvol) : null,
+        rsi: r.rsi != null ? String(r.rsi) : null,
+        atr: r.atr != null ? String(r.atr) : null,
+        entryLow: r.entryLow != null ? String(r.entryLow) : null,
+        entryHigh: r.entryHigh != null ? String(r.entryHigh) : null,
+        stopLevel: r.stopLevel != null ? String(r.stopLevel) : null,
+        target1: r.target1 != null ? String(r.target1) : null,
+        target2: r.target2 != null ? String(r.target2) : null,
+        criteriaJson: JSON.stringify(r.criteria),
+        trapDetected: r.trap?.detected ?? false,
+        trapType: r.trap?.type ?? null,
+        trapDetails: r.trap?.details ?? null,
+        optionStrategy: r.optionStrategy ?? null,
+        optionStrike: r.optionStrike != null ? String(r.optionStrike) : null,
+        optionExpiry: r.optionExpiry ?? null,
+        optionDebit: r.optionDebit != null ? String(r.optionDebit) : null,
+        optionMaxProfit: r.optionMaxProfit != null ? String(r.optionMaxProfit) : null,
+        optionMaxLoss: r.optionMaxLoss != null ? String(r.optionMaxLoss) : null,
+        alertSent: false,
+      }));
       await db.insert(intradayScanResults).values(inserts);
     }
 
     // Find grade-A tickers that haven't been alerted in the last 60 min
-    const sixtyMinAgo = now - 60 * 60 * 1000;
-    const gradeAResults = results.filter((r) => r.grade === "A");
-
+    const sixtyMinAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const gradeAResults = valid.filter(r => r.grade === "A");
     const toAlert: typeof gradeAResults = [];
+
     for (const r of gradeAResults) {
-      // Check if we already alerted this symbol in the last 60 min
       const recent = await db
         .select()
         .from(intradayScanResults)
         .where(
           and(
-            eq(intradayScanResults.symbol, r.ticker),
+            eq(intradayScanResults.ticker, r.ticker),
             eq(intradayScanResults.grade, "A"),
-            gte(intradayScanResults.scannedAt, Math.floor(sixtyMinAgo / 1000))
+            gte(intradayScanResults.scannedAt, sixtyMinAgo)
           )
         )
         .limit(1);
 
-      const alreadyAlerted = recent.some((row: { alerted: number }) => row.alerted === 1);
-      if (!alreadyAlerted) {
-        toAlert.push(r);
-      }
+      const alreadyAlerted = recent.some(row => row.alertSent);
+      if (!alreadyAlerted) toAlert.push(r);
     }
 
-    // Send email if there are new grade-A signals
     if (toAlert.length > 0) {
-      await sendGradeAAlertEmail(
-        toAlert.map((r) => ({
-          symbol: r.ticker,
-          score: r.score,
-          grade: r.grade,
-          direction: r.direction,
-          criteria: r.criteria,
-        }))
-      );
+      await sendGradeAAlertEmail(toAlert.map(r => ({
+        ticker: r.ticker,
+        grade: r.grade,
+        direction: r.direction,
+        weightedScore: r.weightedScore,
+        maxScore: r.maxScore,
+        price: r.price,
+        trapDetected: r.trap?.detected ?? false,
+      })));
 
       // Mark as alerted
       for (const r of toAlert) {
         await db
           .update(intradayScanResults)
-          .set({ alerted: 1 })
+          .set({ alertSent: true })
           .where(
             and(
-              eq(intradayScanResults.symbol, r.ticker),
-              eq(intradayScanResults.scannedAt, scanBatch)
+              eq(intradayScanResults.ticker, r.ticker),
+              eq(intradayScanResults.alertSent, false),
+              eq(intradayScanResults.grade, "A")
             )
           );
       }
-
-      console.log(`[IntradayScan] Sent grade-A alert for: ${toAlert.map((r) => r.ticker).join(", ")}`);
+      console.log(`[IntradayScan] Sent grade-A alert for: ${toAlert.map(r => r.ticker).join(", ")}`);
     }
 
     return res.json({
       ok: true,
-      scanned: results.length,
+      scanned: valid.length,
       gradeA: gradeAResults.length,
       alerted: toAlert.length,
       time: new Date().toISOString(),
     });
   } catch (err: unknown) {
     const error = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : undefined;
     console.error("[IntradayScan] Handler error:", error);
-    return res.status(500).json({
-      error,
-      stack,
-      context: { url: req.url },
-      timestamp: new Date().toISOString(),
-    });
+    return res.status(500).json({ error, timestamp: new Date().toISOString() });
   }
 }

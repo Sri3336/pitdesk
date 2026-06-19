@@ -94,3 +94,22 @@
 - [x] IntradayScanner.tsx: Add "History" tab showing last 8 scan batches with timestamps and grade summaries
 - [x] Update options-trading-analyzer-builder skill with latest PitDesk context
 - [x] Add intraday.getScanHistory tRPC procedure (group by batch, return grade counts + topA tickers)
+
+## Phase 11: Priority 1 Feature Ports from options-strategy-analyzer
+
+- [x] Port server/analysisEngine.ts (Black-Scholes + 13 strategies + Greeks + IV/RV)
+- [x] Port server/excelExport.ts (9-tab Excel workbook export)
+- [x] Port server/eventImpact.ts (earnings/FOMC event impact analysis)
+- [x] Add analysis_runs DB table + migration
+- [x] Add analysis router procedures (run, history, delete, exportExcel)
+- [x] Port client/src/pages/Analyzer.tsx (full 1916-line page with 13 strategies)
+- [x] Port client/src/components/EventImpactPanel.tsx
+- [x] Port shared/tickerUniverse.ts (66-ticker curated universe with sector metadata)
+- [x] Port full PCR Dashboard (696-line version with OI baseline, sparklines, TickerDetailDrawer)
+- [x] Add pcr_oi_snapshots + pcr_scheduled_results + pcr_alert_settings DB tables
+- [x] Add PCR scheduled router procedures (getLatest, getHistory, triggerScan)
+- [x] Port client/src/components/TickerDetailDrawer.tsx
+- [x] Port server/lib/intradayScorer.ts (self-learning scorer with institutional trap detector)
+- [x] Add scan_outcomes + criteria_weights DB tables
+- [x] Add intradayScanner router procedures (getBacktestStats, getWeights, updateWeights)
+- [x] Add Backtest Stats tab + Weight Sliders tab to IntradayScanner.tsx

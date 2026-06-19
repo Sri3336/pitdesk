@@ -1,88 +1,97 @@
 /**
- * PitDesk Intraday Scanner — 50-ticker watchlist across sectors
- * These are the default tickers scanned every 15 min during market hours.
- * Curated for liquidity, volatility, and sector diversity.
+ * PitDesk Intraday Trend Scanner — 50-Ticker Watchlist
+ *
+ * Tier 1 (top 25): scanned every 5 minutes during market hours
+ * Tier 2 (remaining 25): scanned every 15 minutes
+ *
+ * Sectors: AI/Semis, Mega-Cap Tech, Storage/Memory, EV/Space,
+ *          Financials, Energy, Healthcare, Airlines/Travel, ETFs
  */
 
-export interface IntradayTicker {
+export interface ScannerTicker {
   symbol: string;
   name: string;
   sector: string;
+  tier: 1 | 2; // 1 = every 5 min, 2 = every 15 min
+  etfTicker?: string; // corresponding ETF for options liquidity check
 }
 
-export const INTRADAY_TICKERS: IntradayTicker[] = [
-  // Technology (12)
-  { symbol: "AAPL",  name: "Apple",             sector: "Technology" },
-  { symbol: "MSFT",  name: "Microsoft",          sector: "Technology" },
-  { symbol: "NVDA",  name: "NVIDIA",             sector: "Technology" },
-  { symbol: "META",  name: "Meta Platforms",     sector: "Technology" },
-  { symbol: "GOOGL", name: "Alphabet",           sector: "Technology" },
-  { symbol: "AMZN",  name: "Amazon",             sector: "Technology" },
-  { symbol: "AMD",   name: "AMD",                sector: "Technology" },
-  { symbol: "TSMC",  name: "TSMC",               sector: "Technology" },
-  { symbol: "AVGO",  name: "Broadcom",           sector: "Technology" },
-  { symbol: "CRM",   name: "Salesforce",         sector: "Technology" },
-  { symbol: "ORCL",  name: "Oracle",             sector: "Technology" },
-  { symbol: "PLTR",  name: "Palantir",           sector: "Technology" },
+export const SCANNER_TICKERS: ScannerTicker[] = [
+  // ── AI / Semis ──────────────────────────────────────────────────────────────
+  { symbol: "NVDA", name: "NVIDIA", sector: "AI/Semis", tier: 1 },
+  { symbol: "AMD",  name: "Advanced Micro Devices", sector: "AI/Semis", tier: 1 },
+  { symbol: "AVGO", name: "Broadcom", sector: "AI/Semis", tier: 1 },
+  { symbol: "MRVL", name: "Marvell Technology", sector: "AI/Semis", tier: 1 },
+  { symbol: "ARM",  name: "Arm Holdings", sector: "AI/Semis", tier: 1 },
+  { symbol: "AMAT", name: "Applied Materials", sector: "AI/Semis", tier: 2 },
+  { symbol: "LRCX", name: "Lam Research", sector: "AI/Semis", tier: 2 },
+  { symbol: "INTC", name: "Intel", sector: "AI/Semis", tier: 2 },
+  { symbol: "MSTR", name: "MicroStrategy", sector: "AI/Semis", tier: 2 },
+  { symbol: "CRWV", name: "CoreWeave", sector: "AI/Semis", tier: 2 },
 
-  // Consumer / EV / Autos (5)
-  { symbol: "TSLA",  name: "Tesla",              sector: "Consumer/EV" },
-  { symbol: "RIVN",  name: "Rivian",             sector: "Consumer/EV" },
-  { symbol: "NIO",   name: "NIO",                sector: "Consumer/EV" },
-  { symbol: "F",     name: "Ford",               sector: "Consumer/EV" },
-  { symbol: "GM",    name: "General Motors",     sector: "Consumer/EV" },
+  // ── Mega-Cap Tech ────────────────────────────────────────────────────────────
+  { symbol: "AAPL",  name: "Apple", sector: "Mega-Cap Tech", tier: 1 },
+  { symbol: "MSFT",  name: "Microsoft", sector: "Mega-Cap Tech", tier: 1 },
+  { symbol: "META",  name: "Meta Platforms", sector: "Mega-Cap Tech", tier: 1 },
+  { symbol: "GOOGL", name: "Alphabet", sector: "Mega-Cap Tech", tier: 1 },
+  { symbol: "AMZN",  name: "Amazon", sector: "Mega-Cap Tech", tier: 1 },
+  { symbol: "CRM",   name: "Salesforce", sector: "Mega-Cap Tech", tier: 2 },
+  { symbol: "ADBE",  name: "Adobe", sector: "Mega-Cap Tech", tier: 2 },
+  { symbol: "TSLA",  name: "Tesla", sector: "EV/Space", tier: 1 },
 
-  // Financials (6)
-  { symbol: "JPM",   name: "JPMorgan Chase",     sector: "Financials" },
-  { symbol: "GS",    name: "Goldman Sachs",      sector: "Financials" },
-  { symbol: "BAC",   name: "Bank of America",    sector: "Financials" },
-  { symbol: "MS",    name: "Morgan Stanley",     sector: "Financials" },
-  { symbol: "V",     name: "Visa",               sector: "Financials" },
-  { symbol: "COIN",  name: "Coinbase",           sector: "Financials" },
+  // ── Storage / Memory ─────────────────────────────────────────────────────────
+  { symbol: "MU",   name: "Micron Technology", sector: "Storage/Memory", tier: 1 },
+  { symbol: "SNDK", name: "SanDisk", sector: "Storage/Memory", tier: 1 },
+  { symbol: "WDC",  name: "Western Digital", sector: "Storage/Memory", tier: 2 },
+  { symbol: "STX",  name: "Seagate Technology", sector: "Storage/Memory", tier: 2 },
+  { symbol: "SPCX", name: "SPCX ETF", sector: "Storage/Memory", tier: 2 },
 
-  // Healthcare / Biotech (5)
-  { symbol: "UNH",   name: "UnitedHealth",       sector: "Healthcare" },
-  { symbol: "LLY",   name: "Eli Lilly",          sector: "Healthcare" },
-  { symbol: "MRNA",  name: "Moderna",            sector: "Healthcare" },
-  { symbol: "ABBV",  name: "AbbVie",             sector: "Healthcare" },
-  { symbol: "BIIB",  name: "Biogen",             sector: "Healthcare" },
+  // ── Financials ───────────────────────────────────────────────────────────────
+  { symbol: "JPM", name: "JPMorgan Chase", sector: "Financials", tier: 1 },
+  { symbol: "GS",  name: "Goldman Sachs", sector: "Financials", tier: 1 },
+  { symbol: "BAC", name: "Bank of America", sector: "Financials", tier: 2 },
+  { symbol: "MS",  name: "Morgan Stanley", sector: "Financials", tier: 2 },
+  { symbol: "V",   name: "Visa", sector: "Financials", tier: 2 },
 
-  // Energy (4)
-  { symbol: "XOM",   name: "ExxonMobil",         sector: "Energy" },
-  { symbol: "CVX",   name: "Chevron",            sector: "Energy" },
-  { symbol: "OXY",   name: "Occidental",         sector: "Energy" },
-  { symbol: "SLB",   name: "SLB (Schlumberger)", sector: "Energy" },
+  // ── Energy ───────────────────────────────────────────────────────────────────
+  { symbol: "XOM", name: "ExxonMobil", sector: "Energy", tier: 1 },
+  { symbol: "CVX", name: "Chevron", sector: "Energy", tier: 2 },
+  { symbol: "FCX", name: "Freeport-McMoRan", sector: "Energy", tier: 2 },
+  { symbol: "OXY", name: "Occidental Petroleum", sector: "Energy", tier: 2 },
+  { symbol: "SLB", name: "SLB (Schlumberger)", sector: "Energy", tier: 2 },
 
-  // Industrials / Defense (4)
-  { symbol: "CAT",   name: "Caterpillar",        sector: "Industrials" },
-  { symbol: "BA",    name: "Boeing",             sector: "Industrials" },
-  { symbol: "LMT",   name: "Lockheed Martin",    sector: "Industrials" },
-  { symbol: "RTX",   name: "RTX Corp",           sector: "Industrials" },
+  // ── Healthcare ───────────────────────────────────────────────────────────────
+  { symbol: "LLY",  name: "Eli Lilly", sector: "Healthcare", tier: 1 },
+  { symbol: "UNH",  name: "UnitedHealth", sector: "Healthcare", tier: 2 },
+  { symbol: "MRNA", name: "Moderna", sector: "Healthcare", tier: 2 },
+  { symbol: "ABBV", name: "AbbVie", sector: "Healthcare", tier: 2 },
+  { symbol: "PFE",  name: "Pfizer", sector: "Healthcare", tier: 2 },
 
-  // Retail / Consumer Discretionary (4)
-  { symbol: "WMT",   name: "Walmart",            sector: "Retail" },
-  { symbol: "TGT",   name: "Target",             sector: "Retail" },
-  { symbol: "COST",  name: "Costco",             sector: "Retail" },
-  { symbol: "HD",    name: "Home Depot",         sector: "Retail" },
+  // ── Airlines / Travel ────────────────────────────────────────────────────────
+  { symbol: "UAL", name: "United Airlines", sector: "Airlines/Travel", tier: 1 },
+  { symbol: "DAL", name: "Delta Air Lines", sector: "Airlines/Travel", tier: 2 },
+  { symbol: "AAL", name: "American Airlines", sector: "Airlines/Travel", tier: 2 },
+  { symbol: "CCL", name: "Carnival Corp", sector: "Airlines/Travel", tier: 2 },
 
-  // Semiconductors / Chips (4)
-  { symbol: "INTC",  name: "Intel",              sector: "Semiconductors" },
-  { symbol: "QCOM",  name: "Qualcomm",           sector: "Semiconductors" },
-  { symbol: "MU",    name: "Micron",             sector: "Semiconductors" },
-  { symbol: "AMAT",  name: "Applied Materials",  sector: "Semiconductors" },
+  // ── Broad Market ETFs ────────────────────────────────────────────────────────
+  { symbol: "SPY", name: "S&P 500 ETF", sector: "ETFs", tier: 1 },
+  { symbol: "QQQ", name: "Nasdaq 100 ETF", sector: "ETFs", tier: 1 },
+  { symbol: "IWM", name: "Russell 2000 ETF", sector: "ETFs", tier: 2 },
 
-  // ETFs / Indices (6)
-  { symbol: "SPY",   name: "S&P 500 ETF",        sector: "ETF" },
-  { symbol: "QQQ",   name: "Nasdaq 100 ETF",     sector: "ETF" },
-  { symbol: "IWM",   name: "Russell 2000 ETF",   sector: "ETF" },
-  { symbol: "SOXL",  name: "Semis 3× Bull ETF",  sector: "ETF" },
-  { symbol: "TQQQ",  name: "QQQ 3× Bull ETF",    sector: "ETF" },
-  { symbol: "GLD",   name: "Gold ETF",           sector: "ETF" },
+  // ── Sector ETFs ──────────────────────────────────────────────────────────────
+  { symbol: "SMH", name: "Semiconductor ETF", sector: "ETFs", tier: 2 },
+  { symbol: "XLE", name: "Energy Sector ETF", sector: "ETFs", tier: 2 },
+  { symbol: "XLF", name: "Financial Sector ETF", sector: "ETFs", tier: 2 },
+  { symbol: "ZS",  name: "Zscaler", sector: "Mega-Cap Tech", tier: 2 },
 ];
 
-export const INTRADAY_TICKER_SYMBOLS = INTRADAY_TICKERS.map((t) => t.symbol);
+export const TIER1_TICKERS = SCANNER_TICKERS.filter(t => t.tier === 1).map(t => t.symbol);
+export const TIER2_TICKERS = SCANNER_TICKERS.filter(t => t.tier === 2).map(t => t.symbol);
+export const ALL_TICKERS   = SCANNER_TICKERS.map(t => t.symbol);
+export const SECTORS: string[] = Array.from(new Set(SCANNER_TICKERS.map(t => t.sector)));
+// Alias for backward compatibility with scheduledIntradayScan.ts
+export const INTRADAY_TICKER_SYMBOLS = ALL_TICKERS;
 
-/** Returns ticker metadata by symbol, or undefined if not found */
-export function getIntradayTicker(symbol: string): IntradayTicker | undefined {
-  return INTRADAY_TICKERS.find((t) => t.symbol === symbol.toUpperCase());
+export function getTickerMeta(symbol: string): ScannerTicker | undefined {
+  return SCANNER_TICKERS.find(t => t.symbol === symbol);
 }
