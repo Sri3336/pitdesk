@@ -1,4 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +16,7 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle, RefreshCw, Search,
   Clock, Calendar, Play, Database, Zap, AlertCircle, CheckCircle2,
   Bell, BellOff, Plus, Trash2, ToggleLeft, ToggleRight, Target, Award,
-  X, ChevronRight, Activity, BarChart2, Info,
+  X, ChevronRight, Activity, BarChart2, Info, BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
@@ -662,11 +665,63 @@ function ScanDetailTab() {
 }
 
 // ─── Main Page — Signal Board ─────────────────────────────────────────────────
+// ─── How-To Video Modal ──────────────────────────────────────────────────────
+function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-4 pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <BookOpen className="h-4 w-4 text-green-600" />
+            How to Use the PCR Strategy
+          </DialogTitle>
+        </DialogHeader>
+        <div className="px-5 pb-5">
+          <video
+            src="/manus-storage/pcr_howto_final_8a087d0c.mp4"
+            controls
+            autoPlay
+            className="w-full rounded-lg bg-slate-900"
+            style={{ maxHeight: "60vh" }}
+          />
+          <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">PCR Zones</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div><span className="text-red-600 font-medium">PCR &gt; 1.2</span> — Fear → Contrarian Bullish</div>
+                <div><span className="text-slate-500 font-medium">0.8–1.2</span> — Neutral</div>
+                <div><span className="text-green-600 font-medium">PCR &lt; 0.5</span> — Greed → Contrarian Bearish</div>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">COI Signal</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div>COI Imbalance <span className="text-orange-600 font-medium">≥45%</span> = strong conviction</div>
+                <div>Smart money repositioning detected</div>
+                <div>Highest-confidence trade setup</div>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">Workflow</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div>1. Run <span className="font-medium">11:30 Scan</span> intraday</div>
+                <div>2. Check Signal Board for setups</div>
+                <div>3. Confirm with RSI + price action</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function PCRStrategy() {
   const [sectorFilter, setSectorFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<"board" | "history" | "detail" | "alerts" | "trend">("board");
+  const [showHowTo, setShowHowTo] = useState(false);
 
   const tickers = useMemo(() => TICKER_UNIVERSE.map(t => t.symbol), []);
 
@@ -856,6 +911,17 @@ export default function PCRStrategy() {
           </button>
         )}
 
+        {/* How-To button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs px-2.5 border-green-200 text-green-700 hover:bg-green-50"
+          onClick={() => setShowHowTo(true)}
+        >
+          <BookOpen className="h-3.5 w-3.5 mr-1" />
+          How-To
+        </Button>
+
         {/* Scan controls */}
         <div className="flex items-center gap-1.5">
           <Button
@@ -892,6 +958,8 @@ export default function PCRStrategy() {
           )}
         </div>
       </div>
+
+      <HowToVideoModal open={showHowTo} onClose={() => setShowHowTo(false)} />
 
       {/* ── Main Content Area ─────────────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
