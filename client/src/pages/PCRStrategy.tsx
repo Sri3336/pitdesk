@@ -429,7 +429,7 @@ function PCRExplainerSection() {
             {/* Thumbnail preview — always visible */}
             <div className="relative shrink-0 w-24 h-14 rounded-md overflow-hidden border border-blue-200 shadow-sm">
               <img
-                src="/manus-storage/pcr_frame1_title_b46f06b4.png"
+                src="https://d2xsxph8kpxj0f.cloudfront.net/118490340/4ziQjLcBuBgPL6xfwF5uaR/pcr_frame1_title_new-9HfLbPpnp9yS78mpjTM2oE.webp"
                 alt="PCR Strategy explainer thumbnail"
                 className="w-full h-full object-cover"
               />
@@ -453,8 +453,8 @@ function PCRExplainerSection() {
           <div className="mt-4">
             <video
               ref={videoRef}
-              src="/manus-storage/pcr_explainer_18c762bd.mp4"
-              poster="/manus-storage/pcr_frame1_title_b46f06b4.png"
+              src="/manus-storage/pcr_explainer_new_6a65aca1.mp4"
+              poster="https://d2xsxph8kpxj0f.cloudfront.net/118490340/4ziQjLcBuBgPL6xfwF5uaR/pcr_frame1_title_new-9HfLbPpnp9yS78mpjTM2oE.webp"
               controls
               autoPlay
               className="w-full rounded-lg shadow-md max-h-[420px] bg-slate-900"
