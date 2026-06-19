@@ -13,7 +13,7 @@ import {
 import {
   TrendingUp, TrendingDown, Minus, AlertTriangle, RefreshCw, Search, Filter,
   BarChart2, ArrowUpDown, Info, Clock, Calendar, Play, Database, Zap, AlertCircle, CheckCircle2,
-  Share2, Bell, BellOff, Plus, Trash2, ToggleLeft, ToggleRight,
+  Share2, Bell, BellOff, Plus, Trash2, ToggleLeft, ToggleRight, Target, Award,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
@@ -1357,6 +1357,100 @@ export default function PCRStrategy() {
               </div>
             </div>
           )}
+
+          {/* ── Top Signals Card (COI imbalance ≥ 45%) ─────────────────────── */}
+          {!scheduledLoading && scheduledData && scheduledData.length > 0 && (() => {
+            type ScanRow = {
+              id: number; ticker: string; signal: string; pcr: string;
+              coiImbalancePct: number | null; coiSignal: string | null;
+              atmStrike: number | null; isExpiryDay: boolean; isExpiryEve: boolean;
+              atmCallDelta: number | null; atmPutDelta: number | null;
+              coiCallPct: number | null; coiPutPct: number | null;
+              strategyHint: string; signalStrength: number;
+            };
+            const topSignals = (scheduledData as ScanRow[])
+              .filter(r => (r.coiImbalancePct ?? 0) >= 45)
+              .sort((a, b) => (b.coiImbalancePct ?? 0) - (a.coiImbalancePct ?? 0));
+            if (topSignals.length === 0) return null;
+            return (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="h-4 w-4 text-orange-600" />
+                  <h3 className="text-sm font-semibold text-foreground">Top COI Signals</h3>
+                  <span className="text-xs text-muted-foreground">— tickers with ≥45% COI imbalance (strong conviction)</span>
+                  <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200">
+                    <Award className="h-3 w-3" />{topSignals.length} signal{topSignals.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                  {topSignals.map(item => {
+                    const coiSig = item.coiSignal ?? "NEUTRAL";
+                    const imbalance = item.coiImbalancePct ?? 0;
+                    const callPct = item.coiCallPct ?? 50;
+                    const putPct = item.coiPutPct ?? 50;
+                    const isBullish = coiSig === "BUY_CALL";
+                    const isBearish = coiSig === "BUY_PUT";
+                    const cardBg = isBullish ? "bg-emerald-50 border-emerald-300" : isBearish ? "bg-red-50 border-red-300" : "bg-slate-50 border-slate-200";
+                    const signalColor = isBullish ? "text-emerald-700" : isBearish ? "text-red-700" : "text-slate-600";
+                    const signalLabel = isBullish ? "BUY CALL" : isBearish ? "BUY PUT" : "NEUTRAL";
+                    const signalBg = isBullish ? "bg-emerald-100 border-emerald-300" : isBearish ? "bg-red-100 border-red-300" : "bg-slate-100 border-slate-200";
+                    const atmDelta = isBullish ? item.atmCallDelta : item.atmPutDelta;
+                    return (
+                      <div key={item.ticker} className={`rounded-lg border ${cardBg} p-3 relative overflow-hidden`}>
+                        {/* Imbalance strength bar — background strip */}
+                        <div
+                          className={`absolute inset-0 opacity-10 ${isBullish ? "bg-emerald-400" : isBearish ? "bg-red-400" : "bg-slate-400"}`}
+                          style={{ width: `${imbalance}%` }}
+                        />
+                        <div className="relative">
+                          <div className="flex items-start justify-between gap-1 mb-1.5">
+                            <div>
+                              <span className="font-bold text-sm text-foreground">{item.ticker}</span>
+                              {item.isExpiryDay && (
+                                <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 border border-red-300">EXPIRY</span>
+                              )}
+                              {item.isExpiryEve && !item.isExpiryDay && (
+                                <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-300">EXP EVE</span>
+                              )}
+                            </div>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${signalBg} ${signalColor}`}>
+                              {isBullish ? <TrendingUp className="h-3 w-3" /> : isBearish ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+                              {signalLabel}
+                            </span>
+                          </div>
+                          {/* COI imbalance bar */}
+                          <div className="mb-2">
+                            <div className="flex justify-between text-[9px] text-muted-foreground mb-0.5">
+                              <span>Calls {callPct.toFixed(0)}%</span>
+                              <span className={`font-bold ${signalColor}`}>{imbalance.toFixed(1)}% imbalance</span>
+                              <span>Puts {putPct.toFixed(0)}%</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-slate-200 overflow-hidden flex">
+                              <div className="h-full bg-emerald-400 transition-all" style={{ width: `${callPct}%` }} />
+                              <div className="h-full bg-red-400 transition-all" style={{ width: `${putPct}%` }} />
+                            </div>
+                          </div>
+                          {/* ATM strike + delta */}
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                            {item.atmStrike ? (
+                              <span>ATM <span className="font-bold text-foreground">${item.atmStrike.toFixed(2)}</span></span>
+                            ) : null}
+                            {atmDelta !== null && (
+                              <span>Δ <span className="font-bold text-foreground">{Math.abs(atmDelta).toFixed(2)}</span></span>
+                            )}
+                          </div>
+                          {/* Entry hint */}
+                          <p className="text-[10px] text-blue-700 font-medium mt-1.5 truncate">
+                            🎯 {isBullish ? "Buy ATM call" : isBearish ? "Buy ATM put" : "No trade"} — wait for VWAP pullback
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {scheduledLoading ? (
             <div className="space-y-2">

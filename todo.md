@@ -159,3 +159,4 @@
 - [x] Update PCR Strategy scan results UI — COI imbalance bar, ATM strike badge, expiry warning, VWAP entry hint
 - [x] Add TRADIER_API_KEY secret and validate with live tests (42 tests passing)
 - [x] Verified live COI pipeline: AAPL $298.01, ATM $297.50, 7-strike window, real OI from Tradier
+- [x] Add Top COI Signals summary card at top of 11:30 AM scan results (coiImbalancePct >= 45%, sorted by strength, with imbalance bar, ATM strike, delta, VWAP entry hint, expiry badges)
