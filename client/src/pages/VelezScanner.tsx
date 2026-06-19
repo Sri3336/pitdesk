@@ -281,9 +281,12 @@ function SignalRow({ signal }: { signal: DailySignal }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 // ─── How-To Video Modal ──────────────────────────────────────────────────────
+const VELEZ_YT_ID = "6rSI7Ibws_o";
 function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [playing, setPlaying] = useState(false);
+  const handleOpenChange = (v: boolean) => { if (!v) setPlaying(false); onClose(); };
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
         <DialogHeader className="px-5 pt-4 pb-2">
           <DialogTitle className="flex items-center gap-2 text-base">
@@ -292,14 +295,35 @@ function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void
           </DialogTitle>
         </DialogHeader>
         <div className="px-5 pb-5">
-          <div className="relative w-full rounded-lg overflow-hidden bg-slate-900" style={{ aspectRatio: "16/9" }}>
-            <iframe
-              src="https://www.youtube.com/embed/6rSI7Ibws_o?autoplay=1&rel=0"
-              title="PitDesk: How to Use the Velez Scanner"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="absolute inset-0 w-full h-full border-0"
-            />
+          <div
+            className="relative w-full rounded-lg overflow-hidden bg-slate-900 cursor-pointer"
+            style={{ aspectRatio: "16/9" }}
+            onClick={() => !playing && setPlaying(true)}
+          >
+            {playing ? (
+              <iframe
+                src={`https://www.youtube.com/embed/${VELEZ_YT_ID}?autoplay=1&rel=0`}
+                title="PitDesk: How to Use the Velez Scanner"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="absolute inset-0 w-full h-full border-0"
+              />
+            ) : (
+              <>
+                <img
+                  src={`https://img.youtube.com/vi/${VELEZ_YT_ID}/maxresdefault.jpg`}
+                  alt="Velez Scanner How-To thumbnail"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${VELEZ_YT_ID}/hqdefault.jpg`; }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-600/90 text-white shadow-lg hover:scale-105 transition-transform">
+                    <svg className="w-7 h-7 ml-1" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+                  </div>
+                </div>
+                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded font-medium">2:55</div>
+              </>
+            )}
           </div>
           <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
             <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">

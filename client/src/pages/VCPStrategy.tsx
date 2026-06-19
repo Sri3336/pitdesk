@@ -13,6 +13,7 @@ import {
   CheckCircle, XCircle, AlertTriangle, Zap, Share2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TICKER_UNIVERSE, SECTORS, type TickerInfo } from "../../../shared/tickerUniverse";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
@@ -289,83 +290,98 @@ function VCPRow({ item, tickerInfo }: { item: VCPBatchItem; tickerInfo?: TickerI
 }
 
 // ─── VCP Explainer Video Section ────────────────────────────────────────────
-function VCPExplainerSection() {
-  const [open, setOpen] = useState(false);
-
-  const handleToggle = () => {
-    setOpen(prev => !prev);
-  };
-
+const VCP_YT_ID = "MCxRAOXzUF4";
+function VCPHowToModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [playing, setPlaying] = useState(false);
+  const handleOpenChange = (v: boolean) => { if (!v) setPlaying(false); onClose(); };
   return (
-    <Card className="border-emerald-200 bg-emerald-50/50">
-      <CardContent className="pt-4 pb-3">
-        <button
-          onClick={handleToggle}
-          className="w-full flex items-center justify-between gap-3 text-left group"
-        >
-          <div className="flex items-center gap-3">
-            {/* Thumbnail preview — always visible */}
-            <div className="relative shrink-0 w-24 h-14 rounded-md overflow-hidden border border-emerald-200 shadow-sm">
-              <img
-                src="https://d2xsxph8kpxj0f.cloudfront.net/118490340/4ziQjLcBuBgPL6xfwF5uaR/vcp_frame1_title_new-5XsDeweQJKLtG3yBpKBRoG.webp"
-                alt="VCP Strategy explainer thumbnail"
-                className="w-full h-full object-cover"
-              />
-              {!open && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-600/90 text-white">
-                    <svg className="w-3.5 h-3.5 ml-0.5" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-emerald-900">How VCP Strategy Works</p>
-              <p className="text-xs text-emerald-700">Watch a 96-second explainer — Minervini VCP pattern, 9-point score, and breakout options plays</p>
-            </div>
-          </div>
-          <svg className={`w-4 h-4 text-emerald-600 transition-transform duration-200 ${open ? "rotate-180" : ""}`} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6l4 4 4-4"/></svg>
-        </button>
-
-        {open && (
-          <div className="mt-4">
-            <div className="relative w-full rounded-lg overflow-hidden bg-slate-900" style={{ aspectRatio: "16/9" }}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-4 pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <TrendingUp className="h-4 w-4 text-emerald-600" />
+            How to Use the VCP Strategy
+          </DialogTitle>
+        </DialogHeader>
+        <div className="px-5 pb-5">
+          <div
+            className="relative w-full rounded-lg overflow-hidden bg-slate-900 cursor-pointer"
+            style={{ aspectRatio: "16/9" }}
+            onClick={() => !playing && setPlaying(true)}
+          >
+            {playing ? (
               <iframe
-                src="https://www.youtube.com/embed/MCxRAOXzUF4?autoplay=1&rel=0"
+                src={`https://www.youtube.com/embed/${VCP_YT_ID}?autoplay=1&rel=0`}
                 title="PitDesk: How to Use the VCP Strategy"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 className="absolute inset-0 w-full h-full border-0"
               />
-            </div>
-            {/* Share button */}
-            <div className="mt-2 flex justify-end">
-              <button
-                onClick={() => {
-                  const url = `${window.location.origin}/vcp-strategy?howItWorks=open`;
-                  navigator.clipboard.writeText(url).then(() => toast.success("Link copied to clipboard!"));
-                }}
-                className="inline-flex items-center gap-1.5 text-xs text-emerald-700 hover:text-emerald-900 transition-colors px-2 py-1 rounded hover:bg-emerald-100"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                Share this explainer
-              </button>
-            </div>
-            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-              {[
-                { label: "Stage 1: Accumulation", hint: "Base building, low volume", color: "text-slate-700 bg-slate-50 border-slate-200" },
-                { label: "Stage 2: Uptrend", hint: "VCP forms here — buy zone", color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-                { label: "Pivot Breakout", hint: "Buy ATM call, 30–45 DTE", color: "text-blue-700 bg-blue-50 border-blue-200" },
-                { label: "Stop Loss", hint: "Close below pivot level", color: "text-red-700 bg-red-50 border-red-200" },
-              ].map(item => (
-                <div key={item.label} className={`rounded border p-2 ${item.color}`}>
-                  <p className="font-semibold leading-tight">{item.label}</p>
-                  <p className="mt-0.5 opacity-80">{item.hint}</p>
+            ) : (
+              <>
+                <img
+                  src={`https://img.youtube.com/vi/${VCP_YT_ID}/maxresdefault.jpg`}
+                  alt="VCP Strategy How-To thumbnail"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${VCP_YT_ID}/hqdefault.jpg`; }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-600/90 text-white shadow-lg hover:scale-105 transition-transform">
+                    <svg className="w-7 h-7 ml-1" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+                  </div>
                 </div>
-              ))}
+                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded font-medium">2:34</div>
+              </>
+            )}
+          </div>
+          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            {[
+              { label: "Stage 1: Accumulation", hint: "Base building, low volume", color: "text-slate-700 bg-slate-50 border-slate-200" },
+              { label: "Stage 2: Uptrend", hint: "VCP forms here — buy zone", color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+              { label: "Pivot Breakout", hint: "Buy ATM call, 30–45 DTE", color: "text-blue-700 bg-blue-50 border-blue-200" },
+              { label: "Stop Loss", hint: "Close below pivot level", color: "text-red-700 bg-red-50 border-red-200" },
+            ].map(item => (
+              <div key={item.label} className={`rounded border p-2 ${item.color}`}>
+                <p className="font-semibold leading-tight">{item.label}</p>
+                <p className="mt-0.5 opacity-80">{item.hint}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function VCPExplainerSection() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card className="border-emerald-200 bg-emerald-50/50">
+      <CardContent className="pt-4 pb-3">
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full flex items-center gap-3 text-left group hover:opacity-90 transition-opacity"
+        >
+          {/* YouTube thumbnail preview */}
+          <div className="relative shrink-0 w-24 h-14 rounded-md overflow-hidden border border-emerald-200 shadow-sm">
+            <img
+              src={`https://img.youtube.com/vi/${VCP_YT_ID}/hqdefault.jpg`}
+              alt="VCP Strategy explainer thumbnail"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-red-600/90 text-white">
+                <svg className="w-3.5 h-3.5 ml-0.5" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+              </div>
             </div>
           </div>
-        )}
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-emerald-900">How VCP Strategy Works</p>
+            <p className="text-xs text-emerald-700">Watch a 2m 34s explainer — Minervini VCP pattern, 9-point score, and breakout options plays</p>
+          </div>
+          <svg className="w-4 h-4 text-emerald-600 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 4l4 4-4 4"/></svg>
+        </button>
+        <VCPHowToModal open={open} onClose={() => setOpen(false)} />
       </CardContent>
     </Card>
   );
