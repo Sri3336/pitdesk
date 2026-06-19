@@ -311,7 +311,7 @@ function VCPExplainerSection() {
             {/* Thumbnail preview — always visible */}
             <div className="relative shrink-0 w-24 h-14 rounded-md overflow-hidden border border-emerald-200 shadow-sm">
               <img
-                src="/manus-storage/vcp_frame1_title_283b6057.png"
+                src="https://d2xsxph8kpxj0f.cloudfront.net/118490340/4ziQjLcBuBgPL6xfwF5uaR/vcp_frame1_title_new-5XsDeweQJKLtG3yBpKBRoG.webp"
                 alt="VCP Strategy explainer thumbnail"
                 className="w-full h-full object-cover"
               />
@@ -335,8 +335,8 @@ function VCPExplainerSection() {
           <div className="mt-4">
             <video
               ref={videoRef}
-              src="/manus-storage/vcp_explainer_4e87be26.mp4"
-              poster="/manus-storage/vcp_frame1_title_283b6057.png"
+              src="/manus-storage/vcp_explainer_new_d0de15b2.mp4"
+              poster="https://d2xsxph8kpxj0f.cloudfront.net/118490340/4ziQjLcBuBgPL6xfwF5uaR/vcp_frame1_title_new-5XsDeweQJKLtG3yBpKBRoG.webp"
               controls
               autoPlay
               className="w-full rounded-lg shadow-md max-h-[420px] bg-slate-900"
