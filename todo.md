@@ -160,3 +160,15 @@
 - [x] Add TRADIER_API_KEY secret and validate with live tests (42 tests passing)
 - [x] Verified live COI pipeline: AAPL $298.01, ATM $297.50, 7-strike window, real OI from Tradier
 - [x] Add Top COI Signals summary card at top of 11:30 AM scan results (coiImbalancePct >= 45%, sorted by strength, with imbalance bar, ATM strike, delta, VWAP entry hint, expiry badges)
+
+## Phase 16: Signal Board PCR Strategy Page Rewrite
+
+- [x] Reimagine PCR Strategy page as "Signal Board" (Option C) — heat map grid with sector grouping, slide-in detail panel, slim top bar with scan controls
+- [x] HeatCell component — color-coded by COI signal (BUY_CALL green, BUY_PUT red, PCR fallback), COI split mini-bar, expiry badge, strong-signal glow dot
+- [x] DetailPanel component — slide-in from right, COI split bar, ATM strike/delta/expiry grid, VWAP entry hint, PCR sentiment section
+- [x] ScanDetailTab — date selector from getScanRunDates, detail table with sector/signal filters, sort by delta/signal/pcr
+- [x] HistoryTab — last N scan runs with processed/actionable counts and top signals
+- [x] PCR Alert Settings Tab — unchanged from prior version
+- [x] PCRTrendChart tab — named import fix (was default, now named export)
+- [x] Fix TypeScript errors: getScanRunDetail { date } → { runDate }, PCRTrendChart named import, Set spread → Array.from(new Set(...)), void mutations .mutate() not .mutate({})
+- [x] 0 TypeScript errors, 42 tests passing
