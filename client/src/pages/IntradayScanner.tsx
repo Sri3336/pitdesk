@@ -41,6 +41,7 @@ import {
   Save,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { INTRADAY_TICKER_SYMBOLS } from "@shared/intradayTickers";
 
@@ -187,6 +188,92 @@ function ScorecardModal({ card, onClose }: { card: IntradayScorecard | null; onC
   );
 }
 
+// ─── Record Outcome Dialog ──────────────────────────────────────────────────
+
+function RecordOutcomeDialog({
+  card,
+  onClose,
+}: {
+  card: IntradayScorecard | null;
+  onClose: () => void;
+}) {
+  const [exitPrice, setExitPrice] = useState("");
+  const utils = trpc.useUtils();
+  const recordMutation = trpc.intraday.recordOutcome.useMutation({
+    onSuccess: (result) => {
+      const emoji = result.outcome === "win" ? "✅" : result.outcome === "loss" ? "❌" : "➡️";
+      toast.success(`${emoji} ${card?.ticker} — ${result.outcome.toUpperCase()} (${result.pnlPct.toFixed(2)}% P&L)`);
+      utils.intraday.getBacktestStats.invalidate();
+      setExitPrice("");
+      onClose();
+    },
+    onError: (e) => toast.error(`Failed to record outcome: ${e.message}`),
+  });
+  if (!card) return null;
+  const entryPrice = card.currentPrice ?? 0;
+  const exit = parseFloat(exitPrice);
+  const pnlPct = exitPrice && !isNaN(exit) && entryPrice > 0
+    ? ((exit - entryPrice) / entryPrice) * (card.direction === "Bearish" ? -1 : 1) * 100
+    : null;
+  return (
+    <Dialog open={!!card} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Record Outcome — {card.ticker}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Entry price (at scan)</span>
+            <span className="font-mono font-bold">${entryPrice.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Direction</span>
+            <span className={`font-semibold ${
+              card.direction === "Bullish" ? "text-green-600" : card.direction === "Bearish" ? "text-red-500" : "text-gray-500"
+            }`}>{card.direction}</span>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="exit-price">Exit price</Label>
+            <input
+              id="exit-price"
+              type="number"
+              step="0.01"
+              placeholder="e.g. 185.50"
+              value={exitPrice}
+              onChange={(e) => setExitPrice(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+          {pnlPct !== null && (
+            <div className={`text-center text-lg font-bold ${
+              pnlPct > 0.5 ? "text-green-600" : pnlPct < -0.5 ? "text-red-500" : "text-gray-500"
+            }`}>
+              {pnlPct > 0 ? "+" : ""}{pnlPct.toFixed(2)}% → {pnlPct > 0.5 ? "WIN" : pnlPct < -0.5 ? "LOSS" : "NEUTRAL"}
+            </div>
+          )}
+          <Button
+            className="w-full bg-green-600 hover:bg-green-700 text-white"
+            disabled={!exitPrice || isNaN(exit) || exit <= 0 || recordMutation.isPending}
+            onClick={() => {
+              if (!entryPrice) return;
+              recordMutation.mutate({
+                scanResultId: 0,
+                ticker: card.ticker,
+                grade: (card.grade === "A" || card.grade === "B" || card.grade === "C" ? card.grade : "none") as "A" | "B" | "C" | "none",
+                direction: card.direction.toLowerCase() as "bullish" | "bearish" | "neutral",
+                entryPrice,
+                exitPrice: exit,
+              });
+            }}
+          >
+            {recordMutation.isPending ? "Saving…" : "Record Outcome"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Results Table ────────────────────────────────────────────────────────────
 
 function ResultsTable({
@@ -202,6 +289,7 @@ function ResultsTable({
 }) {
   const [filter, setFilter] = useState<"all" | "A" | "B" | "C" | "D">("all");
   const [search, setSearch] = useState("");
+  const [outcomeCard, setOutcomeCard] = useState<IntradayScorecard | null>(null);
 
   const sorted = useMemo(() => {
     return [...results]
@@ -215,6 +303,7 @@ function ResultsTable({
   const gradeB = results.filter((r) => r.grade === "B" && !r.error).length;
 
   return (
+    <>
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -305,7 +394,15 @@ function ResultsTable({
                     <TableCell className="text-right font-mono text-sm">${r.currentPrice?.toFixed(2) ?? "—"}</TableCell>
                     <TableCell className="text-right font-mono text-sm text-gray-500">${r.vwap?.toFixed(2) ?? "—"}</TableCell>
                     <TableCell className="text-right">
-                      <span className="text-xs text-green-700 hover:underline">Details →</span>
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-xs text-green-700 hover:underline" onClick={() => onSelect(r)}>Details →</span>
+                        <button
+                          className="px-2 py-0.5 text-xs border border-gray-300 rounded hover:border-green-500 hover:text-green-700 transition-colors"
+                          onClick={() => setOutcomeCard(r)}
+                        >
+                          Record
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -315,6 +412,8 @@ function ResultsTable({
         )}
       </CardContent>
     </Card>
+    <RecordOutcomeDialog card={outcomeCard} onClose={() => setOutcomeCard(null)} />
+    </>
   );
 }
 

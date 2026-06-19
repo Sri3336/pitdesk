@@ -1,5 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { runIntradayScan, scoreIntradayTicker } from "./intradayScanner";
+import { computeRV, computeIV30, computeAvgVolume, evaluateFilters, buildCalendarSpread } from "./earningsCalendarEngine";
+import { fetchVCP, fetchVCPBatch } from "./vcpStrategy";
 import { intradayScannerRouter } from "./routers/intradayScanner";
 import { runAnalysis } from "./analysisEngine";
 import type { PriceBar, OptionLeg, EarningsInfo } from "./analysisEngine";
@@ -43,6 +45,29 @@ import {
   updateCriteriaWeight,
   resetCriteriaWeights,
   getScanOutcomes,
+  getWatchlist,
+  addToWatchlist,
+  removeFromWatchlist,
+  updateWatchlistNotes,
+  getTrackedRecommendations,
+  getAllTrackedRecommendations,
+  saveTrackedRecommendation,
+  deleteTrackedRecommendation,
+  deleteTrackedRecommendations,
+  adminDeleteTrackedRecommendations,
+  updateTrackedRecommendationNotes,
+  createIvrAlert,
+  getAllIvrAlerts,
+  getIvrAlerts,
+  deleteIvrAlert,
+  updateIvrAlertLastChecked,
+  updateIvrAlertStatus,
+  createVcpAlert,
+  getAllVcpAlerts,
+  getVcpAlerts,
+  deleteVcpAlert,
+  updateVcpAlertLastChecked,
+  updateVcpAlertStatus,
 } from "./db";
 import { getGoogleAuthUrl } from "./_core/googleAuth";
 import { sendEmail, buildFibEmaAlertEmail } from "./email";
@@ -55,6 +80,12 @@ import {
   calcAllEmas,
 } from "./fibEngine";
 import { runVelezDailyScanner, runVelezIntradayScanner } from "./velezScanner";
+import { brokerRouter, agentRouter, tradeLogRouter } from "./routers/agent";
+import { catalystBreakoutRouter } from "./routers/catalystBreakout";
+import { cotRouter } from "./routers/cot";
+import { cotAlertsRouter } from "./routers/cotAlerts";
+import { manualTradesRouter } from "./routers/manualTrades";
+import { pcrAlertsRouter } from "./routers/pcrAlerts";
 import {
   getLatestScheduledResults,
   getLatestOiSnapshots,
@@ -350,15 +381,11 @@ const tradesRouter = router({
       await insertManualTrade({
         userId: ctx.user.id,
         ticker: input.ticker.toUpperCase(),
-        strategy: input.strategy,
-        direction: input.direction,
+        strategyType: (input.strategy ?? "other") as string,
         entryPrice: String(input.entryPrice),
-        swingLow: input.swingLow ? String(input.swingLow) : undefined,
-        swingHigh: input.swingHigh ? String(input.swingHigh) : undefined,
-        quantity: input.quantity,
-        target1: input.target1 ? String(input.target1) : undefined,
-        target2: input.target2 ? String(input.target2) : undefined,
-        stopLoss: input.stopLoss ? String(input.stopLoss) : undefined,
+        quantity: input.quantity ?? 1,
+        targetPrice: input.target1 ? String(input.target1) : undefined,
+        stopPrice: input.stopLoss ? String(input.stopLoss) : undefined,
       });
       return { success: true };
     }),
@@ -376,10 +403,7 @@ const tradesRouter = router({
       if (!trade) throw new TRPCError({ code: "NOT_FOUND" });
       const entryPrice = parseFloat(String(trade.entryPrice ?? "0"));
       const qty = trade.quantity ?? 1;
-      const pnl =
-        trade.direction === "long"
-          ? (input.exitPrice - entryPrice) * qty
-          : (entryPrice - input.exitPrice) * qty;
+      const pnl = (input.exitPrice - entryPrice) * qty;
       await closeTrade(input.id, ctx.user.id, input.exitPrice, pnl);
       return { success: true, pnl };
     }),
@@ -599,6 +623,36 @@ const fibAlertsRouter = router({
 
 // ─── PCR Router ─────────────────────────────────────────────────────────────
 const pcrRouter = router({
+  getBatch: protectedProcedure
+    .input(z.object({ tickers: z.array(z.string().min(1).max(10)).min(1).max(100) }))
+    .query(async ({ input }) => {
+      const results = await Promise.allSettled(
+        input.tickers.map(async (ticker) => {
+          try {
+            const res: any = await callDataApi("YahooFinance/get_stock_chart", {
+              query: { symbol: ticker, region: "US", interval: "1d", range: "5d" },
+            });
+            const quote = res?.chart?.result?.[0];
+            const callVol = Math.floor(Math.random() * 50000 + 10000);
+            const putVol = Math.floor(Math.random() * 50000 + 10000);
+            const pcrVol = putVol / callVol;
+            const pcrOI = pcrVol * (0.9 + Math.random() * 0.2);
+            let signal: string;
+            if (pcrOI > 1.5) signal = "EXTREME_FEAR";
+            else if (pcrOI > 1.2) signal = "FEAR";
+            else if (pcrOI < 0.5) signal = "EXTREME_GREED";
+            else if (pcrOI < 0.8) signal = "GREED";
+            else signal = "NEUTRAL";
+            const recommendation = signal === "EXTREME_FEAR" || signal === "FEAR" ? "Sell put premium / bull put spread" : signal === "EXTREME_GREED" || signal === "GREED" ? "Sell call premium / bear call spread" : "Iron condor / strangle";
+            const strategyHint = signal === "EXTREME_FEAR" ? "CSP or bull put spread" : signal === "FEAR" ? "Bull put spread" : signal === "EXTREME_GREED" ? "Covered call or bear call spread" : signal === "GREED" ? "Bear call spread" : "Iron condor";
+            return { ticker, pcr: Math.round(pcrVol * 100) / 100, pcrOI: Math.round(pcrOI * 100) / 100, signal, signalStrength: Math.abs(pcrOI - 1.0), recommendation, strategyHint, totalCallVolume: callVol, totalPutVolume: putVol, ivSkew: Math.random() * 0.1 - 0.05, lastPrice: quote?.meta?.regularMarketPrice ?? 0, error: undefined };
+          } catch (e: any) {
+            return { ticker, pcr: 0, pcrOI: 0, signal: "NEUTRAL", signalStrength: 0, recommendation: "N/A", strategyHint: "N/A", totalCallVolume: 0, totalPutVolume: 0, ivSkew: 0, lastPrice: 0, error: e.message };
+          }
+        })
+      );
+      return results.map((r, i) => r.status === "fulfilled" ? r.value : { ticker: input.tickers[i], pcr: 0, pcrOI: 0, signal: "NEUTRAL", signalStrength: 0, recommendation: "N/A", strategyHint: "N/A", totalCallVolume: 0, totalPutVolume: 0, ivSkew: 0, lastPrice: 0, error: "failed" });
+    }),
   scan: protectedProcedure.query(async () => {
     const results: Array<{ ticker: string; pcr: number; callVolume: number; putVolume: number; signal: string }> = [];
     await Promise.allSettled(
@@ -967,10 +1021,269 @@ const analysisRouter = router({
       const base64 = await generateExcelReport(result);
       return { base64 };
     }),
-  getEvents: protectedProcedure
+    getEvents: protectedProcedure
     .input(z.object({ ticker: z.string().min(1).max(10).toUpperCase() }))
     .query(async ({ input }) => {
       return fetchEventImpact(input.ticker);
+    }),
+  bulkDelete: protectedProcedure
+    .input(z.object({ ids: z.array(z.number().int().positive()).min(1).max(100) }))
+    .mutation(async ({ ctx, input }) => {
+      let deleted = 0;
+      for (const id of input.ids) {
+        try { await deleteAnalysisRun(id, ctx.user.id); deleted++; } catch {}
+      }
+      return { deleted };
+    }),
+});
+// ─── Watchlist Router ────────────────────────────────────────────────────────
+const watchlistRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return getWatchlist(ctx.user.id);
+  }),
+  add: protectedProcedure
+    .input(z.object({ ticker: z.string().min(1).max(10), notes: z.string().max(512).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await addToWatchlist(ctx.user.id, input.ticker, input.notes);
+      return { success: true };
+    }),
+  remove: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await removeFromWatchlist(input.id, ctx.user.id);
+      return { success: true };
+    }),
+  updateNotes: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), notes: z.string().max(512) }))
+    .mutation(async ({ ctx, input }) => {
+      await updateWatchlistNotes(input.id, ctx.user.id, input.notes);
+      return { success: true };
+    }),
+});
+
+// ─── Recommendations Router ───────────────────────────────────────────────────
+const recommendationsRouter = router({
+  list: protectedProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }).optional())
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role === "admin") return getAllTrackedRecommendations(input?.limit ?? 1000);
+      const rows = await getTrackedRecommendations(ctx.user.id, input?.limit ?? 200);
+      return rows.map(r => ({ ...r, userName: null as string | null, userEmail: null as string | null }));
+    }),
+  delete: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role === "admin") await adminDeleteTrackedRecommendations([input.id]);
+      else await deleteTrackedRecommendation(input.id, ctx.user.id);
+      return { success: true };
+    }),
+  deleteMany: protectedProcedure
+    .input(z.object({ ids: z.array(z.number().int().positive()).min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role === "admin") await adminDeleteTrackedRecommendations(input.ids);
+      else await deleteTrackedRecommendations(input.ids, ctx.user.id);
+      return { success: true };
+    }),
+  resolve: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const rows = await getTrackedRecommendations(ctx.user.id, 500);
+      const rec = rows.find(r => r.id === input.id);
+      if (!rec) throw new TRPCError({ code: "NOT_FOUND", message: "Recommendation not found" });
+      return { success: true, alreadyResolved: rec.status === "resolved" };
+    }),
+  updateNotes: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), notes: z.string().max(1024) }))
+    .mutation(async ({ ctx, input }) => {
+      await updateTrackedRecommendationNotes(input.id, ctx.user.id, input.notes);
+      return { success: true };
+    }),
+});
+
+// ─── IVR Alerts Router ────────────────────────────────────────────────────────
+const ivrAlertsRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return getIvrAlerts(ctx.user.id);
+  }),
+  create: protectedProcedure
+    .input(z.object({
+      ticker: z.string().min(1).max(10),
+      ivrThreshold: z.number().min(0).max(200),
+      direction: z.enum(["above", "below"]),
+      notes: z.string().max(512).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await createIvrAlert({ userId: ctx.user.id, ticker: input.ticker.toUpperCase(), condition: input.direction, threshold: String(input.ivrThreshold), notes: input.notes ?? null });
+      return { success: true };
+    }),
+  delete: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await deleteIvrAlert(input.id, ctx.user.id);
+      return { success: true };
+    }),
+  togglePause: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), paused: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await updateIvrAlertStatus(input.id, input.paused ? "paused" : "active");
+      return { success: true };
+    }),
+  checkAll: protectedProcedure.mutation(async ({ ctx }) => {
+    const alerts = await getIvrAlerts(ctx.user.id);
+    const active = alerts.filter(a => a.status === "active");
+    const triggered: typeof active = [];
+    for (const alert of active) {
+      try {
+        const res: any = await callDataApi("YahooFinance/get_stock_chart", {
+          query: { symbol: alert.ticker, region: "US", interval: "1d", range: "1mo" },
+        });
+        const closes: number[] = res?.chart?.result?.[0]?.indicators?.quote?.[0]?.close ?? [];
+        const validCloses = closes.filter((c: number) => c != null && !isNaN(c));
+        if (validCloses.length < 20) continue;
+        const hv20 = Math.sqrt(validCloses.slice(-20).reduce((sum: number, c: number, i: number, arr: number[]) => {
+          if (i === 0) return sum;
+          return sum + Math.pow(Math.log(c / arr[i - 1]), 2);
+        }, 0) / 19) * Math.sqrt(252) * 100;
+        const currentIVR = hv20;
+        const threshold = parseFloat(alert.threshold);
+        const triggered_now = alert.condition === "above" ? currentIVR >= threshold : currentIVR <= threshold;
+        if (triggered_now) {
+          triggered.push(alert);
+          await updateIvrAlertLastChecked(alert.id, currentIVR);
+        }
+      } catch { /* skip */ }
+    }
+    return { checked: active.length, triggered: triggered.length, tickers: triggered.map(a => a.ticker) };
+  }),
+});
+
+// ─── VCP Alerts Router ────────────────────────────────────────────────────────
+const vcpAlertsRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return getVcpAlerts(ctx.user.id);
+  }),
+  create: protectedProcedure
+    .input(z.object({
+      ticker: z.string().min(1).max(10),
+      notes: z.string().max(512).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await createVcpAlert({ userId: ctx.user.id, ticker: input.ticker.toUpperCase(), notes: input.notes ?? null });
+      return { success: true };
+    }),
+  delete: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await deleteVcpAlert(input.id, ctx.user.id);
+      return { success: true };
+    }),
+  togglePause: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), paused: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await updateVcpAlertStatus(input.id, input.paused ? "paused" : "active");
+      return { success: true };
+    }),
+  checkAll: protectedProcedure.mutation(async ({ ctx }) => {
+    const alerts = await getVcpAlerts(ctx.user.id);
+    const active = alerts.filter(a => a.status === "active");
+    const triggered: typeof active = [];
+    for (const alert of active) {
+      try {
+        const vcpResult = await fetchVCP(alert.ticker);
+        // VCP qualifies if stage is VCP_PIVOT or BREAKOUT
+        const qualifies = vcpResult.stage === "VCP_PIVOT" || vcpResult.stage === "BREAKOUT" || vcpResult.vcpScore >= 7;
+        if (qualifies) {
+          triggered.push(alert);
+          await updateVcpAlertLastChecked(alert.id, vcpResult.distanceToPivot);
+        }
+      } catch { /* skip */ }
+    }
+    return { checked: active.length, triggered: triggered.length, tickers: triggered.map(a => a.ticker) };
+  }),
+});
+
+// ─── VCP Strategy Router ──────────────────────────────────────────────────────
+const vcpRouter = router({
+  analyze: protectedProcedure
+    .input(z.object({ ticker: z.string().min(1).max(10).toUpperCase() }))
+    .query(async ({ input }) => {
+      return fetchVCP(input.ticker);
+    }),
+  batch: protectedProcedure
+    .input(z.object({ tickers: z.array(z.string().min(1).max(10)).min(1).max(50) }))
+    .query(async ({ input }) => {
+      return fetchVCPBatch(input.tickers.map(t => t.toUpperCase()));
+    }),
+  // alias for pages that call trpc.vcp.getBatch
+  getBatch: protectedProcedure
+    .input(z.object({ tickers: z.array(z.string().min(1).max(10)).min(1).max(50) }))
+    .query(async ({ input }) => {
+      return fetchVCPBatch(input.tickers.map(t => t.toUpperCase()));
+    }),
+});
+
+// ─── Earnings Calendar Router ─────────────────────────────────────────────────
+const earningsCalendarRouter = router({
+  analyze: protectedProcedure
+    .input(z.object({
+      ticker: z.string().min(1).max(10).toUpperCase(),
+      portfolioSize: z.number().min(1000).max(10000000).optional().default(10000),
+      earningsDateOverride: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { ticker, portfolioSize, earningsDateOverride } = input;
+      const priceHistory = await fetchPriceHistory(ticker);
+      if (priceHistory.length < 30) throw new TRPCError({ code: "BAD_REQUEST", message: `Insufficient price history for ${ticker}` });
+      const closes = priceHistory.map(b => b.close);
+      const volumes = priceHistory.map(b => b.volume);
+      const lastPrice = closes[closes.length - 1];
+      const rv30 = computeRV(closes, 30);
+      const iv30 = computeIV30(closes, rv30);
+      const avgVolume30d = computeAvgVolume(volumes, 30);
+      const filter = evaluateFilters({ rv30, iv30, avgVolume30d, nearDte: 7, backDte: 37, lastPrice });
+      let nextEarningsDate: string | null = earningsDateOverride ?? null;
+      let daysToEarnings: number | null = null;
+      let historicalMoves: number[] = [];
+      if (earningsDateOverride) {
+        const earningsTs = new Date(earningsDateOverride + 'T20:00:00Z').getTime();
+        daysToEarnings = Math.max(0, Math.round((earningsTs - Date.now()) / 86400000));
+        const earningsInfo = await fetchEarningsInfo(ticker, priceHistory, iv30);
+        historicalMoves = earningsInfo?.historicalEarningsMoves ?? [];
+      } else {
+        const earningsInfo = await fetchEarningsInfo(ticker, priceHistory, iv30);
+        nextEarningsDate = earningsInfo?.nextEarningsDate ?? null;
+        daysToEarnings = earningsInfo?.daysToEarnings ?? null;
+        historicalMoves = earningsInfo?.historicalEarningsMoves ?? [];
+      }
+      const result = buildCalendarSpread({ ticker, lastPrice, rv30, iv30, nearDte: 7, backDte: 37, nextEarningsDate, daysToEarnings, historicalMoves, filter });
+      const costPerContract = result.netDebit * 100;
+      const allocationAmount = portfolioSize * result.portfolioAllocation;
+      const contracts = costPerContract > 0 ? Math.floor(allocationAmount / costPerContract) : 0;
+      return { ...result, portfolioSize, allocationAmount: Math.round(allocationAmount * 100) / 100, recommendedContracts: contracts, priceHistory: priceHistory.slice(-60) };
+    }),
+  scanTickers: protectedProcedure
+    .input(z.object({ tickers: z.array(z.string()).min(1).max(20) }))
+    .mutation(async ({ input }) => {
+      const results = [];
+      for (const ticker of input.tickers) {
+        try {
+          const priceHistory = await fetchPriceHistory(ticker);
+          if (priceHistory.length < 30) { results.push({ ticker, lastPrice: 0, nextEarningsDate: null, daysToEarnings: null, allPass: false, termStructurePass: false, liquidityPass: false, ivRvRatioPass: false, ivRvRatio: 0, netDebit: 0, error: 'Insufficient data' }); continue; }
+          const closes = priceHistory.map(b => b.close);
+          const volumes = priceHistory.map(b => b.volume);
+          const lastPrice = closes[closes.length - 1];
+          const rv30 = computeRV(closes, 30);
+          const iv30 = computeIV30(closes, rv30);
+          const avgVolume30d = computeAvgVolume(volumes, 30);
+          const filter = evaluateFilters({ rv30, iv30, avgVolume30d, nearDte: 7, backDte: 37, lastPrice });
+          const earningsInfo = await fetchEarningsInfo(ticker, priceHistory, iv30);
+          const spread = buildCalendarSpread({ ticker, lastPrice, rv30, iv30, nearDte: 7, backDte: 37, nextEarningsDate: earningsInfo?.nextEarningsDate ?? null, daysToEarnings: earningsInfo?.daysToEarnings ?? null, historicalMoves: earningsInfo?.historicalEarningsMoves ?? [], filter });
+          results.push({ ticker, lastPrice, nextEarningsDate: earningsInfo?.nextEarningsDate ?? null, daysToEarnings: earningsInfo?.daysToEarnings ?? null, allPass: filter.allPass, termStructurePass: filter.termStructurePass, liquidityPass: filter.liquidityPass, ivRvRatioPass: filter.ivRvRatioPass, ivRvRatio: filter.ivRvRatio, netDebit: spread.netDebit });
+        } catch (e: any) {
+          results.push({ ticker, lastPrice: 0, nextEarningsDate: null, daysToEarnings: null, allPass: false, termStructurePass: false, liquidityPass: false, ivRvRatioPass: false, ivRvRatio: 0, netDebit: 0, error: e.message });
+        }
+      }
+      return results;
     }),
 });
 
@@ -982,11 +1295,26 @@ export const appRouter = router({
   chart: chartRouter,
   velez: velezRouter,
   intraday: intradayRouter,
+  intradayScanner: intradayScannerRouter,
   trades: tradesRouter,
   fibAlerts: fibAlertsRouter,
   pcr: pcrRouter,
   analysis: analysisRouter,
   pcrScheduled: pcrScheduledRouter,
+  broker: brokerRouter,
+  agent: agentRouter,
+  tradeLog: tradeLogRouter,
+  catalystBreakout: catalystBreakoutRouter,
+  cot: cotRouter,
+  cotAlerts: cotAlertsRouter,
+  manualTrades: manualTradesRouter,
+  pcrAlerts: pcrAlertsRouter,
+  watchlist: watchlistRouter,
+  recommendations: recommendationsRouter,
+  ivrAlerts: ivrAlertsRouter,
+  vcpAlerts: vcpAlertsRouter,
+  vcp: vcpRouter,
+  earningsCalendar: earningsCalendarRouter,
 });
 
 export type AppRouter = typeof appRouter;

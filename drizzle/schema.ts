@@ -48,27 +48,30 @@ export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export const manualTrades = mysqlTable("manual_trades", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
-  ticker: varchar("ticker", { length: 16 }).notNull(),
-  strategy: varchar("strategy", { length: 64 }),
-  direction: mysqlEnum("direction", ["long", "short"]).default("long").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  strategyType: varchar("strategyType", { length: 64 }).default("other").notNull(),
+  account: varchar("account", { length: 32 }).default("other").notNull(),
+  entryDate: varchar("entryDate", { length: 10 }),
   entryPrice: decimal("entryPrice", { precision: 12, scale: 4 }),
+  quantity: int("quantity").default(1).notNull(),
+  exitDate: varchar("exitDate", { length: 10 }),
   exitPrice: decimal("exitPrice", { precision: 12, scale: 4 }),
-  swingLow: decimal("swingLow", { precision: 12, scale: 4 }),
-  swingHigh: decimal("swingHigh", { precision: 12, scale: 4 }),
-  quantity: int("quantity"),
-  target1: decimal("target1", { precision: 12, scale: 4 }),
-  target2: decimal("target2", { precision: 12, scale: 4 }),
-  stopLoss: decimal("stopLoss", { precision: 12, scale: 4 }),
-  pnl: decimal("pnl", { precision: 12, scale: 4 }),
-  status: mysqlEnum("status", ["open", "closed"]).default("open").notNull(),
-  postTradeNotes: text("postTradeNotes"),
-  lessonsLearned: text("lessonsLearned"),
-  enteredAt: timestamp("enteredAt").defaultNow().notNull(),
-  closedAt: timestamp("closedAt"),
+  targetPrice: decimal("targetPrice", { precision: 12, scale: 4 }),
+  stopPrice: decimal("stopPrice", { precision: 12, scale: 4 }),
+  maxLoss: decimal("maxLoss", { precision: 12, scale: 4 }),
+  maxProfit: decimal("maxProfit", { precision: 12, scale: 4 }),
+  expiryDate: varchar("expiryDate", { length: 10 }),
+  realizedPnl: decimal("realizedPnl", { precision: 12, scale: 4 }),
+  realizedPnlPct: decimal("realizedPnlPct", { precision: 8, scale: 4 }),
+  status: mysqlEnum("status", ["open", "closed", "cancelled"]).default("open").notNull(),
+  source: varchar("source", { length: 32 }).default("manual").notNull(),
+  notes: varchar("notes", { length: 512 }),
+  postTradeNotes: varchar("postTradeNotes", { length: 1024 }),
+  lessonsLearned: varchar("lessonsLearned", { length: 512 }),
+  tags: varchar("tags", { length: 256 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
-
 export type ManualTrade = typeof manualTrades.$inferSelect;
 export type InsertManualTrade = typeof manualTrades.$inferInsert;
 
@@ -284,3 +287,183 @@ export const trackedRecommendations = mysqlTable("tracked_recommendations", {
 }));
 export type TrackedRecommendation = typeof trackedRecommendations.$inferSelect;
 export type InsertTrackedRecommendation = typeof trackedRecommendations.$inferInsert;
+
+// ─── Watchlist ────────────────────────────────────────────────────────────────
+export const watchlist = mysqlTable("watchlist", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  notes: varchar("notes", { length: 512 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  uniqWatch: uniqueIndex("uniq_watchlist").on(t.userId, t.ticker),
+}));
+export type Watchlist = typeof watchlist.$inferSelect;
+export type InsertWatchlist = typeof watchlist.$inferInsert;
+
+// ─── IVR Alerts ───────────────────────────────────────────────────────────────
+export const ivrAlerts = mysqlTable("ivr_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  condition: mysqlEnum("condition", ["above", "below"]).notNull(),
+  threshold: decimal("threshold", { precision: 5, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["active", "triggered", "paused"]).default("active").notNull(),
+  lastCheckedAt: timestamp("lastCheckedAt"),
+  lastTriggeredAt: timestamp("lastTriggeredAt"),
+  lastIvr: decimal("lastIvr", { precision: 5, scale: 2 }),
+  notes: varchar("notes", { length: 256 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  uniqAlert: uniqueIndex("uniq_ivr_alert").on(t.userId, t.ticker, t.condition, t.threshold),
+}));
+export type IvrAlert = typeof ivrAlerts.$inferSelect;
+export type InsertIvrAlert = typeof ivrAlerts.$inferInsert;
+
+// ─── Broker Connections ───────────────────────────────────────────────────────
+export const brokerConnections = mysqlTable("broker_connections", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  broker: mysqlEnum("broker", ["schwab", "etrade"]).notNull(),
+  accessToken: text("accessToken").notNull(),
+  refreshToken: text("refreshToken"),
+  tokenExpiry: timestamp("tokenExpiry"),
+  accountId: varchar("accountId", { length: 64 }),
+  accountLabel: varchar("accountLabel", { length: 128 }),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  uniqBroker: uniqueIndex("uniq_broker_connection").on(t.userId, t.broker),
+}));
+export type BrokerConnection = typeof brokerConnections.$inferSelect;
+export type InsertBrokerConnection = typeof brokerConnections.$inferInsert;
+
+// ─── Agent Runs ───────────────────────────────────────────────────────────────
+export const agentRuns = mysqlTable("agent_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  triggeredBy: mysqlEnum("triggeredBy", ["schedule", "manual"]).notNull(),
+  status: mysqlEnum("status", ["running", "completed", "failed"]).default("running").notNull(),
+  tickersScanned: text("tickersScanned"),
+  proposalsGenerated: int("proposalsGenerated").default(0).notNull(),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+});
+export type AgentRun = typeof agentRuns.$inferSelect;
+export type InsertAgentRun = typeof agentRuns.$inferInsert;
+
+// ─── Trade Proposals ──────────────────────────────────────────────────────────
+export const tradeProposals = mysqlTable("trade_proposals", {
+  id: int("id").autoincrement().primaryKey(),
+  agentRunId: int("agentRunId"),
+  userId: int("userId").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  strategy: varchar("strategy", { length: 64 }).notNull(),
+  legsJson: text("legsJson").notNull(),
+  underlyingPrice: decimal("underlyingPrice", { precision: 12, scale: 4 }).notNull(),
+  netCredit: decimal("netCredit", { precision: 10, scale: 4 }).notNull(),
+  maxProfit: decimal("maxProfit", { precision: 10, scale: 4 }).notNull(),
+  maxLoss: decimal("maxLoss", { precision: 10, scale: 4 }).notNull(),
+  breakeven: decimal("breakeven", { precision: 12, scale: 4 }).notNull(),
+  pop: decimal("pop", { precision: 6, scale: 4 }).notNull(),
+  contracts: int("contracts").notNull(),
+  bpRequired: decimal("bpRequired", { precision: 12, scale: 2 }).notNull(),
+  compositeScore: decimal("compositeScore", { precision: 6, scale: 2 }).notNull(),
+  expiryDate: timestamp("expiryDate").notNull(),
+  targetDte: int("targetDte").notNull(),
+  broker: mysqlEnum("broker", ["schwab", "etrade"]),
+  status: mysqlEnum("status", ["pending", "approved", "rejected", "executed", "failed"]).default("pending").notNull(),
+  rejectionReason: varchar("rejectionReason", { length: 256 }),
+  executedAt: timestamp("executedAt"),
+  reviewedAt: timestamp("reviewedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type TradeProposal = typeof tradeProposals.$inferSelect;
+export type InsertTradeProposal = typeof tradeProposals.$inferInsert;
+
+// ─── Trade Log (Agent-executed trades) ───────────────────────────────────────
+export const tradeLog = mysqlTable("trade_log", {
+  id: int("id").autoincrement().primaryKey(),
+  proposalId: int("proposalId").notNull(),
+  userId: int("userId").notNull(),
+  broker: mysqlEnum("broker", ["schwab", "etrade"]).notNull(),
+  brokerOrderId: varchar("brokerOrderId", { length: 128 }),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  strategy: varchar("strategy", { length: 64 }).notNull(),
+  legsJson: text("legsJson").notNull(),
+  contracts: int("contracts").notNull(),
+  fillPrice: decimal("fillPrice", { precision: 10, scale: 4 }),
+  maxLoss: decimal("maxLoss", { precision: 10, scale: 4 }).notNull(),
+  status: mysqlEnum("status", ["open", "closed", "expired"]).default("open").notNull(),
+  closedAt: timestamp("closedAt"),
+  closeFillPrice: decimal("closeFillPrice", { precision: 10, scale: 4 }),
+  realizedPnl: decimal("realizedPnl", { precision: 10, scale: 4 }),
+  executedAt: timestamp("executedAt").defaultNow(),
+  closedPnl: decimal("closedPnl", { precision: 10, scale: 4 }),
+  notes: varchar("notes", { length: 512 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type TradeLogEntry = typeof tradeLog.$inferSelect;
+export type InsertTradeLogEntry = typeof tradeLog.$inferInsert;
+
+// ─── VCP Alerts ───────────────────────────────────────────────────────────────
+export const vcpAlerts = mysqlTable("vcp_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  proximityPct: decimal("proximityPct", { precision: 5, scale: 2 }).notNull().default("3.00"),
+  status: mysqlEnum("status", ["active", "triggered", "paused"]).default("active").notNull(),
+  lastCheckedAt: timestamp("lastCheckedAt"),
+  lastTriggeredAt: timestamp("lastTriggeredAt"),
+  lastDistancePct: decimal("lastDistancePct", { precision: 6, scale: 2 }),
+  notes: varchar("notes", { length: 256 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  uniqVcpAlert: uniqueIndex("uniq_vcp_alert").on(t.userId, t.ticker),
+}));
+export type VcpAlert = typeof vcpAlerts.$inferSelect;
+export type InsertVcpAlert = typeof vcpAlerts.$inferInsert;
+
+// ─── Catalyst Breakout Watch ──────────────────────────────────────────────────
+export const catalystBreakoutWatch = mysqlTable("catalyst_breakout_watch", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  keyLevel: decimal("keyLevel", { precision: 12, scale: 4 }).notNull(),
+  direction: mysqlEnum("direction", ["resistance", "support"]).notNull(),
+  levelLabel: varchar("levelLabel", { length: 100 }),
+  daysTested: int("daysTested").default(0),
+  touches: int("touches").default(0),
+  nextEarningsDate: varchar("nextEarningsDate", { length: 10 }),
+  catalystNotes: varchar("catalystNotes", { length: 256 }),
+  status: mysqlEnum("status", ["watching", "near_break", "broken_out", "broken_down", "invalidated"]).default("watching").notNull(),
+  lastPrice: decimal("lastPrice", { precision: 12, scale: 4 }),
+  distancePct: decimal("distancePct", { precision: 8, scale: 4 }),
+  volumeRatio: decimal("volumeRatio", { precision: 8, scale: 4 }),
+  lastScannedAt: timestamp("lastScannedAt"),
+  notes: varchar("notes", { length: 512 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type CatalystBreakoutWatchEntry = typeof catalystBreakoutWatch.$inferSelect;
+export type InsertCatalystBreakoutWatch = typeof catalystBreakoutWatch.$inferInsert;
+
+// ─── COT Threshold Alerts ─────────────────────────────────────────────────────
+export const cotAlerts = mysqlTable("cot_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  instrumentId: varchar("instrumentId", { length: 50 }).notNull(),
+  instrumentName: varchar("instrumentName", { length: 100 }).notNull(),
+  condition: mysqlEnum("condition", ["above", "below"]).notNull(),
+  threshold: int("threshold").notNull(),
+  status: mysqlEnum("status", ["active", "paused", "triggered"]).default("active").notNull(),
+  lastCotIndex: int("lastCotIndex"),
+  lastTriggeredAt: timestamp("lastTriggeredAt"),
+  notes: varchar("notes", { length: 256 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type CotAlert = typeof cotAlerts.$inferSelect;
+export type InsertCotAlert = typeof cotAlerts.$inferInsert;

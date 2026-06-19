@@ -14,17 +14,49 @@ const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
-// Protected pages
+// Core pages
 const Home = lazy(() => import("./pages/Home"));
-const VelezScanner = lazy(() => import("./pages/VelezScanner"));
-const TradeLog = lazy(() => import("./pages/TradeLog"));
-const FibEmaAlerts = lazy(() => import("./pages/FibEmaAlerts"));
-const PCRDashboard = lazy(() => import("./pages/PCRDashboard"));
-const Analyzer = lazy(() => import("./pages/Analyzer"));
+const PitDeskHome = lazy(() => import("./pages/PitDeskHome"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const Profile = lazy(() => import("./pages/Profile"));
-const CandlestickChart = lazy(() => import("./pages/CandlestickChart"));
+
+// Scanner / Strategy pages
+const VelezScanner = lazy(() => import("./pages/VelezScanner"));
 const IntradayScanner = lazy(() => import("./pages/IntradayScanner"));
+const IntradayTickerDetail = lazy(() => import("./pages/IntradayTickerDetail"));
+const ScanAll = lazy(() => import("./pages/ScanAll"));
+const CandlestickChart = lazy(() => import("./pages/CandlestickChart"));
+const CatalystBreakoutWatch = lazy(() => import("./pages/CatalystBreakoutWatch"));
+const VCPStrategy = lazy(() => import("./pages/VCPStrategy"));
+const VcpAlerts = lazy(() => import("./pages/VcpAlerts"));
+const IvrAlerts = lazy(() => import("./pages/IvrAlerts"));
+
+// Analysis pages
+const Analyzer = lazy(() => import("./pages/Analyzer"));
+const PCRDashboard = lazy(() => import("./pages/PCRDashboard"));
+const PCRStrategy = lazy(() => import("./pages/PCRStrategy"));
+const EarningsCalendar = lazy(() => import("./pages/EarningsCalendar"));
+const History = lazy(() => import("./pages/History"));
+
+// Intelligence / Execution pages
+// AI Trading Agent uses TradeProposals page (same component as in old repo)
+const TradeProposals = lazy(() => import("./pages/TradeProposals"));
+const Performance = lazy(() => import("./pages/Performance"));
+
+// Trade log
+const TradeLog = lazy(() => import("./pages/TradeLog"));
+const FibEmaAlerts = lazy(() => import("./pages/FibEmaAlerts"));
+
+// Data / Reference pages
+const COTDashboard = lazy(() => import("./pages/COTDashboard"));
+const COTAlerts = lazy(() => import("./pages/COTAlerts"));
+const COTReference = lazy(() => import("./pages/COTReference").catch(() => ({ default: () => <ComingSoon title="COT Reference" /> })));
+const COTMethodology = lazy(() => import("./pages/COTMethodology").catch(() => ({ default: () => <ComingSoon title="COT Methodology" /> })));
+const WatchList = lazy(() => import("./pages/WatchList"));
+const BrokerSettings = lazy(() => import("./pages/BrokerSettings"));
+const Methodology = lazy(() => import("./pages/Methodology").catch(() => ({ default: () => <ComingSoon title="Methodology" /> })));
+const Glossary = lazy(() => import("./pages/Glossary").catch(() => ({ default: () => <ComingSoon title="Glossary" /> })));
+const HowTo = lazy(() => import("./pages/HowTo"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -63,30 +95,52 @@ function Router() {
           <DashboardLayout>
             <Suspense fallback={<PageLoader />}>
               <Switch>
+                {/* Home */}
                 <Route path="/" component={Home} />
+                <Route path="/dashboard" component={PitDeskHome} />
+
+                {/* Scanners */}
                 <Route path="/velez-scanner" component={VelezScanner} />
-                <Route path="/trade-log" component={TradeLog} />
-                <Route path="/fib-ema-alerts" component={FibEmaAlerts} />
-                <Route path="/pcr-dashboard" component={PCRDashboard} />
+                <Route path="/intraday-scanner" component={IntradayScanner} />
+                <Route path="/intraday-scanner/:ticker">{(params) => <IntradayTickerDetail ticker={params.ticker ?? ""} onClose={() => window.history.back()} />}</Route>
+                <Route path="/scan-all" component={ScanAll} />
+                <Route path="/charts" component={CandlestickChart} />
+
+                {/* Strategies */}
+                <Route path="/catalyst-watch" component={CatalystBreakoutWatch} />
+                <Route path="/vcp-strategy" component={VCPStrategy} />
+                <Route path="/vcp-alerts" component={VcpAlerts} />
+                <Route path="/ivr-alerts" component={IvrAlerts} />
+
+                {/* Analysis */}
                 <Route path="/analyzer" component={Analyzer} />
+                <Route path="/history" component={History} />
+                <Route path="/pcr-dashboard" component={PCRDashboard} />
+                <Route path="/pcr-strategy" component={PCRStrategy} />
+                <Route path="/earnings-calendar" component={EarningsCalendar} />
+                <Route path="/fib-ema-alerts" component={FibEmaAlerts} />
+
+                {/* Intelligence / Execution */}
+                <Route path="/agent" component={TradeProposals} />
+                <Route path="/trade-proposals" component={TradeProposals} />
+                <Route path="/performance" component={Performance} />
+                <Route path="/trade-log" component={TradeLog} />
+
+                {/* Data / Reference */}
+                <Route path="/cot-dashboard" component={COTDashboard} />
+                <Route path="/cot-alerts" component={COTAlerts} />
+                <Route path="/cot-reference" component={COTReference} />
+                <Route path="/cot-methodology" component={COTMethodology} />
+                <Route path="/watchlist" component={WatchList} />
+                <Route path="/broker-settings" component={BrokerSettings} />
+                <Route path="/methodology" component={Methodology} />
+                <Route path="/glossary" component={Glossary} />
+                <Route path="/how-to" component={HowTo} />
+
+                {/* Admin */}
                 <Route path="/admin/users" component={AdminUsers} />
                 <Route path="/profile" component={Profile} />
-                <Route path="/charts" component={CandlestickChart} />
-                <Route path="/intraday-scanner" component={IntradayScanner} />
-                {/* Stub routes — coming soon */}
-                <Route path="/pcr-strategy" component={() => <ComingSoon title="PCR Strategy" />} />
-                <Route path="/vcp-strategy" component={() => <ComingSoon title="VCP Strategy" />} />
-                <Route path="/catalyst-watch" component={() => <ComingSoon title="Catalyst Watch" />} />
-                <Route path="/ivr-alerts" component={() => <ComingSoon title="IVR Alerts" />} />
-                <Route path="/vcp-alerts" component={() => <ComingSoon title="VCP Alerts" />} />
-                <Route path="/agent" component={() => <ComingSoon title="AI Agent" />} />
-                <Route path="/performance" component={() => <ComingSoon title="Performance Tracker" />} />
-                <Route path="/earnings-calendar" component={() => <ComingSoon title="Earnings Calendar" />} />
-                <Route path="/scan-all" component={() => <ComingSoon title="Scan All" />} />
-                <Route path="/watchlist" component={() => <ComingSoon title="Watchlist" />} />
-                <Route path="/methodology" component={() => <ComingSoon title="Methodology" />} />
-                <Route path="/glossary" component={() => <ComingSoon title="Glossary" />} />
-                <Route path="/how-to" component={() => <ComingSoon title="How-To Guide" />} />
+
                 <Route path="/404" component={NotFound} />
                 <Route component={NotFound} />
               </Switch>

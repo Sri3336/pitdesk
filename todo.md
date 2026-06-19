@@ -113,3 +113,30 @@
 - [x] Add scan_outcomes + criteria_weights DB tables
 - [x] Add intradayScanner router procedures (getBacktestStats, getWeights, updateWeights)
 - [x] Add Backtest Stats tab + Weight Sliders tab to IntradayScanner.tsx
+
+## Phase 12: Port Remaining 12 Features + Trade Outcome Recording
+
+### Group A: Strategy Pages
+- [x] Port client/src/pages/CatalystBreakout.tsx (BCOS strategy)
+- [x] Port client/src/pages/VCPStrategy.tsx + VCP alerts server logic
+- [x] Port client/src/pages/IVRAlerts.tsx
+- [x] Wire all routes in App.tsx and sidebar nav
+
+### Group B: Analysis + Intelligence Pages
+- [x] Port client/src/pages/EarningsCalendarSpread.tsx
+- [x] Port client/src/pages/AITradingAgent.tsx (AI chat + trade proposals)
+- [x] Port client/src/pages/PerformanceTracker.tsx (P&L curve, win rate, best/worst trades)
+
+### Group C: Data + Reference Pages
+- [x] Port client/src/pages/COTDashboard.tsx + COT alerts
+- [x] Port client/src/pages/Watchlist.tsx
+- [x] Port client/src/pages/TradeProposals.tsx
+- [x] Port client/src/pages/BrokerSettings.tsx (E*TRADE -4723, -2738, Schwab)
+
+### Group D: Intraday Deep-Dive
+- [x] Port client/src/pages/IntradayTickerDetail.tsx (radar chart + options setup card)
+- [x] Port client/src/pages/ScanAll.tsx
+
+### Group E: Trade Outcome Recording
+- [x] Add "Record Outcome" button to Intraday Scanner results rows (opens exit price dialog → records win/loss/neutral)
+- [x] Wire to intraday.recordOutcome tRPC mutation (via intradayScannerRouter)

@@ -2,33 +2,57 @@ import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   AnalysisRun,
+  AgentRun,
+  BrokerConnection,
+  CatalystBreakoutWatchEntry,
+  CotAlert,
   CriteriaWeight,
   FibEmaAlert,
+  InsertAgentRun,
   InsertAnalysisRun,
+  InsertBrokerConnection,
+  InsertCatalystBreakoutWatch,
+  InsertCotAlert,
   InsertFibEmaAlert,
+  InsertIvrAlert,
   InsertManualTrade,
   InsertPcrAlertSetting,
   InsertPcrOiSnapshot,
   InsertPcrScheduledResult,
   InsertScanOutcome,
+  InsertTradeProposal,
   InsertUser,
+  InsertVcpAlert,
+  InsertWatchlist,
+  IvrAlert,
   ManualTrade,
   PasswordResetToken,
   PcrAlertSetting,
   PcrOiSnapshot,
   PcrScheduledResult,
   ScanOutcome,
+  TradeProposal,
+  VcpAlert,
+  Watchlist,
+  agentRuns,
   analysisRuns,
+  brokerConnections,
+  catalystBreakoutWatch,
+  cotAlerts,
   criteriaWeights,
   fibEmaAlertHistory,
   fibEmaAlerts,
+  ivrAlerts,
   manualTrades,
   passwordResetTokens,
   pcrAlertSettings,
   pcrOiSnapshots,
   pcrScheduledResults,
   scanOutcomes,
+  tradeProposals,
   users,
+  vcpAlerts,
+  watchlist,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -302,7 +326,7 @@ export async function closeTrade(
   if (!db) throw new Error("DB not available");
   await db
     .update(manualTrades)
-    .set({ exitPrice: String(exitPrice), pnl: String(pnl), status: "closed", closedAt: new Date() })
+    .set({ exitPrice: String(exitPrice), realizedPnl: String(pnl), status: "closed" })
     .where(and(eq(manualTrades.id, id), eq(manualTrades.userId, userId)));
 }
 
@@ -532,4 +556,322 @@ export async function resetCriteriaWeights(userId: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
   await db.delete(criteriaWeights).where(eq(criteriaWeights.userId, userId));
+}
+
+// ─── Watchlist ────────────────────────────────────────────────────────────────
+export async function getWatchlist(userId: number): Promise<Watchlist[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(watchlist).where(eq(watchlist.userId, userId)).orderBy(desc(watchlist.createdAt));
+}
+
+export async function addToWatchlist(userId: number, ticker: string, notes?: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(watchlist).values({ userId, ticker, notes }).onDuplicateKeyUpdate({ set: { notes } });
+}
+
+export async function removeFromWatchlist(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(watchlist).where(and(eq(watchlist.id, id), eq(watchlist.userId, userId)));
+}
+
+export async function updateWatchlistNotes(id: number, userId: number, notes: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(watchlist).set({ notes }).where(and(eq(watchlist.id, id), eq(watchlist.userId, userId)));
+}
+
+// ─── IVR Alerts ───────────────────────────────────────────────────────────────
+export async function getIvrAlerts(userId: number): Promise<IvrAlert[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(ivrAlerts).where(eq(ivrAlerts.userId, userId)).orderBy(desc(ivrAlerts.createdAt));
+}
+
+export async function getAllIvrAlerts(): Promise<IvrAlert[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(ivrAlerts).where(eq(ivrAlerts.status, "active"));
+}
+
+export async function createIvrAlert(data: Omit<InsertIvrAlert, "id" | "createdAt">): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(ivrAlerts).values(data);
+}
+
+export async function deleteIvrAlert(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(ivrAlerts).where(and(eq(ivrAlerts.id, id), eq(ivrAlerts.userId, userId)));
+}
+
+export async function updateIvrAlertStatus(id: number, status: "active" | "triggered" | "paused", lastTriggeredAt?: Date): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(ivrAlerts).set({ status, ...(lastTriggeredAt ? { lastTriggeredAt } : {}) }).where(eq(ivrAlerts.id, id));
+}
+
+export async function updateIvrAlertLastChecked(id: number, lastIvr: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(ivrAlerts).set({ lastCheckedAt: new Date(), lastIvr: String(lastIvr) }).where(eq(ivrAlerts.id, id));
+}
+
+// ─── VCP Alerts ───────────────────────────────────────────────────────────────
+export async function getVcpAlerts(userId: number): Promise<VcpAlert[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(vcpAlerts).where(eq(vcpAlerts.userId, userId)).orderBy(desc(vcpAlerts.createdAt));
+}
+
+export async function getAllVcpAlerts(): Promise<VcpAlert[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(vcpAlerts).where(eq(vcpAlerts.status, "active"));
+}
+
+export async function createVcpAlert(data: Omit<InsertVcpAlert, "id" | "createdAt">): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(vcpAlerts).values(data);
+}
+
+export async function deleteVcpAlert(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(vcpAlerts).where(and(eq(vcpAlerts.id, id), eq(vcpAlerts.userId, userId)));
+}
+
+export async function updateVcpAlertStatus(id: number, status: "active" | "triggered" | "paused", lastTriggeredAt?: Date): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(vcpAlerts).set({ status, ...(lastTriggeredAt ? { lastTriggeredAt } : {}) }).where(eq(vcpAlerts.id, id));
+}
+
+export async function updateVcpAlertLastChecked(id: number, lastDistancePct: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(vcpAlerts).set({ lastCheckedAt: new Date(), lastDistancePct: String(lastDistancePct) }).where(eq(vcpAlerts.id, id));
+}
+
+// ─── Broker Connections ───────────────────────────────────────────────────────
+export async function getBrokerConnections(userId: number): Promise<BrokerConnection[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(brokerConnections).where(eq(brokerConnections.userId, userId));
+}
+
+export async function upsertBrokerConnection(data: Omit<InsertBrokerConnection, "id" | "createdAt" | "updatedAt">): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(brokerConnections).values(data).onDuplicateKeyUpdate({ set: { ...data } });
+}
+
+export async function deleteBrokerConnection(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(brokerConnections).where(and(eq(brokerConnections.id, id), eq(brokerConnections.userId, userId)));
+}
+
+// ─── Agent Runs ───────────────────────────────────────────────────────────────
+export async function createAgentRun(data: Omit<InsertAgentRun, "id" | "createdAt">): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const [result] = await db.insert(agentRuns).values(data);
+  return (result as any).insertId ?? 0;
+}
+
+export async function updateAgentRun(id: number, data: Partial<AgentRun>): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(agentRuns).set(data).where(eq(agentRuns.id, id));
+}
+
+export async function getAgentRuns(userId: number, limit = 20): Promise<AgentRun[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(agentRuns).where(eq(agentRuns.userId, userId)).orderBy(desc(agentRuns.createdAt)).limit(limit);
+}
+
+// ─── Trade Proposals ──────────────────────────────────────────────────────────
+export async function saveTradeProposal(data: Omit<InsertTradeProposal, "id" | "createdAt">): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const [result] = await db.insert(tradeProposals).values(data);
+  return (result as any).insertId ?? 0;
+}
+
+export async function getTradeProposals(userId: number, status?: string): Promise<TradeProposal[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const q = db.select().from(tradeProposals).where(eq(tradeProposals.userId, userId)).orderBy(desc(tradeProposals.createdAt)).limit(100);
+  return q;
+}
+
+export async function updateTradeProposalStatus(id: number, userId: number, status: "pending" | "approved" | "rejected" | "executed" | "failed", rejectionReason?: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(tradeProposals).set({ status, ...(rejectionReason ? { rejectionReason } : {}) }).where(and(eq(tradeProposals.id, id), eq(tradeProposals.userId, userId)));
+}
+
+// ─── Catalyst Breakout Watch ──────────────────────────────────────────────────
+export async function getCatalystBreakoutWatch(userId: number): Promise<CatalystBreakoutWatchEntry[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(catalystBreakoutWatch).where(eq(catalystBreakoutWatch.userId, userId)).orderBy(desc(catalystBreakoutWatch.createdAt));
+}
+
+export async function addCatalystBreakoutWatch(data: Omit<InsertCatalystBreakoutWatch, "id" | "createdAt" | "updatedAt">): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(catalystBreakoutWatch).values(data);
+}
+
+export async function updateCatalystBreakoutWatch(id: number, userId: number, data: Partial<CatalystBreakoutWatchEntry>): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(catalystBreakoutWatch).set(data).where(and(eq(catalystBreakoutWatch.id, id), eq(catalystBreakoutWatch.userId, userId)));
+}
+
+export async function deleteCatalystBreakoutWatch(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(catalystBreakoutWatch).where(and(eq(catalystBreakoutWatch.id, id), eq(catalystBreakoutWatch.userId, userId)));
+}
+
+export async function getAllCatalystBreakoutWatch(): Promise<CatalystBreakoutWatchEntry[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(catalystBreakoutWatch).where(eq(catalystBreakoutWatch.status, "watching"));
+}
+
+// ─── COT Alerts ───────────────────────────────────────────────────────────────
+export async function getCotAlerts(userId: number): Promise<CotAlert[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(cotAlerts).where(eq(cotAlerts.userId, userId)).orderBy(desc(cotAlerts.createdAt));
+}
+
+export async function getAllCotAlerts(): Promise<CotAlert[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(cotAlerts).where(eq(cotAlerts.status, "active"));
+}
+
+export async function createCotAlert(data: Omit<InsertCotAlert, "id" | "createdAt" | "updatedAt">): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(cotAlerts).values(data);
+}
+
+export async function deleteCotAlert(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(cotAlerts).where(and(eq(cotAlerts.id, id), eq(cotAlerts.userId, userId)));
+}
+
+export async function updateCotAlertStatus(id: number, status: "active" | "paused" | "triggered", lastCotIndex?: number, lastTriggeredAt?: Date): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(cotAlerts).set({ status, ...(lastCotIndex !== undefined ? { lastCotIndex } : {}), ...(lastTriggeredAt ? { lastTriggeredAt } : {}) }).where(eq(cotAlerts.id, id));
+}
+
+// ─── Admin helpers ────────────────────────────────────────────────────────────
+export async function setUserRole(userId: number, role: "user" | "admin"): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ role }).where(eq(users.id, userId));
+}
+
+export async function setUserActive(userId: number, isActive: boolean): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ role: isActive ? "user" : "user" }).where(eq(users.id, userId));
+}
+
+export async function updateUserName(id: number, name: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ name }).where(eq(users.id, id));
+}
+
+export async function getAllAnalysisRuns(limit = 500): Promise<AnalysisRun[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(analysisRuns).orderBy(desc(analysisRuns.createdAt)).limit(limit);
+}
+
+export async function bulkDeleteAnalysisRuns(ids: number[], userId: number, isAdmin: boolean): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  for (const id of ids) {
+    if (isAdmin) {
+      await db.delete(analysisRuns).where(eq(analysisRuns.id, id));
+    } else {
+      await db.delete(analysisRuns).where(and(eq(analysisRuns.id, id), eq(analysisRuns.userId, userId)));
+    }
+  }
+}
+
+export async function saveTrackedRecommendation(data: any): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const { trackedRecommendations } = await import("../drizzle/schema");
+  await db.insert(trackedRecommendations).values(data);
+}
+
+export async function getTrackedRecommendations(userId: number, limit = 200): Promise<any[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const { trackedRecommendations } = await import("../drizzle/schema");
+  return db.select().from(trackedRecommendations).where(eq(trackedRecommendations.userId, userId)).orderBy(desc(trackedRecommendations.createdAt)).limit(limit);
+}
+
+export async function getAllTrackedRecommendations(limit = 1000): Promise<any[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const { trackedRecommendations } = await import("../drizzle/schema");
+  return db.select().from(trackedRecommendations).orderBy(desc(trackedRecommendations.createdAt)).limit(limit);
+}
+
+export async function deleteTrackedRecommendation(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const { trackedRecommendations } = await import("../drizzle/schema");
+  await db.delete(trackedRecommendations).where(and(eq(trackedRecommendations.id, id), eq(trackedRecommendations.userId, userId)));
+}
+
+export async function deleteTrackedRecommendations(ids: number[], userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const { trackedRecommendations } = await import("../drizzle/schema");
+  for (const id of ids) {
+    await db.delete(trackedRecommendations).where(and(eq(trackedRecommendations.id, id), eq(trackedRecommendations.userId, userId)));
+  }
+}
+
+export async function adminDeleteTrackedRecommendations(ids: number[]): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const { trackedRecommendations } = await import("../drizzle/schema");
+  for (const id of ids) {
+    await db.delete(trackedRecommendations).where(eq(trackedRecommendations.id, id));
+  }
+}
+
+export async function resolveTrackedRecommendation(id: number, userId: number, data: any): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const { trackedRecommendations } = await import("../drizzle/schema");
+  await db.update(trackedRecommendations).set(data).where(and(eq(trackedRecommendations.id, id), eq(trackedRecommendations.userId, userId)));
+}
+
+export async function updateTrackedRecommendationNotes(id: number, userId: number, notes: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const { trackedRecommendations } = await import("../drizzle/schema");
+  await db.update(trackedRecommendations).set({ notes }).where(and(eq(trackedRecommendations.id, id), eq(trackedRecommendations.userId, userId)));
 }
