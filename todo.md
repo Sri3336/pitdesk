@@ -172,3 +172,10 @@
 - [x] PCRTrendChart tab — named import fix (was default, now named export)
 - [x] Fix TypeScript errors: getScanRunDetail { date } → { runDate }, PCRTrendChart named import, Set spread → Array.from(new Set(...)), void mutations .mutate() not .mutate({})
 - [x] 0 TypeScript errors, 42 tests passing
+
+## Phase 17: PCR Baseline Backfill
+
+- [x] Write scripts/backfill-pcr-baseline.mjs — reads PCR_Baseline_raw_metrics_20260512.json, inserts 22 tickers into pcr_oi_snapshots (EOD) and pcr_scheduled_results (intraday_scan + eod_snapshot) for 2026-05-12
+- [x] Run backfill script — 22 pcr_oi_snapshots inserted, 22 pcr_scheduled_results (intraday_scan) + 22 (eod_snapshot) inserted for 2026-05-12
+- [x] Verified DB: SOXL PCR=2.04 (EXTREME_FEAR), FAS PCR=1.22 (FEAR), INTC PCR=1.18 (FEAR), AAPL PCR=0.28 (EXTREME_GREED), UNH PCR=0.17 (EXTREME_GREED)
+- [x] PCR Trend chart and History tab now have baseline data from 2026-05-12
