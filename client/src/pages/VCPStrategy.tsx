@@ -335,7 +335,7 @@ function VCPExplainerSection() {
           <div className="mt-4">
             <video
               ref={videoRef}
-              src="/manus-storage/vcp_explainer_new_d0de15b2.mp4"
+              src="/manus-storage/vcp_howto_final_5bccba3e.mp4"
               poster="https://d2xsxph8kpxj0f.cloudfront.net/118490340/4ziQjLcBuBgPL6xfwF5uaR/vcp_frame1_title_new-5XsDeweQJKLtG3yBpKBRoG.webp"
               controls
               autoPlay

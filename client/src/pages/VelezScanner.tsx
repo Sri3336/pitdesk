@@ -27,6 +27,7 @@ import { trpc } from "@/lib/trpc";
 import {
   AlertTriangle,
   BarChart2,
+  BookOpen,
   ChevronDown,
   ChevronRight,
   Info,
@@ -279,8 +280,60 @@ function SignalRow({ signal }: { signal: DailySignal }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+// ─── How-To Video Modal ──────────────────────────────────────────────────────
+function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-4 pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <BookOpen className="h-4 w-4 text-blue-500" />
+            How to Use the Velez Scanner
+          </DialogTitle>
+        </DialogHeader>
+        <div className="px-5 pb-5">
+          <video
+            src="/manus-storage/velez_howto_final_6c15f5cc.mp4"
+            controls
+            autoPlay
+            className="w-full rounded-lg bg-slate-900"
+            style={{ maxHeight: "60vh" }}
+          />
+          <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">The Method</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div>Fibonacci retracement + EMA cluster</div>
+                <div>Proximity <span className="text-blue-600 font-medium">&lt;1%</span> = sweet spot</div>
+                <div>Price bounce = institutional entry</div>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">Two Tabs</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div><span className="font-medium">Daily</span> — swing trades, 3–10 day holds</div>
+                <div><span className="font-medium">Intraday 5-min</span> — same-day entries</div>
+                <div>Both scan all 60 PCR tickers</div>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">Trade Plan</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div>Entry: break above confirming candle</div>
+                <div>Stop: below Fibonacci level</div>
+                <div>Target: 127% / 161.8% extension</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function VelezScanner() {
   const [tab, setTab] = useState<"daily" | "intraday">("daily");
+  const [showHowTo, setShowHowTo] = useState(false);
   const [thresholdPct, setThresholdPct] = useState(1.0);
   const [minPrice, setMinPrice] = useState(10);
   const [excludeOtc, setExcludeOtc] = useState(true);
@@ -321,11 +374,21 @@ export default function VelezScanner() {
             Scans 60 PCR tickers for Velez drop signals with Fibonacci overlay and EMA confluence
           </p>
         </div>
-        <Button
-          onClick={handleScan}
-          disabled={query.isFetching}
-          className="bg-green-500 hover:bg-green-600 text-white shrink-0"
-        >
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 text-xs px-3 border-blue-200 text-blue-700 hover:bg-blue-50"
+            onClick={() => setShowHowTo(true)}
+          >
+            <BookOpen className="h-3.5 w-3.5 mr-1" />
+            How-To
+          </Button>
+          <Button
+            onClick={handleScan}
+            disabled={query.isFetching}
+            className="bg-green-500 hover:bg-green-600 text-white"
+          >
           {query.isFetching ? (
             <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
           ) : (
@@ -333,7 +396,9 @@ export default function VelezScanner() {
           )}
           {query.isFetching ? "Scanning…" : "Run Scan"}
         </Button>
+        </div>
       </div>
+      <HowToVideoModal open={showHowTo} onClose={() => setShowHowTo(false)} />
 
       {/* Controls */}
       <Card>
