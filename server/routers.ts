@@ -1199,9 +1199,15 @@ const ivrAlertsRouter = router({
         const currentIVR = hv20;
         const threshold = parseFloat(alert.threshold);
         const triggered_now = alert.condition === "above" ? currentIVR >= threshold : currentIVR <= threshold;
+        await updateIvrAlertLastChecked(alert.id, currentIVR);
         if (triggered_now) {
           triggered.push(alert);
-          await updateIvrAlertLastChecked(alert.id, currentIVR);
+          await updateIvrAlertStatus(alert.id, "triggered", new Date());
+          await sendEmail({
+            to: "akulasridhar@gmail.com",
+            subject: `IVR Alert: ${alert.ticker} IVR is ${currentIVR.toFixed(1)}% (${alert.condition} ${threshold}%)`,
+            html: `<h2>IVR Alert Triggered</h2><p>Your alert for <strong>${alert.ticker}</strong> has been triggered.</p><ul><li><strong>Condition:</strong> IVR ${alert.condition} ${threshold}%</li><li><strong>Current IVR:</strong> ${currentIVR.toFixed(1)}%</li><li><strong>Triggered at:</strong> ${new Date().toUTCString()}</li></ul>`,
+          });
         }
       } catch { /* skip */ }
     }
@@ -1244,9 +1250,15 @@ const vcpAlertsRouter = router({
         const vcpResult = await fetchVCP(alert.ticker);
         // VCP qualifies if stage is VCP_PIVOT or BREAKOUT
         const qualifies = vcpResult.stage === "VCP_PIVOT" || vcpResult.stage === "BREAKOUT" || vcpResult.vcpScore >= 7;
+        await updateVcpAlertLastChecked(alert.id, vcpResult.distanceToPivot);
         if (qualifies) {
           triggered.push(alert);
-          await updateVcpAlertLastChecked(alert.id, vcpResult.distanceToPivot);
+          await updateVcpAlertStatus(alert.id, "triggered", new Date());
+          await sendEmail({
+            to: "akulasridhar@gmail.com",
+            subject: `VCP Alert: ${alert.ticker} — ${vcpResult.stage} (Score: ${vcpResult.vcpScore}/10)`,
+            html: `<h2>VCP Alert Triggered</h2><p>Your VCP watch on <strong>${alert.ticker}</strong> has triggered.</p><ul><li><strong>Stage:</strong> ${vcpResult.stage}</li><li><strong>VCP Score:</strong> ${vcpResult.vcpScore}/10</li><li><strong>Distance to Pivot:</strong> ${vcpResult.distanceToPivot?.toFixed(2)}%</li><li><strong>Triggered at:</strong> ${new Date().toUTCString()}</li></ul>`,
+          });
         }
       } catch { /* skip */ }
     }

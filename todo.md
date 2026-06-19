@@ -143,8 +143,8 @@
 
 ## Phase 13: Sidebar Nav, Performance Tracker Quick-Entry, Alert Verification
 
-- [ ] Wire all ported pages into DashboardLayout sidebar nav groups (COT Dashboard, Watchlist, Broker Settings, Scan All, Earnings Calendar, HowTo, Trade Proposals)
-- [ ] Add Performance Tracker quick-entry panel (log a closed trade directly from /performance)
-- [ ] Verify VCP alert email procedure is wired and sends to akulasridhar@gmail.com
-- [ ] Verify IVR alert email procedure is wired and sends to akulasridhar@gmail.com
-- [ ] Update options-trading-analyzer-builder skill with Phase 12+13 context
+- [x] Wire all ported pages into DashboardLayout sidebar nav groups (COT Dashboard, Watchlist, Broker Settings, Scan All, Earnings Calendar, HowTo, Trade Proposals)
+- [x] Add Performance Tracker quick-entry panel (Log Trade dialog with recommendations.add tRPC procedure)
+- [x] Verify VCP alert email procedure is wired and sends to akulasridhar@gmail.com
+- [x] Verify IVR alert email procedure is wired and sends to akulasridhar@gmail.com
+- [x] Update options-trading-analyzer-builder skill with Phase 12+13 context

@@ -5,41 +5,16 @@
  * Runs at 9:35 AM ET (14:35 UTC) on weekdays.
  *
  * For each active VCP alert:
- *  1. Fetch the current price and VCP analysis for the ticker
- *  2. Compute distance from current price to the pivot level
- *  3. If distance <= alert threshold, mark as triggered and notify the owner
+ *  1. Run live VCP analysis via fetchVCP() to get current pivot level + distanceToPivot
+ *  2. If distanceToPivot <= proximityPct threshold, mark as triggered
+ *  3. Send push notification (notifyOwner) AND email (sendEmail) to akulasridhar@gmail.com
  *  4. Otherwise update lastDistancePct for tracking
  */
 
 import { getAllVcpAlerts, updateVcpAlertStatus, updateVcpAlertLastChecked } from "./db";
 import { notifyOwner } from "./_core/notification";
-import { callDataApi } from "./_core/dataApi";
-
-interface PriceResult {
-  ticker: string;
-  currentPrice: number | null;
-  error?: string;
-}
-
-async function fetchCurrentPrice(ticker: string): Promise<PriceResult> {
-  try {
-    const resp = await callDataApi("YahooFinance/get_stock_chart", {
-      query: {
-        symbol: ticker,
-        region: "US",
-        interval: "1d",
-        range: "5d",
-        includeAdjustedClose: "true",
-      },
-    });
-
-    const result = (resp as any)?.chart?.result?.[0];
-    const currentPrice = result?.meta?.regularMarketPrice ?? null;
-    return { ticker, currentPrice };
-  } catch (err) {
-    return { ticker, currentPrice: null, error: String(err) };
-  }
-}
+import { sendEmail } from "./email";
+import { fetchVCP } from "./vcpStrategy";
 
 export interface VcpAlertCheckResult {
   checked: number;
@@ -64,67 +39,70 @@ export async function runVcpAlertCheck(): Promise<VcpAlertCheckResult> {
   // Process in batches of 5 to avoid rate limits
   for (let i = 0; i < alerts.length; i += 5) {
     const batch = alerts.slice(i, i + 5);
-    const priceResults = await Promise.allSettled(batch.map(a => fetchCurrentPrice(a.ticker)));
 
-    for (let j = 0; j < batch.length; j++) {
-      const alert = batch[j];
-      const priceResult = priceResults[j];
+    for (const alert of batch) {
+      try {
+        // Use live VCP analysis for accurate pivot level
+        const vcpResult = await fetchVCP(alert.ticker);
+        const { pivotLevel, distanceToPivot, stage, vcpScore } = vcpResult;
 
-      if (priceResult.status === "rejected") {
-        errors++;
-        console.error(`[VCP Alert Check] Error fetching price for ${alert.ticker}:`, priceResult.reason);
-        continue;
-      }
+        const threshold = parseFloat(alert.proximityPct ?? "3");
 
-      const { currentPrice, error } = priceResult.value;
+        console.log(
+          `[VCP Alert Check] ${alert.ticker}: stage=${stage}, score=${vcpScore}, ` +
+          `pivot=${pivotLevel.toFixed(2)}, distance=${distanceToPivot.toFixed(2)}%, threshold=${threshold}%`
+        );
 
-      if (error || currentPrice === null) {
-        errors++;
-        console.warn(`[VCP Alert Check] No price data for ${alert.ticker}`);
-        continue;
-      }
+        // Update last distance regardless of trigger
+        await updateVcpAlertLastChecked(alert.id, distanceToPivot);
 
-      // We need a pivot level to compute distance — use the stored pivotLevel from the alert
-      // The alert stores pivotLevel as a decimal string
-      // pivotLevel is not stored in the alert — we use lastDistancePct as a proxy
-      // If the user set up the alert from the VCP page, the pivot is tracked via the VCP scanner
-      // For now, compute distance using the VCP scanner's live pivot for this ticker
-      // Fallback: use lastDistancePct to check if we're getting closer
-      const lastDist = parseFloat(alert.lastDistancePct ?? "100");
-      // We don't store pivot in the alert, so we skip distance check and just
-      // use the live VCP scan result distance (stored as lastDistancePct by checkAll)
-      // This handler is for the heartbeat — it re-uses the same logic as vcpAlerts.checkAll
-      // which fetches live VCP data. Here we just use current price vs a rough estimate.
-      // Since we don't store pivot in the alert table, we check if lastDistancePct is within threshold
-      if (lastDist <= 0) {
-        // Already at or past pivot — skip
-        continue;
-      }
-      const pivotLevel = currentPrice / (1 - lastDist / 100); // back-calculate from last distance
+        // Trigger if within threshold of pivot (and not already past by more than 2%)
+        const isTriggered = distanceToPivot >= -2 && distanceToPivot <= threshold;
 
-      const distancePct = ((pivotLevel - currentPrice) / pivotLevel) * 100;
-      const threshold = parseFloat(alert.proximityPct ?? "3");
+        if (isTriggered) {
+          await updateVcpAlertStatus(alert.id, "triggered", new Date());
+          triggered++;
+          triggeredTickers.push(alert.ticker);
 
-      console.log(`[VCP Alert Check] ${alert.ticker}: price=${currentPrice.toFixed(2)}, pivot=${pivotLevel.toFixed(2)}, distance=${distancePct.toFixed(2)}%, threshold=${threshold}%`);
+          // Push notification
+          try {
+            await notifyOwner({
+              title: `VCP Alert Triggered: ${alert.ticker}`,
+              content:
+                `${alert.ticker} is within ${distanceToPivot.toFixed(1)}% of its VCP pivot level ($${pivotLevel.toFixed(2)}).\n\n` +
+                `Stage: ${stage} | VCP Score: ${vcpScore}/10\n` +
+                `Alert threshold: ${threshold}%\n\n` +
+                `Consider entering a call debit spread or buying calls on breakout confirmation above the pivot.`,
+            });
+          } catch (notifyErr) {
+            console.error(`[VCP Alert Check] Failed to send push for ${alert.ticker}:`, notifyErr);
+          }
 
-      if (distancePct <= threshold && distancePct >= -2) {
-        // Within threshold (and not already past pivot by more than 2%)
-        await updateVcpAlertStatus(alert.id, "triggered", new Date());
-        triggered++;
-        triggeredTickers.push(alert.ticker);
-
-        // Notify owner
-        try {
-          await notifyOwner({
-            title: `VCP Alert Triggered: ${alert.ticker}`,
-            content: `${alert.ticker} is within ${distancePct.toFixed(1)}% of its VCP pivot level ($${pivotLevel.toFixed(2)}).\n\nCurrent price: $${currentPrice.toFixed(2)}\nAlert threshold: ${threshold}%\n\nConsider entering a call debit spread or buying calls on breakout confirmation above the pivot.`,
-          });
-        } catch (notifyErr) {
-          console.error(`[VCP Alert Check] Failed to notify for ${alert.ticker}:`, notifyErr);
+          // Email notification
+          try {
+            await sendEmail({
+              to: "akulasridhar@gmail.com",
+              subject: `VCP Alert Triggered: ${alert.ticker} — within ${distanceToPivot.toFixed(1)}% of pivot`,
+              html:
+                `<h2>VCP Alert Triggered: ${alert.ticker}</h2>` +
+                `<p>${alert.ticker} is within <strong>${distanceToPivot.toFixed(1)}%</strong> of its VCP pivot level.</p>` +
+                `<ul>` +
+                `<li><strong>Stage:</strong> ${stage}</li>` +
+                `<li><strong>VCP Score:</strong> ${vcpScore}/10</li>` +
+                `<li><strong>Pivot Level:</strong> $${pivotLevel.toFixed(2)}</li>` +
+                `<li><strong>Distance to Pivot:</strong> ${distanceToPivot.toFixed(2)}%</li>` +
+                `<li><strong>Alert Threshold:</strong> ${threshold}%</li>` +
+                `<li><strong>Triggered at:</strong> ${new Date().toUTCString()}</li>` +
+                `</ul>` +
+                `<p>Consider entering a call debit spread or buying calls on breakout confirmation above the pivot.</p>`,
+            });
+          } catch (emailErr) {
+            console.error(`[VCP Alert Check] Failed to send email for ${alert.ticker}:`, emailErr);
+          }
         }
-      } else {
-        // Not triggered — update last distance
-        await updateVcpAlertLastChecked(alert.id, Math.max(0, distancePct));
+      } catch (err) {
+        errors++;
+        console.error(`[VCP Alert Check] Error processing ${alert.ticker}:`, err);
       }
     }
 
@@ -143,11 +121,16 @@ export async function runVcpAlertCheck(): Promise<VcpAlertCheckResult> {
 
   console.log(`[VCP Alert Check] Done: ${alerts.length} checked, ${triggered} triggered, ${errors} errors`);
 
+  // Summary push notification if any triggered
   if (triggered > 0) {
     try {
       await notifyOwner({
         title: `VCP Alert Summary: ${triggered} ticker(s) near pivot`,
-        content: `Daily VCP alert check complete.\n\nTriggered: ${triggeredTickers.join(", ")}\nTotal checked: ${alerts.length}\n\nVisit the VCP Alerts page to review and act on these signals.`,
+        content:
+          `Daily VCP alert check complete.\n\n` +
+          `Triggered: ${triggeredTickers.join(", ")}\n` +
+          `Total checked: ${alerts.length}\n\n` +
+          `Visit the VCP Alerts page to review and act on these signals.`,
       });
     } catch (err) {
       console.error("[VCP Alert Check] Failed to send summary notification:", err);
