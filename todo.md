@@ -148,3 +148,14 @@
 - [x] Verify VCP alert email procedure is wired and sends to akulasridhar@gmail.com
 - [x] Verify IVR alert email procedure is wired and sends to akulasridhar@gmail.com
 - [x] Update options-trading-analyzer-builder skill with Phase 12+13 context
+
+## Phase 15: Real Options Chain Data + COI Delta Signal Engine
+
+- [x] Rebuild fetchOptionsChain() in pcrScheduler.ts to use real Tradier options API — actual put/call OI per strike, 7-strike ATM window
+- [x] Rebuild runEodSnapshot() to save real totalPutOI and totalCallOI from live Tradier options chain
+- [x] Rebuild runIntradayScan() COI imbalance signal: 7-strike ATM window, call%/put% split, imbalance threshold
+- [x] Add tradierClient.ts with analyzeCoiImbalance() — ATM strike selection, expiry filter, delta hints
+- [x] Add COI columns to pcr_scheduled_results schema (coiCallPct, coiPutPct, coiImbalancePct, coiSignal, atmStrike, isExpiryDay, isExpiryEve, atmCallDelta, atmPutDelta, expiration)
+- [x] Update PCR Strategy scan results UI — COI imbalance bar, ATM strike badge, expiry warning, VWAP entry hint
+- [x] Add TRADIER_API_KEY secret and validate with live tests (42 tests passing)
+- [x] Verified live COI pipeline: AAPL $298.01, ATM $297.50, 7-strike window, real OI from Tradier

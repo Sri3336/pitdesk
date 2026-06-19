@@ -25,6 +25,8 @@ import { pcrOiSnapshots, pcrScheduledResults, pcrAlertSettings, trackedRecommend
 import { eq, sql, and, ne, lt, like } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
 import { TICKER_UNIVERSE } from "../shared/tickerUniverse";
+import { analyzeCoiImbalance } from "./tradierClient";
+import { ENV } from "./_core/env";
 
 /**
  * Return today's date in US Eastern Time (ET) as YYYY-MM-DD.
@@ -59,7 +61,20 @@ interface OptionsChainSummary {
   pcrVolume: number;
   pcrOI: number;
   closingPrice: number;
-  ivSkew: number; // ATM put IV - ATM call IV (positive = put skew = bearish hedging)
+  ivSkew: number;
+  // COI imbalance fields (populated when Tradier API key is set)
+  coiCallPct: number;       // % of COI on call side (7 ATM strikes)
+  coiPutPct: number;        // % of COI on put side (7 ATM strikes)
+  coiImbalancePct: number;  // |callPct - putPct| — signal strength
+  coiSignal: "BUY_CALL" | "BUY_PUT" | "NEUTRAL";
+  coiSignalStrength: number; // 1-5
+  atmStrike: number;
+  atmStrikes: number[];
+  isExpiryDay: boolean;
+  isExpiryEve: boolean;
+  atmCallDelta: number | null;
+  atmPutDelta: number | null;
+  expiration: string;
 }
 
 interface PriorSnapshot {
@@ -106,23 +121,47 @@ function classifyPCR(pcr: number): { signal: PCRSignal; strength: number; strate
 // ─── Fetch options chain — delegates to the technical-signal PCR engine ────────
 
 async function fetchOptionsChain(ticker: string): Promise<OptionsChainSummary | null> {
+  // If Tradier API key is configured, use real options chain data (COI strategy)
+  if (ENV.tradierApiKey) {
+    try {
+      const coi = await analyzeCoiImbalance(ticker);
+      if (!coi) return null;
+      return {
+        ticker,
+        totalPutVolume: coi.totalPutVolume,
+        totalCallVolume: coi.totalCallVolume,
+        totalPutOI: coi.totalPutOI,
+        totalCallOI: coi.totalCallOI,
+        pcrVolume: coi.pcrVolume,
+        pcrOI: coi.pcrOI,
+        closingPrice: coi.currentPrice,
+        ivSkew: 0,
+        coiCallPct: coi.callCoiPct,
+        coiPutPct: coi.putCoiPct,
+        coiImbalancePct: coi.imbalancePct,
+        coiSignal: coi.signal,
+        coiSignalStrength: coi.signalStrength,
+        atmStrike: coi.atmStrike,
+        atmStrikes: coi.atmStrikes,
+        isExpiryDay: coi.isExpiryDay,
+        isExpiryEve: coi.isExpiryEve,
+        atmCallDelta: coi.atmCallDelta,
+        atmPutDelta: coi.atmPutDelta,
+        expiration: coi.expiration,
+      };
+    } catch (err) {
+      console.error(`[PCR Scheduler] Tradier error for ${ticker}:`, err);
+      return null;
+    }
+  }
+  // Fallback: synthetic PCR from technical signals (no Tradier key)
   try {
-    // Use the shared pcrStrategy engine which derives PCR from:
-    // RSI-14, 5d/20d price momentum, realized volatility, volume trend, ATR, analyst rating
     const pcrData = await fetchPCR(ticker);
-
-    // Also fetch current price for the snapshot record
     const chartResp = await callDataApi("YahooFinance/get_stock_chart", {
-      query: {
-        symbol: ticker,
-        region: "US",
-        interval: "1d",
-        range: "1d",
-      },
+      query: { symbol: ticker, region: "US", interval: "1d", range: "1d" },
     });
     const meta = (chartResp as any)?.chart?.result?.[0]?.meta;
     const closingPrice: number = meta?.regularMarketPrice ?? 0;
-
     return {
       ticker,
       totalPutVolume: pcrData.totalPutVolume,
@@ -133,9 +172,21 @@ async function fetchOptionsChain(ticker: string): Promise<OptionsChainSummary | 
       pcrOI: pcrData.pcrOI,
       closingPrice,
       ivSkew: pcrData.ivSkew,
+      coiCallPct: 50,
+      coiPutPct: 50,
+      coiImbalancePct: 0,
+      coiSignal: "NEUTRAL" as const,
+      coiSignalStrength: 1,
+      atmStrike: 0,
+      atmStrikes: [],
+      isExpiryDay: false,
+      isExpiryEve: false,
+      atmCallDelta: null,
+      atmPutDelta: null,
+      expiration: "",
     };
   } catch (err) {
-    console.error(`[PCR Scheduler] Error fetching ${ticker}:`, err);
+    console.error(`[PCR Scheduler] Fallback error for ${ticker}:`, err);
     return null;
   }
 }
@@ -316,7 +367,41 @@ export async function runIntradayScan(): Promise<{ processed: number; actionable
       }
 
       const chain = result.value;
-      const { signal, strength, strategyHint, recommendation } = classifyPCR(chain.pcrVolume);
+      // ── Signal classification ─────────────────────────────────────────────
+      // When Tradier is active: use COI imbalance signal (video strategy)
+      // When fallback (synthetic): use classic PCR threshold classification
+      let signal: PCRSignal;
+      let strength: number;
+      let strategyHint: string;
+      let recommendation: string;
+      if (ENV.tradierApiKey && chain.coiImbalancePct > 0) {
+        if (chain.coiSignal === "BUY_CALL") {
+          signal = chain.coiSignalStrength >= 4 ? "EXTREME_FEAR" : "FEAR";
+          strategyHint = "Buy Call (ATM or 0.4Δ) — heavy put writing detected";
+          const slCall = chain.atmCallDelta && chain.atmCallDelta >= 0.45 ? "30 pts" : chain.atmCallDelta && chain.atmCallDelta >= 0.35 ? "25 pts" : "20 pts";
+          const tgtCall = chain.atmCallDelta && chain.atmCallDelta >= 0.45 ? "50 pts" : chain.atmCallDelta && chain.atmCallDelta >= 0.35 ? "40 pts" : "30 pts";
+          const expiryNote = chain.isExpiryDay || chain.isExpiryEve ? "NEXT WEEK expiry" : "current week expiry";
+          recommendation = `COI imbalance: ${chain.coiPutPct.toFixed(0)}% puts / ${chain.coiCallPct.toFixed(0)}% calls on ${chain.atmStrikes.length} ATM strikes. Heavy put writing = market support. Enter call after price pulls back to VWAP. Use ${expiryNote}. SL: ${slCall}, Target: ${tgtCall}. Square off by 3:20 PM.`;
+        } else if (chain.coiSignal === "BUY_PUT") {
+          signal = chain.coiSignalStrength >= 4 ? "EXTREME_GREED" : "GREED";
+          strategyHint = "Buy Put (ATM or 0.4Δ) — heavy call writing detected";
+          const slPut = chain.atmPutDelta && Math.abs(chain.atmPutDelta) >= 0.45 ? "30 pts" : chain.atmPutDelta && Math.abs(chain.atmPutDelta) >= 0.35 ? "25 pts" : "20 pts";
+          const tgtPut = chain.atmPutDelta && Math.abs(chain.atmPutDelta) >= 0.45 ? "50 pts" : chain.atmPutDelta && Math.abs(chain.atmPutDelta) >= 0.35 ? "40 pts" : "30 pts";
+          const expiryNotePut = chain.isExpiryDay || chain.isExpiryEve ? "NEXT WEEK expiry" : "current week expiry";
+          recommendation = `COI imbalance: ${chain.coiCallPct.toFixed(0)}% calls / ${chain.coiPutPct.toFixed(0)}% puts on ${chain.atmStrikes.length} ATM strikes. Heavy call writing = market resistance. Enter put after price pulls back to VWAP. Use ${expiryNotePut}. SL: ${slPut}, Target: ${tgtPut}. Square off by 3:20 PM.`;
+        } else {
+          signal = "NEUTRAL";
+          strategyHint = "No trade — COI balanced";
+          recommendation = `COI imbalance only ${chain.coiImbalancePct.toFixed(0)}% — market is balanced across ${chain.atmStrikes.length} ATM strikes. Wait for clearer positioning before entering.`;
+        }
+        strength = chain.coiSignalStrength;
+      } else {
+        const classified = classifyPCR(chain.pcrVolume);
+        signal = classified.signal;
+        strength = classified.strength;
+        strategyHint = classified.strategyHint;
+        recommendation = classified.recommendation;
+      }
 
       // Get prior EOD snapshot for COI delta and PCR delta
       const prior = await getPriorSnapshot(ticker);
@@ -364,6 +449,16 @@ export async function runIntradayScan(): Promise<{ processed: number; actionable
             ivSkew: chain.ivSkew.toFixed(2),
             pcrDeltaVsPrior: pcrDeltaVsPrior !== null ? pcrDeltaVsPrior.toFixed(4) : null,
             priorSignal: priorSignal ?? null,
+            coiCallPct: chain.coiCallPct.toFixed(2),
+            coiPutPct: chain.coiPutPct.toFixed(2),
+            coiImbalancePct: chain.coiImbalancePct.toFixed(2),
+            coiSignal: chain.coiSignal,
+            atmStrike: chain.atmStrike.toFixed(2),
+            isExpiryDay: chain.isExpiryDay,
+            isExpiryEve: chain.isExpiryEve,
+            atmCallDelta: chain.atmCallDelta !== null ? chain.atmCallDelta.toFixed(4) : null,
+            atmPutDelta: chain.atmPutDelta !== null ? chain.atmPutDelta.toFixed(4) : null,
+            expiration: chain.expiration,
           })
           .onDuplicateKeyUpdate({
             set: {
@@ -380,6 +475,16 @@ export async function runIntradayScan(): Promise<{ processed: number; actionable
               ivSkew: chain.ivSkew.toFixed(2),
               pcrDeltaVsPrior: pcrDeltaVsPrior !== null ? pcrDeltaVsPrior.toFixed(4) : null,
               priorSignal: priorSignal ?? null,
+              coiCallPct: chain.coiCallPct.toFixed(2),
+              coiPutPct: chain.coiPutPct.toFixed(2),
+              coiImbalancePct: chain.coiImbalancePct.toFixed(2),
+              coiSignal: chain.coiSignal,
+              atmStrike: chain.atmStrike.toFixed(2),
+              isExpiryDay: chain.isExpiryDay,
+              isExpiryEve: chain.isExpiryEve,
+              atmCallDelta: chain.atmCallDelta !== null ? chain.atmCallDelta.toFixed(4) : null,
+              atmPutDelta: chain.atmPutDelta !== null ? chain.atmPutDelta.toFixed(4) : null,
+              expiration: chain.expiration,
             },
           });
 
@@ -816,6 +921,17 @@ export async function getScanRunDetail(runDate: string): Promise<Array<{
       priorPCROI: eod?.pcrOI ?? null,
       priorSnapshotDate: eod?.snapshotDate ?? null,
       closingPrice: eod?.closingPrice ?? null,
+      // COI imbalance fields
+      coiCallPct: row.coiCallPct !== null ? parseFloat(row.coiCallPct as unknown as string) : null,
+      coiPutPct: row.coiPutPct !== null ? parseFloat(row.coiPutPct as unknown as string) : null,
+      coiImbalancePct: row.coiImbalancePct !== null ? parseFloat(row.coiImbalancePct as unknown as string) : null,
+      coiSignal: row.coiSignal ?? null,
+      atmStrike: row.atmStrike !== null ? parseFloat(row.atmStrike as unknown as string) : null,
+      isExpiryDay: row.isExpiryDay ?? false,
+      isExpiryEve: row.isExpiryEve ?? false,
+      atmCallDelta: row.atmCallDelta !== null ? parseFloat(row.atmCallDelta as unknown as string) : null,
+      atmPutDelta: row.atmPutDelta !== null ? parseFloat(row.atmPutDelta as unknown as string) : null,
+      expiration: row.expiration ?? null,
     };
   });
 }
@@ -972,6 +1088,17 @@ export async function getDailyLandingTable(runDate?: string): Promise<Array<{
       ivSkew: intraday?.ivSkew ?? null,
       totalPutVolume: intraday?.totalPutVolume ?? 0,
       totalCallVolume: intraday?.totalCallVolume ?? 0,
+      // COI imbalance fields (populated when Tradier key is set)
+      coiCallPct: intraday?.coiCallPct !== null ? parseFloat(intraday?.coiCallPct as unknown as string ?? "50") : null,
+      coiPutPct: intraday?.coiPutPct !== null ? parseFloat(intraday?.coiPutPct as unknown as string ?? "50") : null,
+      coiImbalancePct: intraday?.coiImbalancePct !== null ? parseFloat(intraday?.coiImbalancePct as unknown as string ?? "0") : null,
+      coiSignal: intraday?.coiSignal ?? null,
+      atmStrike: intraday?.atmStrike !== null ? parseFloat(intraday?.atmStrike as unknown as string ?? "0") : null,
+      isExpiryDay: intraday?.isExpiryDay ?? false,
+      isExpiryEve: intraday?.isExpiryEve ?? false,
+      atmCallDelta: intraday?.atmCallDelta !== null ? parseFloat(intraday?.atmCallDelta as unknown as string ?? "0") : null,
+      atmPutDelta: intraday?.atmPutDelta !== null ? parseFloat(intraday?.atmPutDelta as unknown as string ?? "0") : null,
+      expiration: intraday?.expiration ?? null,
       pcrHistory: history,
     };
   });

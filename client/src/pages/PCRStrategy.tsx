@@ -1379,6 +1379,10 @@ export default function PCRStrategy() {
                 totalPutVolume: number; totalCallVolume: number;
                 signalStrength: number; runDate: string;
                 pcrDeltaVsPrior: string | null; priorSignal: string | null;
+                coiCallPct: number | null; coiPutPct: number | null;
+                coiImbalancePct: number | null; coiSignal: string | null;
+                atmStrike: number | null; isExpiryDay: boolean; isExpiryEve: boolean;
+                atmCallDelta: number | null; atmPutDelta: number | null; expiration: string | null;
               }>)
                 .sort((a, b) => b.signalStrength - a.signalStrength)
                 .map(item => {
@@ -1392,10 +1396,15 @@ export default function PCRStrategy() {
                     : null;
                   const priorSig = item.priorSignal as PCRSignal | null;
                   const regimeChanged = priorSig && priorSig !== sig;
+                  const hasCOI = (item.coiImbalancePct ?? 0) > 0;
+                  const callPct = item.coiCallPct ?? 50;
+                  const putPct = item.coiPutPct ?? 50;
+                  const imbalance = item.coiImbalancePct ?? 0;
+                  const coiSig = item.coiSignal ?? "NEUTRAL";
                   return (
                     <div key={item.id} className={`rounded-lg border ${cfg.border} ${cfg.bg} p-3`}>
                       <div className="flex items-start justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <div>
                             <span className="font-bold text-sm">{item.ticker}</span>
                             {tickerInfo && <p className="text-[10px] text-muted-foreground">{tickerInfo.sector}</p>}
@@ -1406,11 +1415,28 @@ export default function PCRStrategy() {
                               ↑ from {SIGNAL_CONFIG[priorSig]?.label ?? priorSig}
                             </span>
                           )}
+                          {item.isExpiryDay && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-300">⚠️ EXPIRY DAY</span>
+                          )}
+                          {!item.isExpiryDay && item.isExpiryEve && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">⚡ Expiry Eve</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-4 text-xs flex-wrap">
-                          <span className="text-muted-foreground">PCR <span className="font-bold num text-foreground">{parseFloat(item.pcr).toFixed(2)}</span></span>
-                          <span className="text-muted-foreground">OI PCR <span className="font-bold num text-foreground">{parseFloat(item.pcrOI).toFixed(2)}</span></span>
-                          {pcrDelta !== null && (
+                          {hasCOI ? (
+                            <span className={`font-bold text-xs ${
+                              coiSig === "BUY_CALL" ? "text-emerald-700" : coiSig === "BUY_PUT" ? "text-red-600" : "text-muted-foreground"
+                            }`}>
+                              {coiSig === "BUY_CALL" ? "📈 BUY CALL" : coiSig === "BUY_PUT" ? "📉 BUY PUT" : "⚖️ NEUTRAL"}
+                              {imbalance > 0 && <span className="ml-1 font-normal opacity-70">({imbalance.toFixed(0)}% imbal)</span>}
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-muted-foreground">PCR <span className="font-bold num text-foreground">{parseFloat(item.pcr).toFixed(2)}</span></span>
+                              <span className="text-muted-foreground">OI PCR <span className="font-bold num text-foreground">{parseFloat(item.pcrOI).toFixed(2)}</span></span>
+                            </>
+                          )}
+                          {!hasCOI && pcrDelta !== null && (
                             <span className={`inline-flex items-center gap-0.5 font-semibold num text-xs ${
                               pcrDelta > 0 ? "text-amber-700" : pcrDelta < 0 ? "text-emerald-700" : "text-muted-foreground"
                             }`}>
@@ -1418,14 +1444,43 @@ export default function PCRStrategy() {
                               {pcrDelta > 0 ? "+" : ""}{pcrDelta.toFixed(2)} vs prior
                             </span>
                           )}
-                          {coiDelta !== 0 && (
+                          {!hasCOI && coiDelta !== 0 && (
                             <span className={`font-semibold num ${coiDelta > 0 ? "text-amber-700" : "text-emerald-700"}`}>
                               COI {coiDelta > 0 ? "+" : ""}{(coiDelta / 1000).toFixed(0)}k ({coiPct > 0 ? "+" : ""}{coiPct.toFixed(1)}%)
                             </span>
                           )}
+                          {(item.atmStrike ?? 0) > 0 && (
+                            <span className="text-muted-foreground text-[10px]">ATM <span className="font-bold num text-foreground">${item.atmStrike}</span></span>
+                          )}
                         </div>
                       </div>
-                        <p className="text-xs text-blue-700 font-medium mt-1.5">{item.strategyHint}</p>
+
+                      {/* COI Imbalance Bar — shown when Tradier data is available */}
+                      {hasCOI && (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-[10px] mb-0.5">
+                            <span className="text-emerald-700 font-semibold">Calls {callPct.toFixed(0)}%</span>
+                            <span className="text-muted-foreground">7-Strike ATM COI Split</span>
+                            <span className="text-red-600 font-semibold">Puts {putPct.toFixed(0)}%</span>
+                          </div>
+                          <div className="flex h-2 rounded-full overflow-hidden">
+                            <div className="bg-emerald-500 transition-all" style={{ width: `${callPct}%` }} />
+                            <div className="bg-red-500 transition-all" style={{ width: `${putPct}%` }} />
+                          </div>
+                          {coiSig !== "NEUTRAL" && (
+                            <p className="text-[10px] mt-1.5 text-blue-700 font-medium">
+                              🎯 Entry: Wait for VWAP pullback after 11:30 AM — {coiSig === "BUY_CALL" ? "buy ATM call" : "buy ATM put"}
+                              {item.atmStrike ? ` at $${item.atmStrike} strike` : ""}
+                              {item.expiration ? ` (exp ${item.expiration})` : ""}
+                              {coiSig === "BUY_CALL" && item.atmCallDelta ? ` • Δ ${item.atmCallDelta.toFixed(2)}` : ""}
+                              {coiSig === "BUY_PUT" && item.atmPutDelta ? ` • Δ ${item.atmPutDelta.toFixed(2)}` : ""}
+                              {" • Square off by 3:20 PM"}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {!hasCOI && <p className="text-xs text-blue-700 font-medium mt-1.5">{item.strategyHint}</p>}
                       <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{item.recommendation}</p>
                       {/* 7-day PCR sparkline */}
                       <PCRSparkline ticker={item.ticker} signal={sig} />

@@ -199,6 +199,17 @@ export const pcrScheduledResults = mysqlTable("pcr_scheduled_results", {
   ivSkew: decimal("ivSkew", { precision: 6, scale: 2 }).default("0"),
   pcrDeltaVsPrior: decimal("pcrDeltaVsPrior", { precision: 8, scale: 4 }),
   priorSignal: varchar("priorSignal", { length: 20 }),
+  // COI imbalance fields (populated when Tradier API key is set)
+  coiCallPct: decimal("coiCallPct", { precision: 6, scale: 2 }).default("50"),
+  coiPutPct: decimal("coiPutPct", { precision: 6, scale: 2 }).default("50"),
+  coiImbalancePct: decimal("coiImbalancePct", { precision: 6, scale: 2 }).default("0"),
+  coiSignal: varchar("coiSignal", { length: 20 }).default("NEUTRAL"),
+  atmStrike: decimal("atmStrike", { precision: 10, scale: 2 }).default("0"),
+  isExpiryDay: boolean("isExpiryDay").default(false),
+  isExpiryEve: boolean("isExpiryEve").default(false),
+  atmCallDelta: decimal("atmCallDelta", { precision: 6, scale: 4 }),
+  atmPutDelta: decimal("atmPutDelta", { precision: 6, scale: 4 }),
+  expiration: varchar("expiration", { length: 12 }).default(""),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => ({
   uniqResult: uniqueIndex("uniq_pcr_result").on(t.ticker, t.runDate, t.runType),
