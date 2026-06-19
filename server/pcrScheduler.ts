@@ -1065,3 +1065,101 @@ export async function getPCRSavedRecommendations(userId: number, ticker?: string
     .orderBy(sql`${trackedRecommendations.entryDate} DESC`)
     .limit(200);
 }
+
+// ─── PCR Trend Chart Data ────────────────────────────────────────────────────
+// Returns merged PCR + price history for a ticker over N days, suitable for
+// the interactive trend chart. Uses pcr_oi_snapshots (EOD) as primary source,
+// falling back to pcr_scheduled_results (intraday) when EOD is sparse.
+export async function getPCRTrendData(
+  ticker: string,
+  days = 30
+): Promise<Array<{
+  date: string;
+  pcrVolume: number;
+  pcrOI: number;
+  price: number | null;
+  signal: string;
+  putVolume: number;
+  callVolume: number;
+  ivSkew: number | null;
+}>> {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Primary: EOD snapshots (one per trading day, most reliable)
+  const eodRows = await db
+    .select({
+      snapshotDate: pcrOiSnapshots.snapshotDate,
+      pcrVolume: pcrOiSnapshots.pcrVolume,
+      pcrOI: pcrOiSnapshots.pcrOI,
+      closingPrice: pcrOiSnapshots.closingPrice,
+      totalPutVolume: pcrOiSnapshots.totalPutVolume,
+      totalCallVolume: pcrOiSnapshots.totalCallVolume,
+    })
+    .from(pcrOiSnapshots)
+    .where(eq(pcrOiSnapshots.ticker, ticker.toUpperCase()))
+    .orderBy(pcrOiSnapshots.snapshotDate)
+    .limit(days);
+
+  // Secondary: intraday scan results (for signal + ivSkew enrichment)
+  const intradayRows = await db
+    .select({
+      runDate: pcrScheduledResults.runDate,
+      signal: pcrScheduledResults.signal,
+      ivSkew: pcrScheduledResults.ivSkew,
+      pcr: pcrScheduledResults.pcr,
+      pcrOI: pcrScheduledResults.pcrOI,
+      totalPutVolume: pcrScheduledResults.totalPutVolume,
+      totalCallVolume: pcrScheduledResults.totalCallVolume,
+    })
+    .from(pcrScheduledResults)
+    .where(and(
+      eq(pcrScheduledResults.ticker, ticker.toUpperCase()),
+      eq(pcrScheduledResults.runType, "intraday_scan")
+    ))
+    .orderBy(sql`${pcrScheduledResults.runDate} DESC`)
+    .limit(days);
+
+  // Build a map of intraday data by date for enrichment
+  const intradayMap = new Map<string, typeof intradayRows[0]>();
+  for (const row of intradayRows) {
+    intradayMap.set(row.runDate, row);
+  }
+
+  function signalFromPCR(pcr: number): string {
+    if (pcr >= 1.5) return "EXTREME_FEAR";
+    if (pcr >= 1.2) return "FEAR";
+    if (pcr >= 0.8) return "NEUTRAL";
+    if (pcr >= 0.5) return "GREED";
+    return "EXTREME_GREED";
+  }
+
+  if (eodRows.length > 0) {
+    return eodRows.map(row => {
+      const intraday = intradayMap.get(row.snapshotDate);
+      const pcrVol = parseFloat(row.pcrVolume);
+      return {
+        date: row.snapshotDate,
+        pcrVolume: pcrVol,
+        pcrOI: parseFloat(row.pcrOI),
+        price: row.closingPrice ? parseFloat(row.closingPrice) : null,
+        signal: intraday?.signal ?? signalFromPCR(pcrVol),
+        putVolume: row.totalPutVolume,
+        callVolume: row.totalCallVolume,
+        ivSkew: intraday?.ivSkew ? parseFloat(intraday.ivSkew) : null,
+      };
+    });
+  }
+
+  // Fallback: use intraday scan results only (no price data)
+  return intradayRows.reverse().map(row => ({
+    date: row.runDate,
+    pcrVolume: parseFloat(row.pcr),
+    pcrOI: parseFloat(row.pcrOI),
+    price: null,
+    signal: row.signal,
+    putVolume: row.totalPutVolume,
+    callVolume: row.totalCallVolume,
+    ivSkew: row.ivSkew ? parseFloat(row.ivSkew) : null,
+  }));
+}

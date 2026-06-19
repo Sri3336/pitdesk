@@ -103,6 +103,7 @@ import {
   getDailyLandingTable,
   savePCRRecommendation,
   getPCRSavedRecommendations,
+  getPCRTrendData,
 } from "./pcrScheduler";
 import { notifyOwner } from "./_core/notification";
 import { callDataApi } from "./_core/dataApi";
@@ -960,6 +961,9 @@ const pcrScheduledRouter = router({
   getPCRSavedRecommendations: protectedProcedure
     .input(z.object({ ticker: z.string().optional() }))
     .query(async ({ input, ctx }) => getPCRSavedRecommendations(ctx.user.id, input.ticker)),
+  getPCRTrend: protectedProcedure
+    .input(z.object({ ticker: z.string(), days: z.number().optional() }))
+    .query(async ({ input }) => getPCRTrendData(input.ticker, input.days ?? 30)),
 });
 
 // ─── Analysis Router ────────────────────────────────────────────────────────────────
