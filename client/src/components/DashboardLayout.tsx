@@ -47,6 +47,7 @@ import {
   Radio,
   Scan,
   Sparkles,
+  Target,
   TrendingUp,
   Zap,
 } from "lucide-react";
@@ -78,6 +79,7 @@ const strategyItems = [
   { icon: LineChart, label: "Velez Scanner", path: "/velez-scanner" },
   { icon: Activity, label: "Intraday Scanner", path: "/intraday-scanner" },
   { icon: Zap, label: "Catalyst Watch", path: "/catalyst-watch" },
+  { icon: Target, label: "Opening Range Scalper", path: "/velez-scanner?tab=ors" },
 ];
 
 const alertItems = [

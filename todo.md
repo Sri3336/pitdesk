@@ -188,3 +188,9 @@
 - [x] UI: Opening Range Scalper tab in VelezScanner.tsx (3rd tab alongside Daily/Intraday 5-min)
 - [x] UI: Alert cards — ticker, direction (LONG/SHORT), TP1/TP2, stop, ATR gate status, reversal pattern
 - [x] Cron: PCR Intraday Scan already active (every 15min 9:30-4pm ET Mon-Fri, task_uid: 5BA9VMik7wD5g6x7DaqQqE) at 15:30 UTC (Mon-Fri) via manus-heartbeat CLI
+
+## Phase 19: ORS Next Steps
+
+- [ ] ORS How-To video — narration + slides + compose + upload to Google Drive
+- [ ] Log Trade button on ORS SETUP_READY rows — pre-fill Trade Log with ticker, direction, entry, stop, TP1, TP2
+- [ ] ORS dedicated sidebar entry under STRATEGIES section

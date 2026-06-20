@@ -71,26 +71,51 @@ function fmt(n: string | number | null | undefined): string {
 
 // ─── Add Trade Form ───────────────────────────────────────────────────────────
 
+interface AddTradePrefill {
+  ticker?: string;
+  direction?: "long" | "short";
+  entry?: string;
+  stop?: string;
+  tp1?: string;
+  tp2?: string;
+  strategy?: string;
+}
+
 function AddTradeDialog({
   open,
   onClose,
   onSuccess,
+  prefill,
 }: {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  prefill?: AddTradePrefill;
 }) {
-  const [ticker, setTicker] = useState("");
-  const [strategy, setStrategy] = useState("");
-  const [direction, setDirection] = useState<"long" | "short">("long");
-  const [entryPrice, setEntryPrice] = useState("");
+  const [ticker, setTicker] = useState(prefill?.ticker ?? "");
+  const [strategy, setStrategy] = useState(prefill?.strategy ?? "");
+  const [direction, setDirection] = useState<"long" | "short">(prefill?.direction ?? "long");
+  const [entryPrice, setEntryPrice] = useState(prefill?.entry ?? "");
   const [swingLow, setSwingLow] = useState("");
   const [swingHigh, setSwingHigh] = useState("");
   const [quantity, setQuantity] = useState("");
-  const [target1, setTarget1] = useState("");
-  const [target2, setTarget2] = useState("");
-  const [stopLoss, setStopLoss] = useState("");
+  const [target1, setTarget1] = useState(prefill?.tp1 ?? "");
+  const [target2, setTarget2] = useState(prefill?.tp2 ?? "");
+  const [stopLoss, setStopLoss] = useState(prefill?.stop ?? "");
   const [useFibTargets, setUseFibTargets] = useState(false);
+
+  // Re-initialize when prefill changes (e.g. navigated from ORS)
+  useEffect(() => {
+    if (open && prefill) {
+      setTicker(prefill.ticker ?? "");
+      setStrategy(prefill.strategy ?? "");
+      setDirection(prefill.direction ?? "long");
+      setEntryPrice(prefill.entry ?? "");
+      setTarget1(prefill.tp1 ?? "");
+      setTarget2(prefill.tp2 ?? "");
+      setStopLoss(prefill.stop ?? "");
+    }
+  }, [open, prefill]);
 
   const entryNum = parseFloat(entryPrice) || 0;
   const swingLowNum = parseFloat(swingLow) || 0;
@@ -606,7 +631,26 @@ function TradeRow({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TradeLog() {
-  const [showAdd, setShowAdd] = useState(false);
+  const [prefill, setPrefill] = useState<AddTradePrefill | undefined>(() => {
+    if (typeof window === "undefined") return undefined;
+    const p = new URLSearchParams(window.location.search);
+    const ticker = p.get("ticker");
+    if (!ticker) return undefined;
+    const dir = p.get("direction");
+    return {
+      ticker: ticker.toUpperCase(),
+      direction: dir === "short" ? "short" : "long",
+      entry: p.get("entry") ?? "",
+      stop: p.get("stop") ?? "",
+      tp1: p.get("tp1") ?? "",
+      tp2: p.get("tp2") ?? "",
+      strategy: p.get("strategy") ?? "",
+    };
+  });
+  const [showAdd, setShowAdd] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).has("ticker");
+  });
   const [filterStatus, setFilterStatus] = useState<"all" | "open" | "closed">("all");
 
   const tradesQuery = trpc.trades.list.useQuery(undefined, { staleTime: 30 * 1000 });
@@ -731,8 +775,9 @@ export default function TradeLog() {
 
       <AddTradeDialog
         open={showAdd}
-        onClose={() => setShowAdd(false)}
+        onClose={() => { setShowAdd(false); setPrefill(undefined); }}
         onSuccess={() => tradesQuery.refetch()}
+        prefill={prefill}
       />
     </div>
   );

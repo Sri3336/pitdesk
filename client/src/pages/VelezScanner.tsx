@@ -40,6 +40,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -359,7 +360,13 @@ function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 export default function VelezScanner() {
-  const [tab, setTab] = useState<"daily" | "intraday" | "ors">("daily");
+  const [tab, setTab] = useState<"daily" | "intraday" | "ors">(() => {
+    if (typeof window !== "undefined") {
+      const t = new URLSearchParams(window.location.search).get("tab");
+      if (t === "ors" || t === "intraday" || t === "daily") return t;
+    }
+    return "daily";
+  });
   const [showHowTo, setShowHowTo] = useState(false);
   const [thresholdPct, setThresholdPct] = useState(1.0);
   const [minPrice, setMinPrice] = useState(10);
@@ -716,6 +723,7 @@ function OrsTable({
                   <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground hidden sm:table-cell">R:R</th>
                   <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">Pattern</th>
                   <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">Status</th>
+                  <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -735,9 +743,22 @@ function OrsTable({
 }
 
 function OrsRow({ result: r }: { result: OrsSignal }) {
+  const [, navigate] = useLocation();
   const isLong = r.direction === "LONG";
   const isShort = r.direction === "SHORT";
   const isReady = r.status === "SETUP_READY";
+  const handleLogTrade = () => {
+    const params = new URLSearchParams({
+      ticker: r.ticker,
+      direction: r.direction === "LONG" ? "long" : "short",
+      entry: r.entryPrice > 0 ? r.entryPrice.toFixed(2) : "",
+      stop: r.stopLoss > 0 ? r.stopLoss.toFixed(2) : "",
+      tp1: r.tp1 > 0 ? r.tp1.toFixed(2) : "",
+      tp2: r.tp2 > 0 ? r.tp2.toFixed(2) : "",
+      strategy: "Opening Range Scalper",
+    });
+    navigate(`/trade-log?${params.toString()}`);
+  };
 
   return (
     <tr className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
@@ -806,6 +827,18 @@ function OrsRow({ result: r }: { result: OrsSignal }) {
         >
           {isReady ? "READY" : r.status === "WATCHING" ? "WATCHING" : "NO GATE"}
         </Badge>
+      </td>
+      <td className="px-3 py-2.5 text-center">
+        {isReady && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[10px] px-2 border-green-400 text-green-700 hover:bg-green-50"
+            onClick={handleLogTrade}
+          >
+            Log Trade
+          </Button>
+        )}
       </td>
     </tr>
   );
