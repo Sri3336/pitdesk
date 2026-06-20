@@ -205,3 +205,10 @@
 - [x] U3: Performance Tracker subtitle fixed to say "Your"
 - [x] U4: PCR board empty-state copy updated to reference Intraday Scan button
 - [x] U6: Dashboard Quick Access updated to 8 cards in 4-column grid (PCR, Velez, ORS, VCP, Analyzer, Trade Log, Catalyst Watch, IVR Alerts)
+
+## Phase 21: Previous Range Pullback (PRP) Scanner
+
+- [ ] Server: previousRangeScanner.ts — swing detection, BOS detection, retracement % calc
+- [ ] tRPC: previousRangeScanner router with scan procedure
+- [ ] UI: PRP tab in VelezScanner.tsx with result cards (ticker, direction, retracement %, zone, target)
+- [ ] Sidebar: Add PRP to sidebar if needed (or keep inside Velez Scanner tabs)

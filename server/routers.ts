@@ -81,6 +81,7 @@ import {
 } from "./fibEngine";
 import { runVelezDailyScanner, runVelezIntradayScanner } from "./velezScanner";
 import { runOpeningRangeScalperScan, scanOpeningRangeScalper } from "./openingRangeScalper";
+import { runPRPScanner, scanPreviousRangePullback } from "./previousRangeScanner";
 import { brokerRouter, agentRouter, tradeLogRouter } from "./routers/agent";
 import { catalystBreakoutRouter } from "./routers/catalystBreakout";
 import { cotRouter } from "./routers/cot";
@@ -308,6 +309,25 @@ const openingRangeScalperRouter = router({
     .input(z.object({ ticker: z.string() }))
     .query(async ({ input }) => {
       return scanOpeningRangeScalper(input.ticker.toUpperCase());
+    }),
+});
+
+// ─── Previous Range Pullback Router ────────────────────────────────────────
+const previousRangeRouter = router({
+  scan: protectedProcedure
+    .input(
+      z.object({
+        tickers: z.array(z.string()).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const tickers = input.tickers ?? [...PCR_TICKERS];
+      return runPRPScanner(tickers);
+    }),
+  scanTicker: protectedProcedure
+    .input(z.object({ ticker: z.string() }))
+    .query(async ({ input }) => {
+      return scanPreviousRangePullback(input.ticker.toUpperCase());
     }),
 });
 
@@ -1405,6 +1425,7 @@ export const appRouter = router({
   vcp: vcpRouter,
   earningsCalendar: earningsCalendarRouter,
   openingRangeScalper: openingRangeScalperRouter,
+  previousRange: previousRangeRouter,
 });
 
 export type AppRouter = typeof appRouter;

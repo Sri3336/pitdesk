@@ -360,18 +360,18 @@ function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 export default function VelezScanner() {
-  const [tab, setTab] = useState<"daily" | "intraday" | "ors">(() => {
+  const [tab, setTab] = useState<"daily" | "intraday" | "ors" | "prp">(() => {
     if (typeof window !== "undefined") {
       const t = new URLSearchParams(window.location.search).get("tab");
-      if (t === "ors" || t === "intraday" || t === "daily") return t;
+      if (t === "ors" || t === "intraday" || t === "daily" || t === "prp") return t;
     }
     return "daily";
   });
-  // Sync tab when URL changes (e.g. sidebar navigation to /velez-scanner?tab=ors)
+  // Sync tab when URL changes (e.g. sidebar navigation to /velez-scanner?tab=prp)
   const [location] = useLocation();
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "ors" || t === "intraday" || t === "daily") setTab(t);
+    if (t === "ors" || t === "intraday" || t === "daily" || t === "prp") setTab(t);
   }, [location]);
 
   const [showHowTo, setShowHowTo] = useState(false);
@@ -394,6 +394,10 @@ export default function VelezScanner() {
     {},
     { enabled: enabled && tab === "ors", staleTime: 60 * 1000 }
   );
+  const prpQuery = trpc.previousRange.scan.useQuery(
+    {},
+    { enabled: enabled && tab === "prp", staleTime: 5 * 60 * 1000 }
+  );
   const query = tab === "daily" ? dailyQuery : intradayQuery;
   const signals = (query.data as DailySignal[] | undefined) ?? [];
 
@@ -401,8 +405,9 @@ export default function VelezScanner() {
     setEnabled(true);
     if (tab === "daily") dailyQuery.refetch();
     else if (tab === "intraday") intradayQuery.refetch();
-    else orsQuery.refetch();
-    const label = tab === "ors" ? "Opening Range Scalper" : `${tab} Velez`;
+    else if (tab === "ors") orsQuery.refetch();
+    else prpQuery.refetch();
+    const label = tab === "ors" ? "Opening Range Scalper" : tab === "prp" ? "Previous Range Pullback" : `${tab} Velez`;
     toast.info(`Running ${label} scan across 60 PCR tickers…`);
   };
 
@@ -537,13 +542,17 @@ export default function VelezScanner() {
       )}
 
             {/* Tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "daily" | "intraday" | "ors")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "daily" | "intraday" | "ors" | "prp")}>
         <TabsList>
           <TabsTrigger value="daily">Daily Signals</TabsTrigger>
           <TabsTrigger value="intraday">Intraday 5-min</TabsTrigger>
           <TabsTrigger value="ors" className="flex items-center gap-1.5">
             <Target className="h-3.5 w-3.5" />
             Opening Range Scalper
+          </TabsTrigger>
+          <TabsTrigger value="prp" className="flex items-center gap-1.5">
+            <TrendingUp className="h-3.5 w-3.5" />
+            Prev Range Pullback
           </TabsTrigger>
         </TabsList>
         <TabsContent value="daily" className="mt-4">
@@ -554,6 +563,9 @@ export default function VelezScanner() {
         </TabsContent>
         <TabsContent value="ors" className="mt-4">
           <OrsTable results={orsQuery.data ?? []} loading={orsQuery.isFetching} started={enabled && tab === "ors"} />
+        </TabsContent>
+        <TabsContent value="prp" className="mt-4">
+          <PrpTable results={prpQuery.data ?? []} loading={prpQuery.isFetching} started={enabled && tab === "prp"} />
         </TabsContent>
       </Tabs>
     </div>
@@ -841,6 +853,219 @@ function OrsRow({ result: r }: { result: OrsSignal }) {
             size="sm"
             variant="outline"
             className="h-6 text-[10px] px-2 border-green-400 text-green-700 hover:bg-green-50"
+            onClick={handleLogTrade}
+          >
+            Log Trade
+          </Button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+// ─── PRP Types ────────────────────────────────────────────────────────────────
+interface PrpSignal {
+  ticker: string;
+  direction: "BULLISH" | "BEARISH";
+  bosLevel: number;
+  rangeAnchor: number;
+  rangeSize: number;
+  currentPrice: number;
+  retracementPct: number;
+  retracementZone: string;
+  level30: number;
+  level50: number;
+  level70: number;
+  target: number;
+  stop: number;
+  rr: number;
+  bosDate: string;
+  daysSinceBos: number;
+  bosVolumeRatio: number;
+  currentVolumeRatio: number;
+  ema21: number | null;
+  ema21Aligned: boolean;
+}
+
+// ─── PRP Table Component ──────────────────────────────────────────────────────
+function PrpTable({
+  results,
+  loading,
+  started,
+}: {
+  results: PrpSignal[];
+  loading: boolean;
+  started: boolean;
+}) {
+  if (!started) {
+    return (
+      <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground border border-dashed border-border rounded-xl">
+        <TrendingUp className="h-8 w-8 text-purple-400" />
+        <div className="text-sm font-medium">Click "Run Scan" to scan for Previous Range Pullback setups</div>
+        <div className="text-xs text-center max-w-sm">
+          Detects break of structure + 30/50/70% retracement into prior range using daily OHLC data (ICT/SMC method)
+        </div>
+      </div>
+    );
+  }
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
+        <RefreshCw className="h-8 w-8 animate-spin text-purple-500" />
+        <div className="text-sm">Scanning 60 tickers for break-of-structure + pullback setups…</div>
+        <div className="text-xs text-muted-foreground">Fetching daily OHLC and computing swing structure</div>
+      </div>
+    );
+  }
+
+  const prime = results.filter((r) => r.retracementZone !== "NONE" && r.rr >= 2 && r.ema21Aligned);
+  const inZone = results.filter((r) => r.retracementZone !== "NONE" && !(r.rr >= 2 && r.ema21Aligned));
+  const watching = results.filter((r) => r.retracementZone === "NONE");
+
+  return (
+    <div className="space-y-4">
+      {/* Summary stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-lg border border-border bg-card p-3 text-center">
+          <div className="text-2xl font-bold text-purple-600">{prime.length}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Prime Setup (BOS + Zone + 4 Swings)</div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3 text-center">
+          <div className="text-2xl font-bold text-blue-500">{inZone.length}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">In Pullback Zone</div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3 text-center">
+          <div className="text-2xl font-bold text-slate-400">{watching.length}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">BOS Detected — Watching</div>
+        </div>
+      </div>
+
+      {results.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground border border-dashed border-border rounded-xl">
+          <AlertTriangle className="h-6 w-6 text-yellow-400" />
+          <div className="text-sm font-medium">No PRP setups found</div>
+          <div className="text-xs">No break-of-structure events detected across 60 tickers</div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border">
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Ticker</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">Price</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">BOS High</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">30% Ret</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">50% Ret</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground hidden sm:table-cell">70% Ret</th>
+                  <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground hidden md:table-cell">Swings</th>
+                  <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">Status</th>
+                  <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...prime, ...inZone, ...watching].map((r) => (
+                  <PrpRow key={r.ticker} result={r} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-2 bg-muted/30 border-t border-border text-xs text-muted-foreground">
+            BOS = Break of Structure (price closes above prior swing high). Retracements are 30/50/70% of the prior range.
+            <span className="ml-2 text-purple-600 font-medium">Prime Setup = BOS + price in 30–70% zone + ≥4 swings into zone.</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PrpRow({ result: r }: { result: PrpSignal }) {
+  const [, navigate] = useLocation();
+  const isPrime = r.retracementZone !== "NONE" && r.rr >= 2 && r.ema21Aligned;
+  const isInZone = r.retracementZone !== "NONE" && !isPrime;
+
+  const handleLogTrade = () => {
+    const entry = r.level50 > 0 ? r.level50.toFixed(2) : "";
+    const stop = r.stop > 0 ? r.stop.toFixed(2) : "";
+    const tp1 = r.target > 0 ? r.target.toFixed(2) : "";
+    const params = new URLSearchParams({
+      ticker: r.ticker,
+      direction: "long",
+      entry,
+      stop,
+      tp1,
+      strategy: "Previous Range Pullback",
+    });
+    navigate(`/trade-log?${params.toString()}`);
+  };
+
+  return (
+    <tr className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+      <td className="px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-foreground">{r.ticker}</span>
+          {r.ema21Aligned && (
+            <Badge variant="outline" className="text-[10px] px-1 py-0 text-purple-700 border-purple-300">
+              EMA↑
+            </Badge>
+          )}
+        </div>
+        <div className="text-[10px] text-muted-foreground mt-0.5">BOS: {r.bosDate}</div>
+      </td>
+      <td className="px-3 py-2.5 text-right font-mono text-xs">
+        <div className="font-semibold">${r.currentPrice.toFixed(2)}</div>
+        {r.retracementZone !== "NONE" && (
+          <div className="text-[10px] text-purple-600">{r.retracementZone}</div>
+        )}
+      </td>
+      <td className="px-3 py-2.5 text-right font-mono text-xs text-green-600">
+        ${r.bosLevel.toFixed(2)}
+      </td>
+      <td className="px-3 py-2.5 text-right font-mono text-xs">
+        <span className={Math.abs(r.currentPrice - r.level30) / (r.level30 || 1) < 0.01 ? "text-purple-600 font-semibold" : "text-muted-foreground"}>
+          ${r.level30.toFixed(2)}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 text-right font-mono text-xs">
+        <span className={Math.abs(r.currentPrice - r.level50) / (r.level50 || 1) < 0.01 ? "text-purple-600 font-semibold" : "text-muted-foreground"}>
+          ${r.level50.toFixed(2)}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 text-right font-mono text-xs hidden sm:table-cell">
+        <span className={Math.abs(r.currentPrice - r.level70) / (r.level70 || 1) < 0.01 ? "text-purple-600 font-semibold" : "text-muted-foreground"}>
+          ${r.level70.toFixed(2)}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 text-center hidden md:table-cell">
+        <div className="flex items-center justify-center gap-1">
+          <span className={`text-xs font-semibold ${r.ema21Aligned ? "text-purple-600" : "text-muted-foreground"}`}>
+            {r.daysSinceBos}d
+          </span>
+          <span className="text-[10px] text-muted-foreground">since BOS</span>
+        </div>
+      </td>
+      <td className="px-3 py-2.5 text-center">
+        <Badge
+          variant="outline"
+          className={`text-[10px] px-1.5 py-0 ${
+            isPrime
+              ? "bg-purple-50 text-purple-700 border-purple-300"
+              : isInZone
+              ? "bg-blue-50 text-blue-700 border-blue-300"
+              : "bg-slate-50 text-slate-500 border-slate-200"
+          }`}
+        >
+          {isPrime ? "PRIME" : isInZone ? "IN ZONE" : "WATCHING"}
+          {r.direction === "BEARISH" && <span className="ml-1 text-[9px]">↓</span>}
+        </Badge>
+      </td>
+      <td className="px-3 py-2.5 text-center">
+        {(isPrime || isInZone) && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[10px] px-2 border-purple-400 text-purple-700 hover:bg-purple-50"
             onClick={handleLogTrade}
           >
             Log Trade
