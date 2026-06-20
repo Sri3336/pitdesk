@@ -722,7 +722,7 @@ export default function Performance() {
       {isAdmin && (
         <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-sm text-amber-800">
           <ShieldCheck className="h-4 w-4 text-amber-600 shrink-0" />
-          <span className="font-medium">Admin view</span> — showing all users' tracked recommendations.
+          <span className="font-medium">Admin view</span> — showing all tracked recommendations.
           {userOptions.length > 0 && (
             <div className="ml-auto flex items-center gap-2">
               <span className="text-xs text-amber-600">Filter by user:</span>
@@ -746,7 +746,7 @@ export default function Performance() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Performance Tracker</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{isAdmin ? "Showing all tracked recommendations and outcomes across your account." : "Track every recommendation against actual market outcomes"}</p>
+          <p className="text-sm text-slate-500 mt-0.5">{isAdmin ? "Showing all tracked recommendations and outcomes." : "Track your recommendations against actual market outcomes"}</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" onClick={() => setShowLogDialog(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">

@@ -197,11 +197,11 @@
 
 ## Phase 20: UI Bug Fixes (from comprehensive test)
 
-- [ ] M1: Velez Scanner How-To — apply thumbnail-first YouTube modal (ID: 6rSI7Ibws_o)
-- [ ] M3: IVR Alerts loading spinner never resolves to empty state
-- [ ] M4: Performance Tracker loading spinner never resolves to empty state
-- [ ] U1: Dashboard banner "Fibonacci Suite — Now Live" is outdated
-- [ ] U2: /options-analyzer returns 404 — add redirect to /analyzer
-- [ ] U3: Performance Tracker subtitle says "All users'" — change to "Your"
-- [ ] U4: PCR Signal Board gray cards — add better empty-state copy
-- [ ] U6: Dashboard Quick Access missing PCR Strategy, VCP, ORS, Catalyst Watch
+- [x] M1: Velez Scanner How-To — thumbnail-first modal already implemented and confirmed working
+- [x] M3: IVR Alerts — added isError + retry:1; shows Retry button on error instead of infinite spinner
+- [x] M4: Performance Tracker — added isError + retry:1; shows Retry button on error instead of infinite spinner
+- [x] U1: Dashboard banner replaced with Opening Range Scalper highlight card
+- [x] U2: Added /options-analyzer and /ai-agent redirect routes in App.tsx
+- [x] U3: Performance Tracker subtitle fixed to say "Your"
+- [x] U4: PCR board empty-state copy updated to reference Intraday Scan button
+- [x] U6: Dashboard Quick Access updated to 8 cards in 4-column grid (PCR, Velez, ORS, VCP, Analyzer, Trade Log, Catalyst Watch, IVR Alerts)
