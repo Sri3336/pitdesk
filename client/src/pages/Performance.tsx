@@ -594,7 +594,7 @@ export default function Performance() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const utils = trpc.useUtils();
-  const { data: recs = [], isLoading } = trpc.recommendations.list.useQuery();
+  const { data: recs = [], isLoading, isError } = trpc.recommendations.list.useQuery(undefined, { retry: 1 });
 
   const deleteMutation = trpc.recommendations.delete.useMutation({
     onSuccess: () => { utils.recommendations.list.invalidate(); toast.success("Recommendation deleted"); },
@@ -746,7 +746,7 @@ export default function Performance() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Performance Tracker</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{isAdmin ? "All users' tracked recommendations and outcomes." : "Track every recommendation against actual market outcomes"}</p>
+          <p className="text-sm text-slate-500 mt-0.5">{isAdmin ? "Showing all tracked recommendations and outcomes across your account." : "Track every recommendation against actual market outcomes"}</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" onClick={() => setShowLogDialog(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
@@ -921,6 +921,12 @@ export default function Performance() {
       {/* Rows */}
       {isLoading ? (
         <div className="text-center py-16 text-slate-400">Loading recommendations...</div>
+      ) : isError ? (
+        <div className="text-center py-16 text-slate-400">
+          <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <div className="font-medium text-slate-500 mb-1">Could not load recommendations</div>
+          <div className="text-sm">Refresh the page to try again.</div>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-30" />

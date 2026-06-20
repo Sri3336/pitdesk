@@ -206,8 +206,9 @@ export default function IvrAlerts() {
   const { user } = useAuth();
   const utils = trpc.useUtils();
 
-  const { data: alerts = [], isLoading, refetch } = trpc.ivrAlerts.list.useQuery(undefined, {
+  const { data: alerts = [], isLoading, isError, refetch } = trpc.ivrAlerts.list.useQuery(undefined, {
     enabled: !!user,
+    retry: 1,
   });
 
   const deleteAlert = trpc.ivrAlerts.delete.useMutation({
@@ -309,6 +310,10 @@ export default function IvrAlerts() {
         <CardContent>
           {isLoading ? (
             <div className="text-center text-muted-foreground py-8 text-sm">Loading alerts...</div>
+          ) : isError ? (
+            <div className="text-center text-muted-foreground py-8 text-sm">
+              Could not load alerts. <button className="underline" onClick={() => refetch()}>Retry</button>
+            </div>
           ) : alerts.length === 0 ? (
             <div className="text-center text-muted-foreground py-8 text-sm">
               No alerts yet. Create one above to get started.

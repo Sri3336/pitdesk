@@ -1,16 +1,17 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { trpc } from "@/lib/trpc";
-import { Activity, AlertTriangle, BarChart2, LineChart, Sparkles, TrendingUp, Zap } from "lucide-react";
+import { Activity, AlertTriangle, BarChart2, LineChart, Radio, Sparkles, Target, TrendingUp, Zap } from "lucide-react";
 import { useLocation } from "wouter";
 
 const quickLinks = [
-  { icon: LineChart, label: "Velez Scanner", desc: "Daily & intraday Fib signals", path: "/velez-scanner", color: "text-blue-500", bg: "bg-blue-50" },
-  { icon: Sparkles, label: "Fib+EMA Alerts", desc: "Confluence zone scanner", path: "/fib-ema-alerts", color: "text-green-600", bg: "bg-green-50" },
-  { icon: Zap, label: "Trade Log", desc: "Log trades with Fib targets", path: "/trade-log", color: "text-orange-500", bg: "bg-orange-50" },
-  { icon: BarChart2, label: "PCR Dashboard", desc: "Put/Call ratio for 60 tickers", path: "/pcr-dashboard", color: "text-purple-500", bg: "bg-purple-50" },
-  { icon: Activity, label: "Options Analyzer", desc: "13 strategies, Black-Scholes", path: "/analyzer", color: "text-cyan-500", bg: "bg-cyan-50" },
-  { icon: AlertTriangle, label: "IVR Alerts", desc: "IV rank alerts", path: "/ivr-alerts", color: "text-red-500", bg: "bg-red-50" },
+  { icon: Radio,         label: "PCR Signal Board",        desc: "COI heat map + intraday scan",      path: "/pcr-strategy",          color: "text-purple-600", bg: "bg-purple-50" },
+  { icon: LineChart,     label: "Velez Scanner",            desc: "Daily & intraday Fib signals",      path: "/velez-scanner",         color: "text-blue-500",   bg: "bg-blue-50"   },
+  { icon: Target,        label: "Opening Range Scalper",    desc: "ATR gate + reversal patterns",      path: "/velez-scanner?tab=ors", color: "text-orange-500", bg: "bg-orange-50" },
+  { icon: Sparkles,      label: "VCP Strategy",             desc: "Volatility contraction patterns",   path: "/vcp-strategy",          color: "text-green-600",  bg: "bg-green-50"  },
+  { icon: Activity,      label: "Options Analyzer",         desc: "13 strategies, Black-Scholes",      path: "/analyzer",              color: "text-cyan-500",   bg: "bg-cyan-50"   },
+  { icon: Zap,           label: "Trade Log",                desc: "Log & journal every trade",         path: "/trade-log",             color: "text-amber-500",  bg: "bg-amber-50"  },
+  { icon: BarChart2,     label: "Catalyst Watch",           desc: "BCOS breakout setups",              path: "/catalyst-watch",        color: "text-rose-500",   bg: "bg-rose-50"   },
+  { icon: AlertTriangle, label: "IVR Alerts",               desc: "IV rank threshold alerts",          path: "/ivr-alerts",            color: "text-red-500",    bg: "bg-red-50"    },
 ];
 
 export default function Home() {
@@ -18,6 +19,10 @@ export default function Home() {
   const [, navigate] = useLocation();
 
   const firstName = user?.name?.split(" ")[0] ?? "Sridhar";
+
+  // Greeting based on time of day
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -28,7 +33,7 @@ export default function Home() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            Good morning, {firstName} 👋
+            {greeting}, {firstName} 👋
           </h1>
           <p className="text-sm text-muted-foreground">
             PitDesk — Your personal trading intelligence platform
@@ -36,35 +41,35 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Fibonacci Suite highlight */}
-      <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+      {/* Opening Range Scalper highlight */}
+      <Card className="border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2 text-green-700">
-            <Sparkles className="h-4 w-4" />
-            Fibonacci Suite — Now Live
+          <CardTitle className="text-base flex items-center gap-2 text-orange-700">
+            <Target className="h-4 w-4" />
+            Opening Range Scalper — Now Live
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div className="flex items-start gap-2">
-              <span className="text-green-500 font-bold mt-0.5">✓</span>
+              <span className="text-orange-500 font-bold mt-0.5">✓</span>
               <div>
-                <div className="font-medium text-foreground">Fib Retracement Overlay</div>
-                <div className="text-muted-foreground text-xs">23.6%, 38.2%, 50%, 61.8%, 78.6% on Velez Scanner</div>
+                <div className="font-medium text-foreground">ATR Gate Filter</div>
+                <div className="text-muted-foreground text-xs">First 15-min candle ≥ 25% of Daily ATR-14 required</div>
               </div>
             </div>
             <div className="flex items-start gap-2">
-              <span className="text-green-500 font-bold mt-0.5">✓</span>
+              <span className="text-orange-500 font-bold mt-0.5">✓</span>
               <div>
-                <div className="font-medium text-foreground">Extension Profit Targets</div>
-                <div className="text-muted-foreground text-xs">127.2%, 161.8%, 261.8% in Scanner + Trade Log</div>
+                <div className="font-medium text-foreground">Opening Range Box</div>
+                <div className="text-muted-foreground text-xs">Breakout + reversal candle detection 9:30–11:00 AM ET</div>
               </div>
             </div>
             <div className="flex items-start gap-2">
-              <span className="text-green-500 font-bold mt-0.5">✓</span>
+              <span className="text-orange-500 font-bold mt-0.5">✓</span>
               <div>
-                <div className="font-medium text-foreground">Fib+EMA Confluence Alerts</div>
-                <div className="text-muted-foreground text-xs">Scan 60 PCR tickers for high-probability zones</div>
+                <div className="font-medium text-foreground">One-Click Log Trade</div>
+                <div className="text-muted-foreground text-xs">Pre-fills Trade Log with entry, stop, TP1, TP2</div>
               </div>
             </div>
           </div>
@@ -76,7 +81,7 @@ export default function Home() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
           Quick Access
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {quickLinks.map((link) => (
             <button
               key={link.path}
@@ -97,31 +102,31 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Fibonacci education card */}
+      {/* Strategy quick-reference */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold text-muted-foreground">
-            Fibonacci Trading Rules (Your Strategy)
+            Your Strategy Rules at a Glance
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div className="space-y-2">
-              <div className="font-medium text-foreground">Retracement Entry Rules</div>
+              <div className="font-medium text-foreground">PCR Signal Zones</div>
               <ul className="space-y-1 text-muted-foreground text-xs">
-                <li>• Confirm trend using EMA (price above 50 EMA = uptrend)</li>
-                <li>• Wait for pullback to 38.2%–61.8% Fib zone</li>
-                <li>• Confirm bounce when price reclaims EMA at Fib level</li>
-                <li>• Enter with stop below the Fib level</li>
+                <li>• <span className="text-emerald-600 font-medium">PCR &gt; 1.5</span> — Extreme Fear → contrarian bullish (sell puts)</li>
+                <li>• <span className="text-teal-600 font-medium">PCR 1.0–1.5</span> — Fear → bull put spread</li>
+                <li>• <span className="text-slate-500 font-medium">PCR 0.7–1.0</span> — Neutral → iron condor</li>
+                <li>• <span className="text-red-600 font-medium">PCR &lt; 0.7</span> — Greed/Extreme Greed → bear call spread</li>
               </ul>
             </div>
             <div className="space-y-2">
-              <div className="font-medium text-foreground">Extension Profit Targets</div>
+              <div className="font-medium text-foreground">Opening Range Scalper Rules</div>
               <ul className="space-y-1 text-muted-foreground text-xs">
-                <li>• <span className="text-blue-600 font-medium">T1: 127.2%</span> — First profit target, partial exit</li>
-                <li>• <span className="text-green-600 font-medium">T2: 161.8%</span> — Primary target, golden ratio</li>
-                <li>• <span className="text-purple-600 font-medium">T3: 261.8%</span> — Aggressive target, strong trends</li>
-                <li>• Move stop to breakeven after T1 is hit</li>
+                <li>• First 15-min candle must be ≥ 25% of Daily ATR-14</li>
+                <li>• Wait for price to break outside the opening range box</li>
+                <li>• Enter on Hammer / Engulfing reversal back into box</li>
+                <li>• TP1 = near box edge · TP2 = far box edge · 90-min limit</li>
               </ul>
             </div>
           </div>

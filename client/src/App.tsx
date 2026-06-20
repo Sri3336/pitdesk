@@ -114,6 +114,9 @@ function Router() {
 
                 {/* Analysis */}
                 <Route path="/analyzer" component={Analyzer} />
+                {/* Friendly URL aliases */}
+                <Route path="/options-analyzer">{() => { window.location.replace("/analyzer"); return null; }}</Route>
+                <Route path="/ai-agent">{() => { window.location.replace("/agent"); return null; }}</Route>
                 <Route path="/history" component={History} />
                 <Route path="/pcr-dashboard" component={PCRDashboard} />
                 <Route path="/pcr-strategy" component={PCRStrategy} />

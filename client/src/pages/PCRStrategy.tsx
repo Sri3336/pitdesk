@@ -295,7 +295,7 @@ function DetailPanel({ cell, onClose }: { cell: HeatCellData; onClose: () => voi
         ) : (
           <div className="text-xs text-muted-foreground bg-slate-50 rounded-lg border border-slate-200 p-3 text-center">
             <Clock className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-            No 11:30 AM scan data yet. Run the scan to see COI signals.
+            No intraday scan data yet. Click "Intraday Scan" above to see COI signals.
           </div>
         )}
 

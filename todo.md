@@ -194,3 +194,14 @@
 - [x] ORS How-To video — narration (5m 44s, 6 sections) + 6 slides + composed + uploaded to Google Drive (PitDesk How-To Videos folder)
 - [x] Log Trade button on ORS SETUP_READY rows — navigates to /trade-log with URL params; TradeLog reads params and auto-opens pre-filled AddTradeDialog
 - [x] ORS dedicated sidebar entry under STRATEGIES section (/velez-scanner?tab=ors)
+
+## Phase 20: UI Bug Fixes (from comprehensive test)
+
+- [ ] M1: Velez Scanner How-To — apply thumbnail-first YouTube modal (ID: 6rSI7Ibws_o)
+- [ ] M3: IVR Alerts loading spinner never resolves to empty state
+- [ ] M4: Performance Tracker loading spinner never resolves to empty state
+- [ ] U1: Dashboard banner "Fibonacci Suite — Now Live" is outdated
+- [ ] U2: /options-analyzer returns 404 — add redirect to /analyzer
+- [ ] U3: Performance Tracker subtitle says "All users'" — change to "Your"
+- [ ] U4: PCR Signal Board gray cards — add better empty-state copy
+- [ ] U6: Dashboard Quick Access missing PCR Strategy, VCP, ORS, Catalyst Watch
