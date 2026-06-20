@@ -179,3 +179,12 @@
 - [x] Run backfill script — 22 pcr_oi_snapshots inserted, 22 pcr_scheduled_results (intraday_scan) + 22 (eod_snapshot) inserted for 2026-05-12
 - [x] Verified DB: SOXL PCR=2.04 (EXTREME_FEAR), FAS PCR=1.22 (FEAR), INTC PCR=1.18 (FEAR), AAPL PCR=0.28 (EXTREME_GREED), UNH PCR=0.17 (EXTREME_GREED)
 - [x] PCR Trend chart and History tab now have baseline data from 2026-05-12
+
+## Phase 18: Opening Range Scalper + Intraday Cron
+
+- [x] Server: openingRangeScalper.ts — ATR gate (≥25% Daily ATR), opening range box, reversal candle detection (Hammer/InvHammer/Engulfing), 90-min window
+- [x] DB: no separate table needed — scan is stateless/on-demand for caching scan results
+- [x] tRPC: openingRangeScalper router (scan, getResults, getHistory)
+- [x] UI: Opening Range Scalper tab in VelezScanner.tsx (3rd tab alongside Daily/Intraday 5-min)
+- [x] UI: Alert cards — ticker, direction (LONG/SHORT), TP1/TP2, stop, ATR gate status, reversal pattern
+- [x] Cron: PCR Intraday Scan already active (every 15min 9:30-4pm ET Mon-Fri, task_uid: 5BA9VMik7wD5g6x7DaqQqE) at 15:30 UTC (Mon-Fri) via manus-heartbeat CLI

@@ -34,6 +34,7 @@ import {
   RefreshCw,
   Shield,
   Sparkles,
+  Target,
   TrendingDown,
   TrendingUp,
   Zap,
@@ -358,7 +359,7 @@ function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 export default function VelezScanner() {
-  const [tab, setTab] = useState<"daily" | "intraday">("daily");
+  const [tab, setTab] = useState<"daily" | "intraday" | "ors">("daily");
   const [showHowTo, setShowHowTo] = useState(false);
   const [thresholdPct, setThresholdPct] = useState(1.0);
   const [minPrice, setMinPrice] = useState(10);
@@ -375,14 +376,20 @@ export default function VelezScanner() {
     { enabled: enabled && tab === "intraday", staleTime: 60 * 1000 }
   );
 
+  const orsQuery = trpc.openingRangeScalper.scan.useQuery(
+    {},
+    { enabled: enabled && tab === "ors", staleTime: 60 * 1000 }
+  );
   const query = tab === "daily" ? dailyQuery : intradayQuery;
   const signals = (query.data as DailySignal[] | undefined) ?? [];
 
   const handleScan = () => {
     setEnabled(true);
     if (tab === "daily") dailyQuery.refetch();
-    else intradayQuery.refetch();
-    toast.info(`Running ${tab} Velez scan across 60 PCR tickers…`);
+    else if (tab === "intraday") intradayQuery.refetch();
+    else orsQuery.refetch();
+    const label = tab === "ors" ? "Opening Range Scalper" : `${tab} Velez`;
+    toast.info(`Running ${label} scan across 60 PCR tickers…`);
   };
 
   const confluenceCount = signals.filter((s) => s.hasConfluence).length;
@@ -515,18 +522,24 @@ export default function VelezScanner() {
         </div>
       )}
 
-      {/* Tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "daily" | "intraday")}>
+            {/* Tabs */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "daily" | "intraday" | "ors")}>
         <TabsList>
           <TabsTrigger value="daily">Daily Signals</TabsTrigger>
           <TabsTrigger value="intraday">Intraday 5-min</TabsTrigger>
+          <TabsTrigger value="ors" className="flex items-center gap-1.5">
+            <Target className="h-3.5 w-3.5" />
+            Opening Range Scalper
+          </TabsTrigger>
         </TabsList>
-
         <TabsContent value="daily" className="mt-4">
           <ScannerTable signals={signals} loading={query.isFetching} started={enabled} />
         </TabsContent>
         <TabsContent value="intraday" className="mt-4">
           <ScannerTable signals={signals} loading={query.isFetching} started={enabled} />
+        </TabsContent>
+        <TabsContent value="ors" className="mt-4">
+          <OrsTable results={orsQuery.data ?? []} loading={orsQuery.isFetching} started={enabled && tab === "ors"} />
         </TabsContent>
       </Tabs>
     </div>
@@ -600,5 +613,200 @@ function ScannerTable({
         <span className="ml-2 text-green-600 font-medium">Green "Confluence" badge = price within {1}% of both Fib level AND EMA.</span>
       </div>
     </div>
+  );
+}
+
+// ─── ORS Types ────────────────────────────────────────────────────────────────
+interface OrsSignal {
+  ticker: string;
+  direction: "LONG" | "SHORT" | "NONE";
+  boxHigh: number;
+  boxLow: number;
+  boxSize: number;
+  dailyAtr: number;
+  atrThreshold: number;
+  atrGatePassed: boolean;
+  openingCandleBullish: boolean;
+  reversalPattern: string;
+  reversalCandleHigh: number;
+  reversalCandleLow: number;
+  entryPrice: number;
+  stopLoss: number;
+  tp1: number;
+  tp2: number;
+  riskReward: number;
+  currentPrice: number;
+  scannedAt: string;
+  withinWindow: boolean;
+  status: "SETUP_READY" | "WATCHING" | "NO_GATE" | "NO_SIGNAL" | "WINDOW_CLOSED";
+  statusReason: string;
+}
+
+// ─── ORS Table Component ──────────────────────────────────────────────────────
+function OrsTable({
+  results,
+  loading,
+  started,
+}: {
+  results: OrsSignal[];
+  loading: boolean;
+  started: boolean;
+}) {
+  if (!started) {
+    return (
+      <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground border border-dashed border-border rounded-xl">
+        <Target className="h-8 w-8 text-orange-400" />
+        <div className="text-sm font-medium">Click "Run Scan" to scan for Opening Range Scalper setups</div>
+        <div className="text-xs text-center max-w-sm">
+          Scans 60 tickers for first 15-min candle ATR gate, box breakout, and reversal candle pattern (9:30–11:00 AM ET)
+        </div>
+      </div>
+    );
+  }
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
+        <RefreshCw className="h-8 w-8 animate-spin text-orange-500" />
+        <div className="text-sm">Scanning 60 tickers for opening range setups…</div>
+        <div className="text-xs text-muted-foreground">Fetching 15-min candles and computing ATR gates</div>
+      </div>
+    );
+  }
+
+  const ready = results.filter((r) => r.status === "SETUP_READY");
+  const watching = results.filter((r) => r.status === "WATCHING");
+  const noGate = results.filter((r) => r.status === "NO_GATE");
+
+  return (
+    <div className="space-y-4">
+      {/* Strategy legend */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-lg border border-border bg-card p-3 text-center">
+          <div className="text-2xl font-bold text-green-600">{ready.length}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Setup Ready</div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3 text-center">
+          <div className="text-2xl font-bold text-amber-500">{watching.length}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">ATR Gate Passed — Watching</div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3 text-center">
+          <div className="text-2xl font-bold text-slate-400">{noGate.length}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">ATR Gate Failed</div>
+        </div>
+      </div>
+
+      {ready.length === 0 && watching.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground border border-dashed border-border rounded-xl">
+          <AlertTriangle className="h-6 w-6 text-yellow-400" />
+          <div className="text-sm font-medium">No ORS setups found</div>
+          <div className="text-xs">Run scan between 9:45–11:00 AM ET for best results</div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border">
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Ticker</th>
+                  <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">Direction</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">Entry</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">Stop</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">TP1</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">TP2</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground hidden sm:table-cell">R:R</th>
+                  <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">Pattern</th>
+                  <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...ready, ...watching].map((r) => (
+                  <OrsRow key={r.ticker} result={r} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-2 bg-muted/30 border-t border-border text-xs text-muted-foreground">
+            ATR Gate: first 15-min candle ≥ 25% of Daily ATR-14. Entry on reversal candle break. TP1 = near box edge, TP2 = far box edge.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrsRow({ result: r }: { result: OrsSignal }) {
+  const isLong = r.direction === "LONG";
+  const isShort = r.direction === "SHORT";
+  const isReady = r.status === "SETUP_READY";
+
+  return (
+    <tr className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+      <td className="px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-foreground">{r.ticker}</span>
+          {r.atrGatePassed && (
+            <Badge variant="outline" className="text-[10px] px-1 py-0 text-green-700 border-green-300">ATR ✓</Badge>
+          )}
+        </div>
+        <div className="text-[10px] text-muted-foreground mt-0.5">
+          Box: {r.boxLow.toFixed(2)}–{r.boxHigh.toFixed(2)} ({r.boxSize.toFixed(2)})
+        </div>
+      </td>
+      <td className="px-3 py-2.5 text-center">
+        {isReady ? (
+          <Badge className={`text-xs ${isLong ? "bg-green-100 text-green-800 border-green-300" : "bg-red-100 text-red-800 border-red-300"}`}>
+            {isLong ? (
+              <><TrendingUp className="h-3 w-3 mr-1" />LONG</>
+            ) : (
+              <><TrendingDown className="h-3 w-3 mr-1" />SHORT</>
+            )}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        )}
+      </td>
+      <td className="px-3 py-2.5 text-right font-mono text-xs">
+        {r.entryPrice > 0 ? `$${r.entryPrice.toFixed(2)}` : "—"}
+      </td>
+      <td className="px-3 py-2.5 text-right font-mono text-xs text-red-600">
+        {r.stopLoss > 0 ? `$${r.stopLoss.toFixed(2)}` : "—"}
+      </td>
+      <td className="px-3 py-2.5 text-right font-mono text-xs text-blue-600">
+        {r.tp1 > 0 ? `$${r.tp1.toFixed(2)}` : "—"}
+      </td>
+      <td className="px-3 py-2.5 text-right font-mono text-xs text-green-600">
+        {r.tp2 > 0 ? `$${r.tp2.toFixed(2)}` : "—"}
+      </td>
+      <td className="px-3 py-2.5 text-right text-xs hidden sm:table-cell">
+        {r.riskReward > 0 ? (
+          <span className={r.riskReward >= 2 ? "text-green-600 font-semibold" : "text-muted-foreground"}>
+            {r.riskReward.toFixed(1)}:1
+          </span>
+        ) : "—"}
+      </td>
+      <td className="px-3 py-2.5 text-center">
+        {r.reversalPattern !== "NONE" ? (
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+            {r.reversalPattern.replace(/_/g, " ")}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        )}
+      </td>
+      <td className="px-3 py-2.5 text-center">
+        <Badge
+          variant="outline"
+          className={`text-[10px] px-1.5 py-0 ${
+            isReady
+              ? "bg-green-50 text-green-700 border-green-300"
+              : r.status === "WATCHING"
+              ? "bg-amber-50 text-amber-700 border-amber-300"
+              : "bg-slate-50 text-slate-500 border-slate-200"
+          }`}
+        >
+          {isReady ? "READY" : r.status === "WATCHING" ? "WATCHING" : "NO GATE"}
+        </Badge>
+      </td>
+    </tr>
   );
 }

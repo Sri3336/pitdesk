@@ -80,6 +80,7 @@ import {
   calcAllEmas,
 } from "./fibEngine";
 import { runVelezDailyScanner, runVelezIntradayScanner } from "./velezScanner";
+import { runOpeningRangeScalperScan, scanOpeningRangeScalper } from "./openingRangeScalper";
 import { brokerRouter, agentRouter, tradeLogRouter } from "./routers/agent";
 import { catalystBreakoutRouter } from "./routers/catalystBreakout";
 import { cotRouter } from "./routers/cot";
@@ -289,6 +290,26 @@ async function fetchEarningsInfo(symbol: string, priceHistory: PriceBar[], media
     return null;
   }
 }
+
+// ─── Opening Range Scalper Router ──────────────────────────────────────────────
+const openingRangeScalperRouter = router({
+  scan: protectedProcedure
+    .input(
+      z.object({
+        tickers: z.array(z.string()).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const tickers = input.tickers ?? [...PCR_TICKERS];
+      return runOpeningRangeScalperScan(tickers);
+    }),
+
+  scanTicker: protectedProcedure
+    .input(z.object({ ticker: z.string() }))
+    .query(async ({ input }) => {
+      return scanOpeningRangeScalper(input.ticker.toUpperCase());
+    }),
+});
 
 // ─── Velez Scanner Router ─────────────────────────────────────────────────────
 const velezRouter = router({
@@ -1383,6 +1404,7 @@ export const appRouter = router({
   vcpAlerts: vcpAlertsRouter,
   vcp: vcpRouter,
   earningsCalendar: earningsCalendarRouter,
+  openingRangeScalper: openingRangeScalperRouter,
 });
 
 export type AppRouter = typeof appRouter;
