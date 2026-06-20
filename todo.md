@@ -191,6 +191,6 @@
 
 ## Phase 19: ORS Next Steps
 
-- [ ] ORS How-To video — narration + slides + compose + upload to Google Drive
-- [ ] Log Trade button on ORS SETUP_READY rows — pre-fill Trade Log with ticker, direction, entry, stop, TP1, TP2
-- [ ] ORS dedicated sidebar entry under STRATEGIES section
+- [x] ORS How-To video — narration (5m 44s, 6 sections) + 6 slides + composed + uploaded to Google Drive (PitDesk How-To Videos folder)
+- [x] Log Trade button on ORS SETUP_READY rows — navigates to /trade-log with URL params; TradeLog reads params and auto-opens pre-filled AddTradeDialog
+- [x] ORS dedicated sidebar entry under STRATEGIES section (/velez-scanner?tab=ors)

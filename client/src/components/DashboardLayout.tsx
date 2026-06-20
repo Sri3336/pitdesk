@@ -117,7 +117,14 @@ function NavGroup({
   return (
     <SidebarMenu>
       {items.map((item) => {
-        const isActive = location === item.path;
+        // Support query-string paths: /velez-scanner?tab=ors
+        const [itemPath, itemQuery] = item.path.split("?");
+        const fullLocation = typeof window !== "undefined"
+          ? window.location.pathname + (window.location.search || "")
+          : location;
+        const isActive = itemQuery
+          ? fullLocation === item.path || fullLocation.startsWith(item.path)
+          : location === item.path;
         return (
           <SidebarMenuItem key={item.path}>
             <SidebarMenuButton

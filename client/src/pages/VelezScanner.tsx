@@ -39,7 +39,7 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -367,6 +367,13 @@ export default function VelezScanner() {
     }
     return "daily";
   });
+  // Sync tab when URL changes (e.g. sidebar navigation to /velez-scanner?tab=ors)
+  const [location] = useLocation();
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "ors" || t === "intraday" || t === "daily") setTab(t);
+  }, [location]);
+
   const [showHowTo, setShowHowTo] = useState(false);
   const [thresholdPct, setThresholdPct] = useState(1.0);
   const [minPrice, setMinPrice] = useState(10);
