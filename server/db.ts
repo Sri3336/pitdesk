@@ -344,6 +344,19 @@ export async function updateTradeNotes(
     .where(and(eq(manualTrades.id, id), eq(manualTrades.userId, userId)));
 }
 
+export async function updateEntryTime(
+  id: number,
+  userId: number,
+  entryTime: string | null
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db
+    .update(manualTrades)
+    .set({ entryTime })
+    .where(and(eq(manualTrades.id, id), eq(manualTrades.userId, userId)));
+}
+
 // ─── Fib+EMA Alerts ──────────────────────────────────────────────────────────
 
 export async function getFibEmaAlertsByUser(userId: number): Promise<FibEmaAlert[]> {

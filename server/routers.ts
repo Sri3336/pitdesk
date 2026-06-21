@@ -37,6 +37,7 @@ import {
   deleteAnalysisRun,
   updateLastSignedIn,
   updateTradeNotes,
+  updateEntryTime,
   updateUserPassword,
   updateUserProfile,
   updateUserRole,
@@ -479,7 +480,7 @@ const tradesRouter = router({
       return { success: true, pnl };
     }),
 
-  updateNotes: protectedProcedure
+    updateNotes: protectedProcedure
     .input(
       z.object({
         id: z.number().int(),
@@ -491,7 +492,12 @@ const tradesRouter = router({
       await updateTradeNotes(input.id, ctx.user.id, input.postTradeNotes, input.lessonsLearned);
       return { success: true };
     }),
-
+  updateEntryTime: protectedProcedure
+    .input(z.object({ id: z.number().int(), entryTime: z.string().regex(/^\d{2}:\d{2}$/).nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await updateEntryTime(input.id, ctx.user.id, input.entryTime);
+      return { success: true };
+    }),
   // Auto-suggest Fib extension targets from entry + swing low
   getFibTargets: protectedProcedure
     .input(
@@ -509,6 +515,41 @@ const tradesRouter = router({
       }
             return calcTradeExtensionTargets(input.entryPrice, input.swingLow);
     }),
+  // Day-of-week analytics — win rate and P&L by weekday
+  dayOfWeek: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const { manualTrades: mt } = await import("../drizzle/schema");
+    const rows = await db
+      .select()
+      .from(mt)
+      .where(and(eq(mt.userId, ctx.user.id), eq(mt.status, "closed")));
+    const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+    const buckets: Record<string, { trades: number; wins: number; totalPnl: number }> = {};
+    for (const d of DAYS) buckets[d] = { trades: 0, wins: 0, totalPnl: 0 };
+    for (const r of rows) {
+      if (!r.entryDate) continue;
+      const date = new Date(r.entryDate + "T12:00:00Z");
+      const dayIndex = date.getUTCDay(); // 0=Sun, 1=Mon, ..., 5=Fri
+      if (dayIndex === 0 || dayIndex === 6) continue;
+      const dayName = DAYS[dayIndex - 1];
+      const pnl = parseFloat(r.realizedPnl ?? "0");
+      buckets[dayName].trades++;
+      buckets[dayName].totalPnl += pnl;
+      if (pnl > 0) buckets[dayName].wins++;
+    }
+    return DAYS.map((day, i) => ({
+      day,
+      shortDay: DAY_SHORT[i],
+      trades: buckets[day].trades,
+      wins: buckets[day].wins,
+      losses: buckets[day].trades - buckets[day].wins,
+      winRate: buckets[day].trades > 0 ? (buckets[day].wins / buckets[day].trades) * 100 : null,
+      totalPnl: buckets[day].totalPnl,
+      avgPnl: buckets[day].trades > 0 ? buckets[day].totalPnl / buckets[day].trades : null,
+    }));
+  }),
   // Time-of-day analytics — win rate and P&L by 30-min session window
   timeOfDay: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();

@@ -7,14 +7,13 @@
  *   pitAdvisor.quickResearch     — single-shot research on a ticker or strategy question
  */
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import type { Message } from "../_core/llm";
 import { callDataApi } from "../_core/dataApi";
 import { getDb } from "../db";
-import { uploadedTrades, tradeUploadBatches } from "../../drizzle/schema";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { uploadedTrades, manualTrades } from "../../drizzle/schema";
+import { desc, eq } from "drizzle-orm";
 
 // ─── System Prompt ─────────────────────────────────────────────────────────────
 
@@ -38,6 +37,8 @@ The platform includes:
 - **IVR Alerts**: Implied Volatility Rank alerts for options premium selling
 - **COT Dashboard**: Commitment of Traders data for institutional positioning
 - **Trade Log**: Personal trade journal with post-trade notes and lessons
+- **Trade Upload**: CSV upload of brokerage trade history for AI analysis
+- **Okala 80/20 NQ System**: Integrated in ORS tab — 200s chart, 80/20 levels, NY Open only
 
 ## Brokerage Accounts
 - E*TRADE -4723 (primary), E*TRADE -2738, Schwab
@@ -146,64 +147,141 @@ async function getQuote(ticker: string): Promise<string> {
   }
 }
 
-async function getUserTradeSummary(userId: number): Promise<string> {
+// ─── Trade Context Builder ─────────────────────────────────────────────────────
+
+async function getUserTradeContext(userId: number, fullHistory = false): Promise<string> {
   try {
     const db = await getDb();
     if (!db) return "No trade data available";
 
-    const trades = await db
+    const limit = fullHistory ? 500 : 50;
+
+    // 1. Uploaded CSV trades
+    const csvTrades = await db
       .select()
       .from(uploadedTrades)
       .where(eq(uploadedTrades.userId, userId))
       .orderBy(desc(uploadedTrades.tradeDate))
-      .limit(50);
+      .limit(limit);
 
-    if (trades.length === 0) return "No uploaded trades found. Upload a CSV from the Trade Upload page first.";
+    // 2. Manual trades from Trade Log
+    const logTrades = await db
+      .select()
+      .from(manualTrades)
+      .where(eq(manualTrades.userId, userId))
+      .orderBy(desc(manualTrades.createdAt))
+      .limit(fullHistory ? 200 : 20);
 
-    const withPnl = trades.filter(t => t.pnl !== null);
-    const wins = withPnl.filter(t => t.isWin === true);
-    const totalPnl = withPnl.reduce((s, t) => s + parseFloat(t.pnl as string), 0);
-    const winRate = withPnl.length > 0 ? (wins.length / withPnl.length * 100).toFixed(1) : "N/A";
-
-    // Ticker breakdown
-    const byTicker: Record<string, { count: number; pnl: number; wins: number }> = {};
-    for (const t of withPnl) {
-      if (!byTicker[t.ticker]) byTicker[t.ticker] = { count: 0, pnl: 0, wins: 0 };
-      byTicker[t.ticker].count++;
-      byTicker[t.ticker].pnl += parseFloat(t.pnl as string);
-      if (t.isWin) byTicker[t.ticker].wins++;
+    if (csvTrades.length === 0 && logTrades.length === 0) {
+      return "No trade data found. Upload a CSV from the Trade Upload page or log trades in the Trade Log first.";
     }
-    const topTickers = Object.entries(byTicker)
-      .sort((a, b) => Math.abs(b[1].pnl) - Math.abs(a[1].pnl))
-      .slice(0, 5)
-      .map(([ticker, d]) => `${ticker}: ${d.count} trades, ${(d.wins / d.count * 100).toFixed(0)}% WR, $${d.pnl.toFixed(0)} P&L`)
-      .join("; ");
 
-    // Strategy breakdown
-    const byStrategy: Record<string, { count: number; pnl: number; wins: number }> = {};
-    for (const t of withPnl) {
-      const strat = t.strategy || "Unknown";
-      if (!byStrategy[strat]) byStrategy[strat] = { count: 0, pnl: 0, wins: 0 };
-      byStrategy[strat].count++;
-      byStrategy[strat].pnl += parseFloat(t.pnl as string);
-      if (t.isWin) byStrategy[strat].wins++;
-    }
-    const topStrategies = Object.entries(byStrategy)
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 3)
-      .map(([s, d]) => `${s}: ${d.count} trades, ${(d.wins / d.count * 100).toFixed(0)}% WR`)
-      .join("; ");
+    const parts: string[] = [];
 
-    return `UPLOADED TRADE SUMMARY (last 50 trades):
-- Total: ${trades.length} trades | With P&L data: ${withPnl.length}
+    // ── CSV Trades Summary ──
+    if (csvTrades.length > 0) {
+      const withPnl = csvTrades.filter(t => t.pnl !== null);
+      const wins = withPnl.filter(t => t.isWin === true);
+      const totalPnl = withPnl.reduce((s, t) => s + parseFloat(t.pnl as string), 0);
+      const winRate = withPnl.length > 0 ? (wins.length / withPnl.length * 100).toFixed(1) : "N/A";
+
+      // Ticker breakdown
+      const byTicker: Record<string, { count: number; pnl: number; wins: number }> = {};
+      for (const t of withPnl) {
+        if (!byTicker[t.ticker]) byTicker[t.ticker] = { count: 0, pnl: 0, wins: 0 };
+        byTicker[t.ticker].count++;
+        byTicker[t.ticker].pnl += parseFloat(t.pnl as string);
+        if (t.isWin) byTicker[t.ticker].wins++;
+      }
+      const topTickers = Object.entries(byTicker)
+        .sort((a, b) => Math.abs(b[1].pnl) - Math.abs(a[1].pnl))
+        .slice(0, 5)
+        .map(([ticker, d]) => `${ticker}: ${d.count} trades, ${(d.wins / d.count * 100).toFixed(0)}% WR, $${d.pnl.toFixed(0)} P&L`)
+        .join("; ");
+
+      // Strategy breakdown
+      const byStrategy: Record<string, { count: number; pnl: number; wins: number }> = {};
+      for (const t of withPnl) {
+        const strat = t.strategy || "Unknown";
+        if (!byStrategy[strat]) byStrategy[strat] = { count: 0, pnl: 0, wins: 0 };
+        byStrategy[strat].count++;
+        byStrategy[strat].pnl += parseFloat(t.pnl as string);
+        if (t.isWin) byStrategy[strat].wins++;
+      }
+      const topStrategies = Object.entries(byStrategy)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 3)
+        .map(([s, d]) => `${s}: ${d.count} trades, ${(d.wins / d.count * 100).toFixed(0)}% WR`)
+        .join("; ");
+
+      // Day of week breakdown
+      const byDay: Record<string, { count: number; pnl: number; wins: number }> = {};
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      for (const t of withPnl) {
+        const d = new Date(t.tradeDate);
+        const dayName = dayNames[d.getUTCDay()];
+        if (!byDay[dayName]) byDay[dayName] = { count: 0, pnl: 0, wins: 0 };
+        byDay[dayName].count++;
+        byDay[dayName].pnl += parseFloat(t.pnl as string);
+        if (t.isWin) byDay[dayName].wins++;
+      }
+      const dayBreakdown = Object.entries(byDay)
+        .sort((a, b) => b[1].count - a[1].count)
+        .map(([day, d]) => `${day}: ${d.count} trades, ${(d.wins / d.count * 100).toFixed(0)}% WR, $${d.pnl.toFixed(0)}`)
+        .join("; ");
+
+      let csvSection = `## UPLOADED BROKERAGE TRADES (${csvTrades.length} trades)
 - Win Rate: ${winRate}% (${wins.length}W / ${withPnl.length - wins.length}L)
-- Total P&L: $${totalPnl.toFixed(2)} | Avg: $${(totalPnl / withPnl.length).toFixed(2)}
-- Best: $${Math.max(...withPnl.map(t => parseFloat(t.pnl as string))).toFixed(2)} | Worst: $${Math.min(...withPnl.map(t => parseFloat(t.pnl as string))).toFixed(2)}
+- Total P&L: $${totalPnl.toFixed(2)} | Avg per trade: $${withPnl.length > 0 ? (totalPnl / withPnl.length).toFixed(2) : "0"}
+- Best trade: $${withPnl.length > 0 ? Math.max(...withPnl.map(t => parseFloat(t.pnl as string))).toFixed(2) : "0"} | Worst: $${withPnl.length > 0 ? Math.min(...withPnl.map(t => parseFloat(t.pnl as string))).toFixed(2) : "0"}
 - Top Tickers: ${topTickers || "N/A"}
 - Top Strategies: ${topStrategies || "N/A"}
-- Recent: ${trades.slice(0, 3).map(t => `${t.ticker} ${t.side} ${t.tradeDate}`).join(", ")}`;
-  } catch {
-    return "Error fetching trade summary";
+- Day of Week P&L: ${dayBreakdown || "N/A"}`;
+
+      if (fullHistory) {
+        const header = "Date | Ticker | Side | Qty | Entry | Exit | P&L | P&L% | Strategy | Notes";
+        const rows = csvTrades.map(t =>
+          `${t.tradeDate} | ${t.ticker} | ${t.side} | ${t.qty} | ${t.entryPrice} | ${t.exitPrice ?? "open"} | ${t.pnl != null ? `$${parseFloat(t.pnl as string).toFixed(2)}` : "—"} | ${t.pnlPct != null ? `${parseFloat(t.pnlPct as string).toFixed(1)}%` : "—"} | ${t.strategy ?? "—"} | ${t.notes ?? ""}`
+        ).join("\n");
+        csvSection += `\n\nFULL TRADE TABLE:\n${header}\n${rows}`;
+      } else {
+        csvSection += `\n- Recent: ${csvTrades.slice(0, 5).map(t => `${t.ticker} ${t.side} ${t.tradeDate} ${t.pnl != null ? `$${parseFloat(t.pnl as string).toFixed(0)}` : ""}`).join(", ")}`;
+      }
+
+      parts.push(csvSection);
+    }
+
+    // ── Manual Trade Log ──
+    if (logTrades.length > 0) {
+      const closed = logTrades.filter(r => r.status === "closed" && r.realizedPnl != null);
+      const wins = closed.filter(r => parseFloat(r.realizedPnl as string) > 0);
+      const totalPnl = closed.reduce((s, r) => s + parseFloat(r.realizedPnl as string), 0);
+
+      let logSection = `## PITDESK TRADE LOG (${logTrades.length} trades, ${closed.length} closed)
+- Win Rate: ${closed.length > 0 ? (wins.length / closed.length * 100).toFixed(1) : "N/A"}% | Total P&L: $${totalPnl.toFixed(2)}`;
+
+      if (fullHistory) {
+        const header = "Date | Time | Ticker | Strategy | Entry | Exit | P&L | Notes | Lessons";
+        const rows = logTrades.map(r =>
+          `${r.entryDate ?? "—"} | ${r.entryTime ?? "—"} | ${r.ticker} | ${r.strategyType} | ${r.entryPrice ?? "—"} | ${r.exitPrice ?? "open"} | ${r.realizedPnl != null ? `$${parseFloat(r.realizedPnl as string).toFixed(2)}` : "—"} | ${r.notes ?? ""} | ${r.lessonsLearned ?? ""}`
+        ).join("\n");
+        logSection += `\n\nFULL LOG TABLE:\n${header}\n${rows}`;
+      } else {
+        const recentWithNotes = logTrades
+          .filter(r => r.notes || r.lessonsLearned)
+          .slice(0, 3)
+          .map(r => `${r.ticker} (${r.strategyType}): ${r.notes ?? ""} | Lesson: ${r.lessonsLearned ?? ""}`)
+          .join("\n");
+        if (recentWithNotes) logSection += `\n- Recent notes:\n${recentWithNotes}`;
+      }
+
+      parts.push(logSection);
+    }
+
+    return parts.join("\n\n");
+  } catch (err) {
+    console.error("getUserTradeContext error:", err);
+    return "Error fetching trade data";
   }
 }
 
@@ -218,14 +296,15 @@ export const pitAdvisorRouter = router({
         content: z.string(),
       })),
       includeTradeContext: z.boolean().default(false),
+      fullTradeHistory: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       let systemContent = PIT_ADVISOR_SYSTEM;
 
-      // Optionally inject user's trade summary
+      // Inject trade context (summary or full history)
       if (input.includeTradeContext) {
-        const tradeSummary = await getUserTradeSummary(ctx.user.id);
-        systemContent += `\n\n## Current User Trade Data\n${tradeSummary}`;
+        const tradeContext = await getUserTradeContext(ctx.user.id, input.fullTradeHistory);
+        systemContent += `\n\n# USER TRADE DATA\n${tradeContext}`;
       }
 
       const messages: Message[] = [
@@ -235,7 +314,7 @@ export const pitAdvisorRouter = router({
 
       const result = await invokeLLM({
         messages,
-        maxTokens: 2000,
+        maxTokens: 2500,
       });
 
       const content = typeof result.choices[0]?.message?.content === "string"
@@ -247,30 +326,31 @@ export const pitAdvisorRouter = router({
   // Analyze user's uploaded trades with AI
   analyzeMyTrades: protectedProcedure
     .input(z.object({
-      focus: z.enum(["overall", "winners", "losers", "strategies", "tickers", "timing"]).default("overall"),
+      focus: z.enum(["overall", "winners", "losers", "strategies", "tickers", "timing", "dayofweek"]).default("overall"),
     }))
     .mutation(async ({ ctx, input }) => {
-      const tradeSummary = await getUserTradeSummary(ctx.user.id);
+      const tradeContext = await getUserTradeContext(ctx.user.id, true);
 
-      if (tradeSummary.startsWith("No uploaded trades")) {
-        return { content: tradeSummary };
+      if (tradeContext.startsWith("No trade data")) {
+        return { content: tradeContext };
       }
 
       const focusPrompts: Record<string, string> = {
-        overall: "Give me a comprehensive analysis of my trading performance. What are my strengths and weaknesses? What patterns do you see?",
-        winners: "Analyze my winning trades. What strategies and setups are working best for me? How can I do more of what's working?",
-        losers: "Analyze my losing trades. What are the common mistakes? What should I stop doing immediately?",
-        strategies: "Which trading strategies are working best for me based on my trade history? Which should I abandon?",
-        tickers: "Which tickers am I trading best and worst? Should I focus on fewer tickers?",
-        timing: "Are there patterns in my trade timing? Am I better at certain market conditions?",
+        overall: "Give me a comprehensive analysis of my trading performance. What are my strengths and weaknesses? What patterns do you see? Be specific and direct.",
+        winners: "Analyze my winning trades in detail. What strategies, setups, tickers, and times of day are working best? How can I do more of what's working?",
+        losers: "Analyze my losing trades. What are the common mistakes, bad setups, or recurring errors? What should I stop doing immediately?",
+        strategies: "Which trading strategies are working best for me based on my full trade history? Which should I abandon? Give me a ranked list with specific win rates.",
+        tickers: "Which tickers am I trading best and worst? Should I focus on fewer tickers? Which ones should I cut from my watchlist?",
+        timing: "Are there patterns in my trade timing? Am I better at certain times of day? When should I avoid trading based on my history?",
+        dayofweek: "Analyze my performance by day of the week. Which days am I most profitable? Which days should I trade smaller or not at all? Give me a specific day-by-day breakdown with win rates and P&L.",
       };
 
       const messages: Message[] = [
-        { role: "system", content: PIT_ADVISOR_SYSTEM + `\n\n## User's Trade Data\n${tradeSummary}` },
+        { role: "system", content: PIT_ADVISOR_SYSTEM + `\n\n# USER TRADE DATA\n${tradeContext}` },
         { role: "user", content: focusPrompts[input.focus] },
       ];
 
-      const result = await invokeLLM({ messages, maxTokens: 2000 });
+      const result = await invokeLLM({ messages, maxTokens: 2500 });
       const content = typeof result.choices[0]?.message?.content === "string"
         ? result.choices[0].message.content : "";
       return { content };

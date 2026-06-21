@@ -27,8 +27,10 @@ import { trpc } from "@/lib/trpc";
 import {
   BarChart2,
   BookOpen,
+  CalendarDays,
   CheckCircle,
   ClipboardList,
+  Clock,
   Info,
   Lightbulb,
   Plus,
@@ -60,6 +62,7 @@ interface Trade {
   status: "open" | "closed";
   postTradeNotes?: string | null;
   lessonsLearned?: string | null;
+  entryTime?: string | null;
   enteredAt: Date;
   closedAt?: Date | null;
 }
@@ -556,6 +559,12 @@ function TradeRow({
 }) {
   const [showClose, setShowClose] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [editingTime, setEditingTime] = useState(false);
+  const [timeInput, setTimeInput] = useState(trade.entryTime ?? "");
+  const updateTimeMutation = trpc.trades.updateEntryTime.useMutation({
+    onSuccess: () => { setEditingTime(false); onRefresh(); },
+    onError: () => toast.error("Failed to save entry time"),
+  });
 
   const pnl = trade.pnl ? parseFloat(String(trade.pnl)) : null;
   const isProfit = pnl != null && pnl >= 0;
@@ -591,8 +600,36 @@ function TradeRow({
               {trade.direction}
             </Badge>
           </div>
-          <div className="text-[10px] text-muted-foreground">
-            {trade.strategy ?? "—"} · {new Date(trade.enteredAt).toLocaleDateString()}
+          <div className="text-[10px] text-muted-foreground flex items-center flex-wrap gap-1">
+            <span>{trade.strategy ?? "—"} · {new Date(trade.enteredAt).toLocaleDateString()}</span>
+            {editingTime ? (
+              <span className="flex items-center gap-1">
+                <input
+                  type="time"
+                  value={timeInput}
+                  onChange={e => setTimeInput(e.target.value)}
+                  className="text-[10px] border border-border rounded px-1 py-0 h-4 bg-background"
+                  autoFocus
+                />
+                <button
+                  className="text-green-600 hover:text-green-700 text-[10px] font-semibold"
+                  onClick={() => updateTimeMutation.mutate({ id: trade.id, entryTime: timeInput || null })}
+                  disabled={updateTimeMutation.isPending}
+                >
+                  {updateTimeMutation.isPending ? "…" : "✓"}
+                </button>
+                <button className="text-muted-foreground hover:text-foreground text-[10px]" onClick={() => setEditingTime(false)}>✕</button>
+              </span>
+            ) : (
+              <button
+                className="flex items-center gap-0.5 text-muted-foreground hover:text-orange-500 transition-colors"
+                onClick={() => { setTimeInput(trade.entryTime ?? ""); setEditingTime(true); }}
+                title={trade.entryTime ? `Entry time: ${trade.entryTime} ET — click to edit` : "Add entry time for time-of-day analysis"}
+              >
+                <Clock className="h-2.5 w-2.5" />
+                <span>{trade.entryTime ?? "add time"}</span>
+              </button>
+            )}
           </div>
         </td>
         <td className="px-3 py-2.5 text-right text-sm font-medium">{fmt(trade.entryPrice)}</td>
@@ -669,9 +706,11 @@ export default function TradeLog() {
   });
   const [filterStatus, setFilterStatus] = useState<"all" | "open" | "closed">("all");
   const [showTod, setShowTod] = useState(false);
+  const [showDow, setShowDow] = useState(false);
 
   const tradesQuery = trpc.trades.list.useQuery(undefined, { staleTime: 30 * 1000 });
   const todQuery = trpc.trades.timeOfDay.useQuery(undefined, { enabled: showTod, staleTime: 5 * 60 * 1000 });
+  const dowQuery = trpc.trades.dayOfWeek.useQuery(undefined, { enabled: showDow, staleTime: 5 * 60 * 1000 });
   const trades = (tradesQuery.data as Trade[] | undefined) ?? [];
 
   const filtered = useMemo(() => {
@@ -857,6 +896,62 @@ export default function TradeLog() {
         )}
       </Card>
 
+      {/* Day-of-Week Analysis Panel */}
+      <Card className="border border-border">
+        <CardHeader className="pb-2 cursor-pointer" onClick={() => setShowDow(!showDow)}>
+          <CardTitle className="text-sm font-semibold flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-blue-500" />
+              Day-of-Week Analysis
+              <span className="text-xs font-normal text-muted-foreground">(closed trades by weekday)</span>
+            </span>
+            <span className="text-xs text-muted-foreground">{showDow ? "Hide" : "Show"}</span>
+          </CardTitle>
+        </CardHeader>
+        {showDow && (
+          <CardContent className="pt-0">
+            {dowQuery.isLoading ? (
+              <div className="flex items-center justify-center h-20 text-muted-foreground text-sm">
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2" />
+                Analyzing trade days…
+              </div>
+            ) : !dowQuery.data || dowQuery.data.every(r => r.trades === 0) ? (
+              <div className="text-center py-6 text-muted-foreground text-sm">
+                <CalendarDays className="h-8 w-8 mx-auto mb-2 text-blue-200" />
+                No closed trades logged yet.
+                <div className="text-xs mt-1">Close some trades to see your day-of-week edge map.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-xs text-muted-foreground mb-2">Win rate and total P&amp;L by day of week. Identify your best and worst trading days.</div>
+                <div className="grid grid-cols-5 gap-2">
+                  {dowQuery.data.map(r => {
+                    const wr = r.winRate;
+                    const barColor = wr === null ? "bg-muted" : wr >= 60 ? "bg-green-500" : wr >= 40 ? "bg-yellow-400" : "bg-red-400";
+                    const textColor = wr === null ? "text-muted-foreground" : wr >= 60 ? "text-green-700" : wr >= 40 ? "text-yellow-700" : "text-red-600";
+                    return (
+                      <div key={r.day} className="flex flex-col items-center gap-1 rounded-lg border border-border p-2 bg-muted/20">
+                        <div className="text-xs font-bold text-foreground">{r.shortDay}</div>
+                        <div className={`w-full rounded-full h-1.5 ${barColor}`} style={{ opacity: r.trades > 0 ? 1 : 0.25 }} />
+                        <div className={`text-sm font-bold ${textColor}`}>
+                          {wr !== null ? `${wr.toFixed(0)}%` : "—"}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground text-center">{r.trades}T · {r.wins}W/{r.losses}L</div>
+                        <div className={`text-[10px] font-semibold ${r.totalPnl >= 0 ? "text-green-600" : "text-red-500"}`}>
+                          {r.trades > 0 ? `${r.totalPnl >= 0 ? "+" : ""}$${r.totalPnl.toFixed(0)}` : "—"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="text-xs text-muted-foreground pt-1">
+                  ℹ️ Okala insight: If you consistently lose on a specific day, consider reducing size or sitting out that day entirely.
+                </div>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
       <AddTradeDialog
         open={showAdd}
         onClose={() => { setShowAdd(false); setPrefill(undefined); }}
