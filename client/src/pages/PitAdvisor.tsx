@@ -284,7 +284,7 @@ What would you like to research today?`,
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       {/* ─── Main Chat Area ─── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
