@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc";
+import { Okala80_20Panel } from "@/components/Okala80_20Panel";
 import {
   AlertTriangle,
   BarChart2,
@@ -562,7 +563,12 @@ export default function VelezScanner() {
           <ScannerTable signals={signals} loading={query.isFetching} started={enabled} />
         </TabsContent>
         <TabsContent value="ors" className="mt-4">
-          <OrsTable results={orsQuery.data ?? []} loading={orsQuery.isFetching} started={enabled && tab === "ors"} />
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4 items-start">
+            <OrsTable results={orsQuery.data ?? []} loading={orsQuery.isFetching} started={enabled && tab === "ors"} />
+            <div className="border border-border rounded-xl p-4 bg-card sticky top-4">
+              <Okala80_20Panel />
+            </div>
+          </div>
         </TabsContent>
         <TabsContent value="prp" className="mt-4">
           <PrpTable results={prpQuery.data ?? []} loading={prpQuery.isFetching} started={enabled && tab === "prp"} />

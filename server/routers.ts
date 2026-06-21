@@ -312,6 +312,33 @@ const openingRangeScalperRouter = router({
     .query(async ({ input }) => {
       return scanOpeningRangeScalper(input.ticker.toUpperCase());
     }),
+
+  // Okala 80/20 Calculator — fetch NQ and ES futures prices
+  getFuturesPrice: protectedProcedure.query(async () => {
+    const symbols = ["NQ=F", "ES=F"];
+    const results: Record<string, { price: number; change: number; changePct: number; symbol: string }> = {};
+    for (const sym of symbols) {
+      try {
+        const res: any = await callDataApi("YahooFinance/get_stock_chart", {
+          query: { symbol: sym, region: "US", interval: "1m", range: "1d" },
+        });
+        const meta = res?.chart?.result?.[0]?.meta;
+        if (meta) {
+          const price = meta.regularMarketPrice ?? meta.previousClose ?? 0;
+          const prevClose = meta.previousClose ?? meta.chartPreviousClose ?? price;
+          results[sym] = {
+            symbol: sym,
+            price: Math.round(price * 100) / 100,
+            change: Math.round((price - prevClose) * 100) / 100,
+            changePct: prevClose ? Math.round(((price - prevClose) / prevClose) * 10000) / 100 : 0,
+          };
+        }
+      } catch {
+        // ignore individual symbol failures
+      }
+    }
+    return results;
+  }),
 });
 
 // ─── Previous Range Pullback Router ────────────────────────────────────────

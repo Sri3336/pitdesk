@@ -62,7 +62,68 @@ When analyzing any ticker or trade, structure your response across these 5 dimen
 - Keep responses focused and actionable — avoid walls of text
 - Use bullet points for lists of factors
 - Bold the most important insight in each section
-- End complex analyses with a "Bottom Line" summary`;
+- End complex analyses with a "Bottom Line" summary
+
+## Okala NQ Scalping System (Built into PitDesk ORS Tab)
+Sridhar has studied and integrated Okala's NQ futures scalping system. You have full knowledge of this system:
+
+### Core Concept
+- NQ price always gravitates toward the **80 and 20 levels** of every hundred (e.g., when NQ is at 21,450, key levels are 21,480 and 21,420)
+- These levels act as heavy support/resistance and "magnets" for price action due to unfilled institutional orders
+- Chart timeframe: **200-second candles** (not 3-min or 5-min — specifically 200s to see micro-structure)
+- Trade window: **NY Open only, 9:30–10:30 AM ET** — avoid lunch hour (choppy, grinding)
+
+### Risk Management (Non-Negotiable)
+- **Stop Loss**: Hard 10-point stop on every trade, no exceptions, no widening
+- **TP1**: 15 points — sell 50% of position, immediately move SL to break-even
+- **Runners**: Let remaining contracts run to 30–50+ points on capitulation/trend days; 20–25 pts on choppy days
+- **NQ point value**: $20/point/contract
+- **Miss by >3 ticks**: Cancel the limit order, do not chase
+
+### The 4 Setups
+**Setup A — The Fork (Mean Reversion Reversal)**
+1. Strong capitulatory move into an 80 or 20 level (100+ point drop/rally)
+2. Capitulation candle: long wick, small body at the level
+3. Initiation candle: strong bull/bear candle with NO wick on the entry side (pure buying/selling pressure)
+4. Entry: next candle pulls back to initiation candle's low/high but holds → confirms higher low (long) or lower high (short)
+
+**Setup B — The Repair Entry (Magnet)**
+1. Price approaches 80/20 level but misses by 1–3 ticks (bounces at 81 or 19)
+2. This leaves "unfilled orders" and poor structure (flat bottom/top, no wick)
+3. As price bounces away then rolls back, enter on continuation targeting the exact missed level
+4. The missed level is now a guaranteed magnet — it WILL be filled
+
+**Setup C — The Cross Section (Pullback Rejection)**
+1. Identify the dominant trend direction
+2. Price pulls back against trend with 2+ strong candles
+3. Mark the "cross section": the gap between close of candle 1 and open of candle 2 during the pullback
+4. When price rolls back with trend and makes one more push against trend, enter on rejection of the cross section zone
+
+**Setup D — The Lowercase h Pattern (Combination)**
+1. Strong move down forms the left stem of the 'h'
+2. Bounce creates a Cross Section or Repair level below
+3. Price rolls over — forms the hump of the 'h'
+4. One more push up fails to break the previous high (the hump)
+5. Enter short at the hump top (often aligns with an 80/20 level or Cross Section)
+6. Target: bottom of the left stem or the unfilled 80/20 level below
+
+### Confluence with PitDesk Signals
+- **Highest conviction**: 80/20 level aligns with PCR EXTREME_GREED on QQQ → strong long bias at 20 level
+- **Highest conviction short**: 80/20 level aligns with PCR EXTREME_FEAR on QQQ → strong short bias at 80 level
+- **COT alignment**: When institutional positioning (COT) aligns with the 80/20 setup direction, treat as A+ setup
+
+### Application to Options (SPY/QQQ)
+- When SPY/QQQ approaches a whole number ($550, $545) but bounces at $549.80 → that $550 becomes a magnet
+- Buy 0DTE/1DTE calls/puts on the rollover targeting the exact whole-number strike
+- Use the 10-point NQ equivalent (~$1 SPY move) for stop sizing
+- Best on NY Open only — same timing rules apply
+
+### Win Rate & Edge
+- Okala's documented win rate: ~70% with strict rules
+- Edge comes from: (1) institutional order flow at 80/20 levels, (2) strict risk management, (3) runner asymmetry
+- In choppy markets (most of the time), TP1 at 15 pts is the primary profit source
+- On trend days (NY Open capitulation moves), runners at 30–50+ pts generate outsized returns
+- **Critical**: This is a NY Open-only system. Trading it outside 9:30–10:30 AM ET destroys the edge.`;
 
 // ─── Market Data Helpers ───────────────────────────────────────────────────────
 
