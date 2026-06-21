@@ -2,11 +2,24 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { lazy, Suspense } from "react";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
+
 import AuthGuard from "./components/AuthGuard";
 import DashboardLayout from "./components/DashboardLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+
+// Pages that manage their own full-height layout — no outer scroll wrapper
+const FULL_HEIGHT_ROUTES = ["/pit-advisor"];
+
+function ScrollableRoute({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+  const isFullHeight = FULL_HEIGHT_ROUTES.some(
+    r => location === r || location.startsWith(r + "/")
+  );
+  if (isFullHeight) return <>{children}</>;
+  return <div className="h-full overflow-y-auto">{children}</div>;
+}
 
 // Auth pages (public — no AuthGuard)
 const SignIn = lazy(() => import("./pages/SignIn"));
@@ -95,6 +108,7 @@ function Router() {
       <Route>
         <AuthGuard>
           <DashboardLayout>
+            <ScrollableRoute>
             <Suspense fallback={<PageLoader />}>
               <Switch>
                 {/* Home */}
@@ -152,6 +166,7 @@ function Router() {
                 <Route component={NotFound} />
               </Switch>
             </Suspense>
+            </ScrollableRoute>
           </DashboardLayout>
         </AuthGuard>
       </Route>

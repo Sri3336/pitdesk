@@ -346,7 +346,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span className="font-semibold text-sm">PitDesk</span>
           </header>
         )}
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-hidden min-h-0">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );
