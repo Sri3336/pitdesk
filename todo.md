@@ -271,3 +271,8 @@
 - [x] Add NQ Futures TradingView mini-chart to Okala 80/20 panel (200-second chart via TradingView widget)
 - [x] Add Pit Advisor Chat button to each Trade Log row — pre-fills chat with trade ticker, date, P&L, strategy
 - [x] Pass pre-filled trade context from Trade Log to Pit Advisor via URL params
+
+## Phase N+1: Three Suggested Features
+- [x] Trade Replay: Add mini TradingView iframe chart dialog to closed Trade Log rows (zoom to entry/exit date range)
+- [x] PCR Dashboard: Add "Ask Pit Advisor" button to each ticker row (pre-fills chat with PCR signal context)
+- [x] Weekly Briefing: Heartbeat cron every Sunday 7 PM ET — LLM generates market outlook email, sends to akulasridhar@gmail.com

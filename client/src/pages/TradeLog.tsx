@@ -34,6 +34,7 @@ import {
   Info,
   Lightbulb,
   MessageSquare,
+  Play,
   Plus,
   Sparkles,
   TrendingDown,
@@ -549,6 +550,83 @@ function NotesDialog({
   );
 }
 
+// ─── Trade Replay Dialog ─────────────────────────────────────────────────────
+
+function TradeReplayDialog({
+  trade,
+  onClose,
+}: {
+  trade: Trade;
+  onClose: () => void;
+}) {
+  // Build a date range: 5 trading days before entry to 5 days after exit (or today)
+  const entryDate = new Date(trade.enteredAt);
+  const exitDate = trade.closedAt ? new Date(trade.closedAt) : new Date();
+
+  // Format as YYYY-MM-DD for TradingView date range
+  const rangeFrom = new Date(entryDate);
+  rangeFrom.setDate(rangeFrom.getDate() - 5);
+  const rangeTo = new Date(exitDate);
+  rangeTo.setDate(rangeTo.getDate() + 5);
+
+  const fromStr = rangeFrom.toISOString().slice(0, 10);
+  const toStr = rangeTo.toISOString().slice(0, 10);
+
+  // TradingView widgetembed URL with date range
+  const chartUrl = `https://s.tradingview.com/widgetembed/?frameElementId=tv_replay_${trade.id}&symbol=${encodeURIComponent(trade.ticker)}&interval=D&hidesidetoolbar=1&hidetoptoolbar=0&symboledit=0&saveimage=0&toolbarbg=f1f3f6&studies=%5B%5D&theme=light&style=1&timezone=America%2FNew_York&withdateranges=1&showpopupbutton=0&range=${fromStr}~${toStr}&locale=en&utm_source=pitdesk.ai`;
+
+  const pnl = trade.pnl ? parseFloat(String(trade.pnl)) : null;
+  const isProfit = pnl != null && pnl >= 0;
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-3xl p-0 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-2">
+          <DialogTitle className="flex items-center gap-2">
+            <Play className="h-4 w-4 text-green-600" />
+            Trade Replay — {trade.ticker}
+            <span className="text-xs font-normal text-muted-foreground ml-1">
+              {trade.strategy ?? ""} · {new Date(trade.enteredAt).toLocaleDateString()}
+              {trade.closedAt ? ` → ${new Date(trade.closedAt).toLocaleDateString()}` : " (open)"}
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Trade summary strip */}
+        <div className="flex items-center gap-4 px-4 py-2 bg-muted/40 border-y border-border text-xs">
+          <span><span className="text-muted-foreground">Entry</span> <strong>{fmt(trade.entryPrice)}</strong></span>
+          {trade.exitPrice && <span><span className="text-muted-foreground">Exit</span> <strong>{fmt(trade.exitPrice)}</strong></span>}
+          {trade.stopLoss && <span><span className="text-muted-foreground">Stop</span> <span className="text-red-500">{fmt(trade.stopLoss)}</span></span>}
+          {trade.target1 && <span><span className="text-muted-foreground">T1</span> <span className="text-blue-600">{fmt(trade.target1)}</span></span>}
+          {trade.target2 && <span><span className="text-muted-foreground">T2</span> <span className="text-green-600">{fmt(trade.target2)}</span></span>}
+          {pnl != null && (
+            <span className={`ml-auto font-semibold ${isProfit ? "text-green-600" : "text-red-500"}`}>
+              P&L: {isProfit ? "+" : ""}${pnl.toFixed(2)}
+            </span>
+          )}
+        </div>
+
+        {/* TradingView chart */}
+        <div style={{ height: 420 }}>
+          <iframe
+            key={chartUrl}
+            src={chartUrl}
+            style={{ width: "100%", height: "100%", border: 0 }}
+            allowTransparency
+            scrolling="no"
+            allowFullScreen
+            title={`${trade.ticker} Trade Replay`}
+          />
+        </div>
+
+        <div className="px-4 py-2 text-[10px] text-muted-foreground bg-muted/20 border-t border-border">
+          Chart shows ±5 days around your entry/exit. Use TradingView controls to zoom in/out.
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Trade Row ────────────────────────────────────────────────────────────────
 
 function TradeRow({
@@ -560,6 +638,7 @@ function TradeRow({
 }) {
   const [showClose, setShowClose] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
   const [editingTime, setEditingTime] = useState(false);
   const [, navigate] = useLocation();
   const [timeInput, setTimeInput] = useState(trade.entryTime ?? "");
@@ -669,6 +748,21 @@ function TradeRow({
                 <CheckCircle className="h-3.5 w-3.5" />
               </Button>
             )}
+            {trade.status === "closed" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-purple-500 hover:text-purple-600 hover:bg-purple-50"
+                    onClick={() => setShowReplay(true)}
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left">Replay this trade on chart</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -709,6 +803,9 @@ function TradeRow({
       )}
       {showNotes && (
         <NotesDialog trade={trade} onClose={() => setShowNotes(false)} onSuccess={onRefresh} />
+      )}
+      {showReplay && (
+        <TradeReplayDialog trade={trade} onClose={() => setShowReplay(false)} />
       )}
     </>
   );

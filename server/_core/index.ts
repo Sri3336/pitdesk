@@ -11,6 +11,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { intradayScanHandler } from "../scheduledIntradayScan";
+import { weeklyBriefingHandler } from "../scheduledWeeklyBriefing";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -54,6 +55,7 @@ async function startServer() {
   registerGoogleAuthRoutes(app);
   // Scheduled heartbeat handlers — must be before tRPC and Vite fallthrough
   app.post("/api/scheduled/intraday-scan", intradayScanHandler);
+  app.post("/api/scheduled/weekly-briefing", weeklyBriefingHandler);
   // tRPC API
   app.use(
     "/api/trpc",

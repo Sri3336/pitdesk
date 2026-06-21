@@ -20,8 +20,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   TrendingUp, TrendingDown, Minus, AlertTriangle, RefreshCw, Search,
   ChevronUp, ChevronDown, ChevronsUpDown, Activity, Clock, Zap,
-  BookmarkPlus, ExternalLink, Info,
+  BookmarkPlus, ExternalLink, Info, MessageSquare,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import { SECTORS } from "../../../shared/tickerUniverse";
@@ -367,6 +368,33 @@ export default function PCRDashboard() {
     });
   }, [rows, search, sectorFilter, signalFilter, scanFilter, sort]);
 
+  const [, navigate] = useLocation();
+
+  const handleAskPitAdvisor = (row: LandingRow, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const signalLabel = {
+      EXTREME_FEAR: "EXTREME FEAR (PCR > 1.5) — contrarian bullish signal",
+      FEAR: "FEAR (PCR 1.0–1.5) — mild bullish lean",
+      NEUTRAL: "NEUTRAL (PCR 0.7–1.0) — range-bound",
+      GREED: "GREED (PCR 0.5–0.7) — mild bearish lean",
+      EXTREME_GREED: "EXTREME GREED (PCR < 0.5) — contrarian bearish signal",
+    }[row.currentSignal] ?? row.currentSignal;
+    const prompt = encodeURIComponent(
+      `PCR Signal Analysis for ${row.ticker}:\n` +
+      `Sector: ${row.sector}\n` +
+      `Current PCR: ${row.currentPCR ?? "N/A"}\n` +
+      `Signal: ${signalLabel}\n` +
+      `PCR Delta vs Prior: ${row.pcrDeltaVsPrior != null ? (Number(row.pcrDeltaVsPrior) > 0 ? "+" : "") + Number(row.pcrDeltaVsPrior).toFixed(3) : "N/A"}\n` +
+      `Strategy Hint: ${row.strategyHint ?? "N/A"}\n` +
+      `Recommendation: ${row.recommendation ?? "N/A"}\n` +
+      (row.closingPrice ? `Last Price: $${parseFloat(row.closingPrice).toFixed(2)}\n` : "") +
+      `\nBased on this PCR signal, what options strategy makes the most sense right now? ` +
+      `Analyze across all 5 dimensions (Technical, Fundamental, Geopolitical, Sentiment, Quant/Math) ` +
+      `and give me a specific trade setup with entry, stop, and target.`
+    );
+    navigate(`/pit-advisor?prompt=${prompt}`);
+  };
+
   const handleRowClick = (ticker: string) => {
     setSelectedTicker(ticker);
     setDrawerOpen(true);
@@ -649,6 +677,17 @@ export default function PCRDashboard() {
                                 </button>
                               </TooltipTrigger>
                               <TooltipContent className="text-xs">Save for backtesting</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={(e) => handleAskPitAdvisor(row, e)}
+                                  className="p-1 rounded hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition-colors"
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">Ask Pit Advisor about this signal</TooltipContent>
                             </Tooltip>
                             <Tooltip>
                               <TooltipTrigger asChild>
