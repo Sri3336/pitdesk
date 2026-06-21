@@ -39,6 +39,16 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // Cookie parser — required for reading session JWT cookies in req.cookies
   app.use(cookieParser());
+
+  // Domain redirect: trading.akulaz.ai -> www.pitdesk.ai (301 permanent)
+  app.use((req, res, next) => {
+    const host = (req.hostname || req.headers.host || "").split(":")[0];
+    if (host === "trading.akulaz.ai") {
+      return res.redirect(301, `https://www.pitdesk.ai${req.originalUrl}`);
+    }
+    next();
+  });
+
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerGoogleAuthRoutes(app);
