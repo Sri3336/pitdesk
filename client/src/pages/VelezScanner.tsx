@@ -360,6 +360,116 @@ function HowToVideoModal({ open, onClose }: { open: boolean; onClose: () => void
   );
 }
 
+// ─── ORS How-To Modal ───────────────────────────────────────────────────────
+function OrsHowToModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-3xl w-full p-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-4 pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Target className="h-4 w-4 text-green-500" />
+            Opening Range Scalper — How-To Guide
+          </DialogTitle>
+        </DialogHeader>
+        <div className="px-5 pb-5 space-y-4">
+          {/* Video placeholder */}
+          <div className="relative w-full rounded-lg overflow-hidden bg-slate-900 flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 rounded-full bg-green-600/20 border-2 border-green-500/40 flex items-center justify-center mx-auto">
+                <BookOpen className="h-7 w-7 text-green-400" />
+              </div>
+              <div className="text-white font-semibold">ORS How-To Video</div>
+              <div className="text-slate-400 text-sm">YouTube video coming soon</div>
+            </div>
+          </div>
+          {/* Quick reference */}
+          <div className="grid grid-cols-3 gap-3 text-xs">
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">The Setup</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div>First 30-min opening range box</div>
+                <div>ATR gate: price move ≥25% daily ATR</div>
+                <div>Reversal candle at range boundary</div>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">Entry Rules</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div>Window: 10:00 AM – 3:00 PM ET</div>
+                <div>Hammer / Inv. Hammer / Engulfing</div>
+                <div>Entry on break of reversal candle</div>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">Targets</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div>TP1: opposite side of range</div>
+                <div>TP2: 1.5× range extension</div>
+                <div>Stop: below/above reversal candle</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── PRP How-To Modal ───────────────────────────────────────────────────────
+function PrpHowToModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-3xl w-full p-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-4 pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <TrendingUp className="h-4 w-4 text-purple-500" />
+            Previous Range Pullback — How-To Guide
+          </DialogTitle>
+        </DialogHeader>
+        <div className="px-5 pb-5 space-y-4">
+          {/* Video placeholder */}
+          <div className="relative w-full rounded-lg overflow-hidden bg-slate-900 flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 rounded-full bg-purple-600/20 border-2 border-purple-500/40 flex items-center justify-center mx-auto">
+                <BookOpen className="h-7 w-7 text-purple-400" />
+              </div>
+              <div className="text-white font-semibold">PRP How-To Video</div>
+              <div className="text-slate-400 text-sm">YouTube video coming soon — narrated guide uploaded to Google Drive</div>
+            </div>
+          </div>
+          {/* Quick reference */}
+          <div className="grid grid-cols-3 gap-3 text-xs">
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">The Setup</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div>ICT/SMC: Break of Structure (BOS)</div>
+                <div>Price pulls back to 30/50/70% zone</div>
+                <div>EMA-21 alignment confirms direction</div>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">Status Levels</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div><span className="text-green-600 font-medium">PRIME</span>: in 30–50% zone + EMA</div>
+                <div><span className="text-yellow-600 font-medium">IN ZONE</span>: 30–70% retracement</div>
+                <div><span className="text-slate-500 font-medium">WATCHING</span>: BOS detected</div>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div className="font-semibold text-slate-700 mb-1">Trade Plan</div>
+              <div className="space-y-1 text-muted-foreground">
+                <div>Entry: bounce from 30/50% level</div>
+                <div>Stop: below swing low (BOS origin)</div>
+                <div>Target: prior swing high (R:R ≥2:1)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function VelezScanner() {
   const [tab, setTab] = useState<"daily" | "intraday" | "ors" | "prp">(() => {
     if (typeof window !== "undefined") {
@@ -376,6 +486,8 @@ export default function VelezScanner() {
   }, [location]);
 
   const [showHowTo, setShowHowTo] = useState(false);
+  const [showOrsHowTo, setShowOrsHowTo] = useState(false);
+  const [showPrpHowTo, setShowPrpHowTo] = useState(false);
   const [thresholdPct, setThresholdPct] = useState(1.0);
   const [minPrice, setMinPrice] = useState(10);
   const [excludeOtc, setExcludeOtc] = useState(true);
@@ -432,7 +544,11 @@ export default function VelezScanner() {
             variant="outline"
             size="sm"
             className="h-9 text-xs px-3 border-blue-200 text-blue-700 hover:bg-blue-50"
-            onClick={() => setShowHowTo(true)}
+            onClick={() => {
+              if (tab === "ors") setShowOrsHowTo(true);
+              else if (tab === "prp") setShowPrpHowTo(true);
+              else setShowHowTo(true);
+            }}
           >
             <BookOpen className="h-3.5 w-3.5 mr-1" />
             How-To
@@ -574,6 +690,12 @@ export default function VelezScanner() {
           <PrpTable results={prpQuery.data ?? []} loading={prpQuery.isFetching} started={enabled && tab === "prp"} />
         </TabsContent>
       </Tabs>
+      {/* Velez How-To Modal */}
+      <HowToVideoModal open={showHowTo} onClose={() => setShowHowTo(false)} />
+      {/* ORS How-To Modal */}
+      <OrsHowToModal open={showOrsHowTo} onClose={() => setShowOrsHowTo(false)} />
+      {/* PRP How-To Modal */}
+      <PrpHowToModal open={showPrpHowTo} onClose={() => setShowPrpHowTo(false)} />
     </div>
   );
 }

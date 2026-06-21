@@ -215,35 +215,35 @@
 
 ## Phase 22: ORS YouTube Embed + COI Email Digest + PRP How-To Video
 
-- [ ] ORS How-To YouTube embed — add thumbnail-first modal to ORS tab (placeholder until YouTube ID provided)
-- [ ] COI signal email digest — send email to akulasridhar@gmail.com when intraday scan finds ticker with ≥45% COI imbalance (BUY CALL/BUY PUT setups with ATM strike, delta, VWAP entry hint)
-- [ ] PRP How-To video — TTS narration (6 sections ~30s each), 6 visual slides, compose with ffmpeg
-- [ ] PRP How-To video — upload to Google Drive PitDesk How-To Videos folder
-- [ ] PRP How-To modal — thumbnail-first YouTube embed in PRP tab (placeholder until YouTube ID provided)
+- [x] ORS How-To YouTube embed — add thumbnail-first modal to ORS tab (placeholder until YouTube ID provided)
+- [x] COI signal email digest — send email to akulasridhar@gmail.com when intraday scan finds ticker with ≥45% COI imbalance (BUY CALL/BUY PUT setups with ATM strike, delta, VWAP entry hint)
+- [x] PRP How-To video — TTS narration (6 sections ~30s each), 6 visual slides, compose with ffmpeg
+- [x] PRP How-To video — upload to Google Drive PitDesk How-To Videos folder
+- [x] PRP How-To modal — thumbnail-first YouTube embed in PRP tab (placeholder until YouTube ID provided)
 
 ## Phase 23: CSV Trade Upload + Community Insights + Pit Advisor
 
 ### CSV Trade Upload
-- [ ] Add `uploaded_trades` DB table (userId, ticker, tradeDate, side, qty, entryPrice, exitPrice, pnl, pnlPct, strategy, notes, source, batchId, isAnonymized)
-- [ ] Add `trade_upload_batches` DB table (userId, filename, rowCount, status, createdAt)
-- [ ] tRPC `tradeUpload.parseCsv` — parse CSV text, auto-detect columns, return preview rows
-- [ ] tRPC `tradeUpload.confirmUpload` — save parsed rows to uploaded_trades for user
-- [ ] tRPC `tradeUpload.myTrades` — list current user's uploaded trades with P&L summary
-- [ ] tRPC `tradeUpload.communityInsights` — aggregated anonymized insights per ticker (win rate, avg pnl%, top strategy, trade count)
-- [ ] tRPC `tradeUpload.deleteBatch` — delete a batch of user's uploaded trades
-- [ ] Frontend: TradeUpload.tsx — drag-drop CSV zone, column mapping step, preview table, confirm button
-- [ ] Frontend: My Trades tab — P&L summary cards, trade table with filter/sort
-- [ ] Frontend: Community Insights tab — win-rate heatmap, top tickers by community activity
-- [ ] Route /trade-upload in App.tsx
-- [ ] Sidebar nav entry under Execution section
+- [x] Add `uploaded_trades` DB table (userId, ticker, tradeDate, side, qty, entryPrice, exitPrice, pnl, pnlPct, strategy, notes, source, batchId, isAnonymized)
+- [x] Add `trade_upload_batches` DB table (userId, filename, rowCount, status, createdAt)
+- [x] tRPC `tradeUpload.parseCsv` — parse CSV text, auto-detect columns, return preview rows
+- [x] tRPC `tradeUpload.confirmUpload` — save parsed rows to uploaded_trades for user
+- [x] tRPC `tradeUpload.myTrades` — list current user's uploaded trades with P&L summary
+- [x] tRPC `tradeUpload.communityInsights` — aggregated anonymized insights per ticker (win rate, avg pnl%, top strategy, trade count)
+- [x] tRPC `tradeUpload.deleteBatch` — delete a batch of user's uploaded trades
+- [x] Frontend: TradeUpload.tsx — drag-drop CSV zone, column mapping step, preview table, confirm button
+- [x] Frontend: My Trades tab — P&L summary cards, trade table with filter/sort
+- [x] Frontend: Community Insights tab — win-rate heatmap, top tickers by community activity
+- [x] Route /trade-upload in App.tsx
+- [x] Sidebar nav entry under Execution section
 
 ### Pit Advisor (AI Research Assistant)
-- [ ] tRPC `pitAdvisor.chat` — non-streaming LLM with PitDesk system prompt (5-dimension: Technical, Fundamental, Geopolitical, Sentiment, Quant/Math)
-- [ ] tRPC `pitAdvisor.analyzeMyTrades` — AI analysis of user's uploaded CSV trades (win rate, patterns, lessons)
-- [ ] System prompt: Trading Buddy persona, proactive, challenges bad setups, speaks plainly
-- [ ] Context injection: PCR signals, ORS setups, VCP alerts, recent trade log entries
-- [ ] Frontend: PitAdvisor.tsx — full-page chat using AIChatBox component
-- [ ] Suggested prompts: "Analyze my uploaded trades", "What's the PCR signal for NVDA?", "Is TSLA a good options play this week?", "Review my last 5 trades", "What strategies work best for PLTR?"
-- [ ] Context sidebar panel: active scanner signals, recent PCR extremes, uploaded trade summary
-- [ ] Route /pit-advisor in App.tsx
-- [ ] Sidebar nav entry at top of Analysis section
+- [x] tRPC `pitAdvisor.chat` — non-streaming LLM with PitDesk system prompt (5-dimension: Technical, Fundamental, Geopolitical, Sentiment, Quant/Math)
+- [x] tRPC `pitAdvisor.analyzeMyTrades` — AI analysis of user's uploaded CSV trades (win rate, patterns, lessons)
+- [x] System prompt: Trading Buddy persona, proactive, challenges bad setups, speaks plainly
+- [x] Context injection: PCR signals, ORS setups, VCP alerts, recent trade log entries
+- [x] Frontend: PitAdvisor.tsx — full-page chat using AIChatBox component
+- [x] Suggested prompts: "Analyze my uploaded trades", "What's the PCR signal for NVDA?", "Is TSLA a good options play this week?", "Review my last 5 trades", "What strategies work best for PLTR?"
+- [x] Context sidebar panel: active scanner signals, recent PCR extremes, uploaded trade summary
+- [x] Route /pit-advisor in App.tsx
+- [x] Sidebar nav entry at top of Analysis section

@@ -103,6 +103,7 @@ function AddTradeDialog({
   const [target2, setTarget2] = useState(prefill?.tp2 ?? "");
   const [stopLoss, setStopLoss] = useState(prefill?.stop ?? "");
   const [useFibTargets, setUseFibTargets] = useState(false);
+  const [entryTime, setEntryTime] = useState("");
 
   // Re-initialize when prefill changes (e.g. navigated from ORS)
   useEffect(() => {
@@ -159,6 +160,7 @@ function AddTradeDialog({
     setTarget2("");
     setStopLoss("");
     setUseFibTargets(false);
+    setEntryTime("");
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -378,6 +380,20 @@ function AddTradeDialog({
             </div>
           </div>
 
+          {/* Entry Time */}
+          <div className="space-y-1.5">
+            <Label htmlFor="entryTime" className="flex items-center gap-1">
+              Entry Time (ET)
+              <span className="text-xs text-muted-foreground ml-1">— for time-of-day analysis</span>
+            </Label>
+            <Input
+              id="entryTime"
+              type="time"
+              value={entryTime}
+              onChange={(e) => setEntryTime(e.target.value)}
+              className="w-36"
+            />
+          </div>
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancel
@@ -652,8 +668,10 @@ export default function TradeLog() {
     return new URLSearchParams(window.location.search).has("ticker");
   });
   const [filterStatus, setFilterStatus] = useState<"all" | "open" | "closed">("all");
+  const [showTod, setShowTod] = useState(false);
 
   const tradesQuery = trpc.trades.list.useQuery(undefined, { staleTime: 30 * 1000 });
+  const todQuery = trpc.trades.timeOfDay.useQuery(undefined, { enabled: showTod, staleTime: 5 * 60 * 1000 });
   const trades = (tradesQuery.data as Trade[] | undefined) ?? [];
 
   const filtered = useMemo(() => {
@@ -772,6 +790,72 @@ export default function TradeLog() {
           </table>
         </div>
       )}
+
+      {/* Time-of-Day Analysis Panel */}
+      <Card className="border border-border">
+        <CardHeader className="pb-2 cursor-pointer" onClick={() => setShowTod(!showTod)}>
+          <CardTitle className="text-sm font-semibold flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <BarChart2 className="h-4 w-4 text-orange-500" />
+              Time-of-Day Analysis
+              <span className="text-xs font-normal text-muted-foreground">(closed trades with entry time)</span>
+            </span>
+            <span className="text-xs text-muted-foreground">{showTod ? "Hide" : "Show"}</span>
+          </CardTitle>
+        </CardHeader>
+        {showTod && (
+          <CardContent className="pt-0">
+            {todQuery.isLoading ? (
+              <div className="flex items-center justify-center h-20 text-muted-foreground text-sm">
+                <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mr-2" />
+                Analyzing trade times…
+              </div>
+            ) : !todQuery.data || todQuery.data.every(r => r.trades === 0) ? (
+              <div className="text-center py-6 text-muted-foreground text-sm">
+                <BarChart2 className="h-8 w-8 mx-auto mb-2 text-orange-200" />
+                No closed trades with entry time logged yet.
+                <div className="text-xs mt-1">Add an entry time when logging trades to see time-of-day patterns.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-xs text-muted-foreground mb-2">Win rate and P&amp;L by 30-minute session window (ET). NY Open window highlighted.</div>
+                <div className="grid gap-1.5">
+                  {todQuery.data.filter(r => r.trades > 0).map(r => (
+                    <div key={r.hour} className={`flex items-center gap-3 rounded-lg px-3 py-2 ${r.isNyOpenWindow ? "bg-green-50 border border-green-200" : "bg-muted/30"}`}>
+                      <div className={`text-xs font-mono w-16 shrink-0 font-semibold ${r.isNyOpenWindow ? "text-green-700" : "text-foreground"}`}>
+                        {r.label}
+                        {r.isNyOpenWindow && <span className="ml-1 text-[9px] text-green-600 font-normal">NY Open</span>}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <div
+                            className={`h-2 rounded-full transition-all ${r.winRate !== null && r.winRate >= 60 ? "bg-green-500" : r.winRate !== null && r.winRate >= 40 ? "bg-yellow-400" : "bg-red-400"}`}
+                            style={{ width: `${Math.max(4, r.winRate ?? 0)}%` }}
+                          />
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {r.trades} trade{r.trades !== 1 ? "s" : ""} · {r.wins}W / {r.losses}L
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className={`text-xs font-semibold ${r.winRate !== null && r.winRate >= 50 ? "text-green-600" : "text-red-500"}`}>
+                          {r.winRate !== null ? `${r.winRate.toFixed(0)}% WR` : "—"}
+                        </div>
+                        <div className={`text-[10px] ${r.totalPnl >= 0 ? "text-green-600" : "text-red-500"}`}>
+                          {r.totalPnl >= 0 ? "+" : ""}${r.totalPnl.toFixed(0)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-muted-foreground pt-1">
+                  ℹ️ Log entry times on new trades to build your time-of-day edge map.
+                </div>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       <AddTradeDialog
         open={showAdd}

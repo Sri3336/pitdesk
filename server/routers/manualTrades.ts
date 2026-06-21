@@ -87,6 +87,7 @@ export const manualTradesRouter = router({
       strategyType: z.enum(STRATEGY_TYPES),
       account: z.enum(ACCOUNTS),
       entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      entryTime: z.string().regex(/^\d{2}:\d{2}$/).optional(), // HH:MM in ET
       entryPrice: z.number().positive(),
       quantity: z.number().int().positive().default(1),
       targetPrice: z.number().positive().optional(),
@@ -107,6 +108,7 @@ export const manualTradesRouter = router({
         strategyType: input.strategyType,
         account: input.account,
         entryDate: input.entryDate,
+        entryTime: input.entryTime ?? null,
         entryPrice: input.entryPrice.toFixed(4),
         quantity: input.quantity,
         targetPrice: input.targetPrice?.toFixed(4) ?? null,
@@ -181,6 +183,54 @@ export const manualTradesRouter = router({
         .where(and(eq(manualTrades.id, input.id), eq(manualTrades.userId, ctx.user.id)));
       return { success: true };
     }),
+
+  // ── Time-of-day analytics ─────────────────────────────────────────────────────
+  timeOfDay: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db
+      .select()
+      .from(manualTrades)
+      .where(and(eq(manualTrades.userId, ctx.user.id), eq(manualTrades.status, "closed")));
+
+    // Build hourly buckets 09:00–16:00 ET
+    const HOURS = [
+      "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+      "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+      "15:00", "15:30",
+    ];
+    const buckets: Record<string, { trades: number; wins: number; totalPnl: number }> = {};
+    for (const h of HOURS) buckets[h] = { trades: 0, wins: 0, totalPnl: 0 };
+
+    for (const r of rows) {
+      if (!r.entryTime) continue;
+      // Round down to nearest 30-min bucket
+      const [hh, mm] = r.entryTime.split(":").map(Number);
+      const bucket = mm < 30 ? `${String(hh).padStart(2, "0")}:00` : `${String(hh).padStart(2, "0")}:30`;
+      if (!buckets[bucket]) continue;
+      const pnl = parseFloat(r.realizedPnl ?? "0");
+      buckets[bucket].trades++;
+      buckets[bucket].totalPnl += pnl;
+      if (pnl > 0) buckets[bucket].wins++;
+    }
+
+    return HOURS.map(h => ({
+      hour: h,
+      label: (() => {
+        const [hh, mm] = h.split(":").map(Number);
+        const period = hh < 12 ? "AM" : "PM";
+        const displayH = hh > 12 ? hh - 12 : hh;
+        return `${displayH}:${String(mm).padStart(2, "0")} ${period}`;
+      })(),
+      trades: buckets[h].trades,
+      wins: buckets[h].wins,
+      losses: buckets[h].trades - buckets[h].wins,
+      winRate: buckets[h].trades > 0 ? (buckets[h].wins / buckets[h].trades) * 100 : null,
+      totalPnl: buckets[h].totalPnl,
+      avgPnl: buckets[h].trades > 0 ? buckets[h].totalPnl / buckets[h].trades : null,
+      isNyOpenWindow: h >= "09:30" && h <= "10:00",
+    }));
+  }),
 
   // ── Delete trade ─────────────────────────────────────────────────────────────
   delete: protectedProcedure

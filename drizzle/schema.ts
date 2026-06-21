@@ -52,6 +52,7 @@ export const manualTrades = mysqlTable("manual_trades", {
   strategyType: varchar("strategyType", { length: 64 }).default("other").notNull(),
   account: varchar("account", { length: 32 }).default("other").notNull(),
   entryDate: varchar("entryDate", { length: 10 }),
+  entryTime: varchar("entryTime", { length: 5 }), // HH:MM in ET (e.g. "09:35")
   entryPrice: decimal("entryPrice", { precision: 12, scale: 4 }),
   quantity: int("quantity").default(1).notNull(),
   exitDate: varchar("exitDate", { length: 10 }),
