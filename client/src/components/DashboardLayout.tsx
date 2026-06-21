@@ -12,8 +12,6 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -156,11 +154,11 @@ function CollapsibleNavSection({
   const [location, navigate] = useLocation();
 
   return (
-    <SidebarGroup className="py-0">
+    <div className="w-full">
       <Collapsible open={isOpen} onOpenChange={() => onToggle(sectionKey)}>
         <CollapsibleTrigger asChild>
           <button
-            className="flex items-center justify-between w-full px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/50 group"
+            className="flex items-center justify-between w-full px-2 py-1.5 mt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/50 group"
           >
             <span>{label}</span>
             <ChevronDown
@@ -168,36 +166,34 @@ function CollapsibleNavSection({
             />
           </button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-none">
-          <SidebarGroupContent className="pt-0.5 pb-1">
-            <SidebarMenu>
-              {items.map((item) => {
-                const [, itemQuery] = item.path.split("?");
-                const fullLocation =
-                  typeof window !== "undefined"
-                    ? window.location.pathname + (window.location.search || "")
-                    : location;
-                const isActive = itemQuery
-                  ? fullLocation === item.path || fullLocation.startsWith(item.path)
-                  : location === item.path;
-                return (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => navigate(item.path)}
-                      className="cursor-pointer h-8 text-sm"
-                    >
-                      <item.icon className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
+        <CollapsibleContent>
+          <SidebarMenu className="px-1 pb-1">
+            {items.map((item) => {
+              const [, itemQuery] = item.path.split("?");
+              const fullLocation =
+                typeof window !== "undefined"
+                  ? window.location.pathname + (window.location.search || "")
+                  : location;
+              const isActive = itemQuery
+                ? fullLocation === item.path || fullLocation.startsWith(item.path)
+                : location === item.path;
+              return (
+                <SidebarMenuItem key={item.path}>
+                  <SidebarMenuButton
+                    isActive={isActive}
+                    onClick={() => navigate(item.path)}
+                    className="cursor-pointer h-8 text-sm"
+                  >
+                    <item.icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
         </CollapsibleContent>
       </Collapsible>
-    </SidebarGroup>
+    </div>
   );
 }
 
