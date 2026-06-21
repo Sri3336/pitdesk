@@ -6,6 +6,7 @@
  *  - Fibonacci retracement overlay (23.6%, 38.2%, 50%, 61.8%, 78.6%)
  *  - Fibonacci extension targets (127.2%, 161.8%, 261.8%)
  *  - Fib + EMA confluence flag (within 1% of both simultaneously)
+ *  - Liquidity Sweep flag (swept Previous Day High or Previous Day Low)
  */
 import { callDataApi } from "./_core/dataApi";
 import {
@@ -52,6 +53,11 @@ export interface VelezDailySignal {
   // Confluence
   fibEmaConfluences: FibEmaConfluence[];
   hasConfluence: boolean;
+  // Liquidity Sweep
+  sweptPDH: boolean;
+  sweptPDL: boolean;
+  prevDayHigh: number | null;
+  prevDayLow: number | null;
 }
 
 export interface VelezIntradaySignal {
@@ -67,6 +73,11 @@ export interface VelezIntradaySignal {
   fibExtensions: FibExtensionResult[];
   fibEmaConfluences: FibEmaConfluence[];
   hasConfluence: boolean;
+  // Liquidity Sweep
+  sweptPDH: boolean;
+  sweptPDL: boolean;
+  prevDayHigh: number | null;
+  prevDayLow: number | null;
 }
 
 // ─── Exchange / Quality Filter ───────────────────────────────────────────────
@@ -149,6 +160,31 @@ function calcAvgVolume(bars: PriceBar[], lookback = 20): number {
   return slice.reduce((s, b) => s + b.volume, 0) / slice.length;
 }
 
+/**
+ * Detects whether the current bar swept the previous day's high or low.
+ * A PDH sweep = today's high > previous day's high (liquidity grab above prior highs).
+ * A PDL sweep = today's low < previous day's low (liquidity grab below prior lows).
+ */
+function detectLiquiditySweep(
+  bars: PriceBar[]
+): { sweptPDH: boolean; sweptPDL: boolean; prevDayHigh: number | null; prevDayLow: number | null } {
+  if (bars.length < 3) {
+    return { sweptPDH: false, sweptPDL: false, prevDayHigh: null, prevDayLow: null };
+  }
+  // bars[-1] = today, bars[-2] = yesterday (the signal bar), bars[-3] = previous day
+  const prevDay = bars[bars.length - 3];
+  const curr = bars[bars.length - 1];
+  if (!prevDay || !curr) {
+    return { sweptPDH: false, sweptPDL: false, prevDayHigh: null, prevDayLow: null };
+  }
+  return {
+    sweptPDH: curr.high > prevDay.high,
+    sweptPDL: curr.low < prevDay.low,
+    prevDayHigh: prevDay.high,
+    prevDayLow: prevDay.low,
+  };
+}
+
 export async function runVelezDailyScanner(
   tickers: string[],
   thresholdPct = 1.0,
@@ -208,6 +244,9 @@ export async function runVelezDailyScanner(
         thresholdPct
       );
 
+      // Liquidity sweep detection — compare today vs 2 days ago (prev day before signal bar)
+      const { sweptPDH, sweptPDL, prevDayHigh, prevDayLow } = detectLiquiditySweep(bars);
+
       // Classic Velez targets: 25% and 50% retracement of the drop
       const dropAmount = prev.close - curr.close;
       const target25 = curr.close + dropAmount * 0.25;
@@ -235,6 +274,10 @@ export async function runVelezDailyScanner(
         ema200,
         fibEmaConfluences,
         hasConfluence: fibEmaConfluences.length > 0,
+        sweptPDH,
+        sweptPDL,
+        prevDayHigh,
+        prevDayLow,
       });
     })
   );
@@ -280,6 +323,26 @@ export async function runVelezIntradayScanner(
         thresholdPct
       );
 
+      // Liquidity sweep: fetch 2 days of daily bars to get yesterday's PDH/PDL
+      let sweptPDH = false;
+      let sweptPDL = false;
+      let prevDayHigh: number | null = null;
+      let prevDayLow: number | null = null;
+      try {
+        const dailyBars = await fetchPriceHistory(ticker, "1d", "5d");
+        if (dailyBars.length >= 2) {
+          const prevDailyBar = dailyBars[dailyBars.length - 2];
+          const todayHigh = Math.max(...highs);
+          const todayLow = Math.min(...lows);
+          prevDayHigh = prevDailyBar.high;
+          prevDayLow = prevDailyBar.low;
+          sweptPDH = todayHigh > prevDailyBar.high;
+          sweptPDL = todayLow < prevDailyBar.low;
+        }
+      } catch {
+        // Ignore — sweep detection is non-critical
+      }
+
       const dropAmount = prev.close - curr.close;
       const target25 = curr.close + dropAmount * 0.25;
       const target50 = curr.close + dropAmount * 0.5;
@@ -298,6 +361,10 @@ export async function runVelezIntradayScanner(
         fibExtensions,
         fibEmaConfluences,
         hasConfluence: fibEmaConfluences.length > 0,
+        sweptPDH,
+        sweptPDL,
+        prevDayHigh,
+        prevDayLow,
       });
     })
   );

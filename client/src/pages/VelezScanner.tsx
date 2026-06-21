@@ -84,6 +84,11 @@ interface DailySignal {
   ema200: number | null;
   fibEmaConfluences: EmaConfluence[];
   hasConfluence: boolean;
+  // Liquidity Sweep
+  sweptPDH?: boolean;
+  sweptPDL?: boolean;
+  prevDayHigh?: number | null;
+  prevDayLow?: number | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -224,6 +229,26 @@ function SignalRow({ signal }: { signal: DailySignal }) {
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent>Fib + EMA confluence detected within 1%</TooltipContent>
+              </Tooltip>
+            )}
+            {signal.sweptPDH && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-purple-400 text-purple-700 bg-purple-50">
+                    ↑PDH
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>Swept Previous Day High ({signal.prevDayHigh != null ? `$${Number(signal.prevDayHigh).toFixed(2)}` : '—'}) — liquidity grab above prior highs</TooltipContent>
+              </Tooltip>
+            )}
+            {signal.sweptPDL && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-orange-400 text-orange-700 bg-orange-50">
+                    ↓PDL
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>Swept Previous Day Low ({signal.prevDayLow != null ? `$${Number(signal.prevDayLow).toFixed(2)}` : '—'}) — liquidity grab below prior lows</TooltipContent>
               </Tooltip>
             )}
           </div>

@@ -26,6 +26,10 @@ async function fetchScanData(ticker: string): Promise<{
   currentPrice: number;
   volumeRatio: number;
   weeklyChange: number;
+  sweptPDH: boolean;
+  sweptPDL: boolean;
+  prevDayHigh: number | null;
+  prevDayLow: number | null;
   error?: string;
 }> {
   try {
@@ -41,12 +45,12 @@ async function fetchScanData(ticker: string): Promise<{
 
     const respAny = resp as any;
     const result = respAny?.chart?.result?.[0];
-    if (!result) return { currentPrice: 0, volumeRatio: 1, weeklyChange: 0, error: "No data" };
+    if (!result) return { currentPrice: 0, volumeRatio: 1, weeklyChange: 0, sweptPDH: false, sweptPDL: false, prevDayHigh: null, prevDayLow: null, error: "No data" };
 
     const closes: number[] = result.indicators.quote[0].close ?? [];
     const volumes: number[] = result.indicators.quote[0].volume ?? [];
     const n = closes.length;
-    if (n < 2) return { currentPrice: 0, volumeRatio: 1, weeklyChange: 0, error: "Insufficient data" };
+    if (n < 2) return { currentPrice: 0, volumeRatio: 1, weeklyChange: 0, sweptPDH: false, sweptPDL: false, prevDayHigh: null, prevDayLow: null, error: "Insufficient data" };
 
     const currentPrice = closes[n - 1] ?? 0;
 
@@ -60,9 +64,19 @@ async function fetchScanData(ticker: string): Promise<{
     const priorClose = closes[Math.max(0, n - 6)] ?? currentPrice;
     const weeklyChange = priorClose > 0 ? ((currentPrice - priorClose) / priorClose) * 100 : 0;
 
-    return { currentPrice, volumeRatio, weeklyChange };
+    // Liquidity sweep: compare today vs previous day high/low
+    const highs: number[] = result.indicators.quote[0].high ?? [];
+    const lows: number[] = result.indicators.quote[0].low ?? [];
+    const prevDayHigh = n >= 2 ? (highs[n - 2] ?? null) : null;
+    const prevDayLow = n >= 2 ? (lows[n - 2] ?? null) : null;
+    const todayHigh = highs[n - 1] ?? 0;
+    const todayLow = lows[n - 1] ?? 0;
+    const sweptPDH = prevDayHigh != null && todayHigh > prevDayHigh;
+    const sweptPDL = prevDayLow != null && todayLow < prevDayLow;
+
+    return { currentPrice, volumeRatio, weeklyChange, sweptPDH, sweptPDL, prevDayHigh, prevDayLow };
   } catch (e) {
-    return { currentPrice: 0, volumeRatio: 1, weeklyChange: 0, error: String(e) };
+    return { currentPrice: 0, volumeRatio: 1, weeklyChange: 0, sweptPDH: false, sweptPDL: false, prevDayHigh: null, prevDayLow: null, error: String(e) };
   }
 }
 
@@ -213,7 +227,7 @@ export const catalystBreakoutRouter = router({
         if (item.status === "invalidated") return item;
 
         const keyLevel = parseFloat(item.keyLevel ?? "0");
-        const { currentPrice, volumeRatio, error } = await fetchScanData(item.ticker);
+        const { currentPrice, volumeRatio, sweptPDH, sweptPDL, prevDayHigh, prevDayLow, error } = await fetchScanData(item.ticker);
 
         if (error || currentPrice === 0) return item;
 
@@ -245,6 +259,10 @@ export const catalystBreakoutRouter = router({
           volumeRatio: String(volumeRatio.toFixed(4)),
           status: newStatus,
           lastScannedAt: new Date(),
+          sweptPDH,
+          sweptPDL,
+          prevDayHigh,
+          prevDayLow,
         };
       })
     );
@@ -336,7 +354,7 @@ export const catalystBreakoutRouter = router({
       if (!item) throw new TRPCError({ code: "NOT_FOUND" });
 
       const keyLevel = parseFloat(item.keyLevel ?? "0");
-      const { currentPrice, volumeRatio, weeklyChange, error } = await fetchScanData(item.ticker);
+      const { currentPrice, volumeRatio, weeklyChange, sweptPDH, sweptPDL, prevDayHigh, prevDayLow, error } = await fetchScanData(item.ticker);
 
       if (error || currentPrice === 0) {
         return { ...item, scanError: error };
@@ -366,6 +384,10 @@ export const catalystBreakoutRouter = router({
         weeklyChange,
         status: newStatus,
         lastScannedAt: new Date(),
+        sweptPDH,
+        sweptPDL,
+        prevDayHigh,
+        prevDayLow,
       };
     }),
 });

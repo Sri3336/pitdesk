@@ -247,3 +247,20 @@
 - [x] Context sidebar panel: active scanner signals, recent PCR extremes, uploaded trade summary
 - [x] Route /pit-advisor in App.tsx
 - [x] Sidebar nav entry at top of Analysis section
+
+## Phase 24: Full Trade History in Pit Advisor + Day-of-Week Analysis + Back-fill Entry Time
+
+- [x] Pit Advisor: "Include My Trades" toggle sends full uploaded_trades + manual_trades history to AI context
+- [x] Day-of-Week analysis panel in Trade Log (win rate/P&L by weekday, color-coded, Okala insight tip)
+- [x] Inline entry time back-fill on every Trade Log row (clock icon → inline time input → save)
+- [x] Backend: trpc.trades.dayOfWeek procedure in routers.ts
+- [x] Backend: trpc.trades.updateEntryTime procedure in routers.ts + updateEntryTime helper in db.ts
+- [x] PITDESK_CONTEXT.md updated with all new features, domain setup, Okala strategy, Pit Advisor details
+
+## Phase 25: Skill Save + Liquidity Sweep Flag
+
+- [ ] Update options-trading-analyzer-builder SKILL.md with all new PitDesk features
+- [ ] Add Liquidity Sweep Flag to Velez Scanner daily results (swept PDH/PDL column)
+- [ ] Add Liquidity Sweep Flag to Velez Scanner intraday results
+- [ ] Add Liquidity Sweep Flag to BCOS Catalyst Watch scan results
+- [ ] Backend: add PDH/PDL sweep detection to velezScanner.ts and catalystBreakout router

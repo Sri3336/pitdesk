@@ -84,6 +84,10 @@ type WatchItem = {
   lastScannedAt: Date | null;
   notes: string | null;
   createdAt: Date;
+  sweptPDH?: boolean;
+  sweptPDL?: boolean;
+  prevDayHigh?: number | null;
+  prevDayLow?: number | null;
 };
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -766,7 +770,33 @@ export default function CatalystBreakoutWatch() {
 
                         {/* Status */}
                         <TableCell>
-                          <StatusBadge status={item.status} />
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <StatusBadge status={item.status} />
+                            {item.sweptPDH && (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-purple-400 text-purple-700 bg-purple-50 cursor-help">
+                                    ↑PDH
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Swept Previous Day High{item.prevDayHigh != null ? ` ($${Number(item.prevDayHigh).toFixed(2)})` : ''} — liquidity grab above prior highs
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            {item.sweptPDL && (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-orange-400 text-orange-700 bg-orange-50 cursor-help">
+                                    ↓PDL
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Swept Previous Day Low{item.prevDayLow != null ? ` ($${Number(item.prevDayLow).toFixed(2)})` : ''} — liquidity grab below prior lows
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
                         </TableCell>
 
                         {/* Actions */}
