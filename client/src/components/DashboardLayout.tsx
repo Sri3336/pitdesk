@@ -57,7 +57,7 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
 const SIDEBAR_WIDTH_KEY = "pitdesk-sidebar-width";
-const SIDEBAR_SECTIONS_KEY = "pitdesk-sidebar-sections";
+const SIDEBAR_SECTIONS_KEY = "pitdesk-sidebar-sections-v2";
 const DEFAULT_WIDTH = 260;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 380;
@@ -127,7 +127,7 @@ const NAV_SECTIONS = [
   {
     key: "reference",
     label: "Reference",
-    defaultOpen: false,
+    defaultOpen: true,
     items: [
       { icon: BookOpen, label: "Methodology", path: "/methodology" },
       { icon: HelpCircle, label: "Glossary", path: "/glossary" },

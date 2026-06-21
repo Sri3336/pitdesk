@@ -267,7 +267,7 @@
 
 ## Phase 26: Sweep Confluence Score + TradingView Chart + Pit Advisor Trade Button
 
-- [ ] Add Sweep Confluence Score to Velez Scanner — auto-flag A+ when signal fires AND ticker swept PDH/PDL same day
-- [ ] Add NQ Futures TradingView mini-chart to Okala 80/20 panel (200-second chart via TradingView widget)
-- [ ] Add Pit Advisor Chat button to each Trade Log row — pre-fills chat with trade ticker, date, P&L, strategy
-- [ ] Pass pre-filled trade context from Trade Log to Pit Advisor via URL params
+- [x] Add Sweep Confluence Score to Velez Scanner — auto-flag A+ when signal fires AND ticker swept PDH/PDL same day
+- [x] Add NQ Futures TradingView mini-chart to Okala 80/20 panel (200-second chart via TradingView widget)
+- [x] Add Pit Advisor Chat button to each Trade Log row — pre-fills chat with trade ticker, date, P&L, strategy
+- [x] Pass pre-filled trade context from Trade Log to Pit Advisor via URL params
