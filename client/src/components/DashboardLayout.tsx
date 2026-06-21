@@ -14,7 +14,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -23,10 +22,10 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   Activity,
-  AlertTriangle,
   BarChart2,
   Bell,
   BookOpen,
@@ -41,12 +40,12 @@ import {
   Home,
   LineChart,
   LogOut,
-  Settings,
-  Shield,
+  MessageSquare,
   PanelLeft,
   Radio,
   Scan,
-  MessageSquare,
+  Settings,
+  Shield,
   Sparkles,
   Target,
   TrendingUp,
@@ -56,93 +55,149 @@ import {
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 
 const SIDEBAR_WIDTH_KEY = "pitdesk-sidebar-width";
+const SIDEBAR_SECTIONS_KEY = "pitdesk-sidebar-sections";
 const DEFAULT_WIDTH = 260;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 380;
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
-const analysisItems = [
-  { icon: Home, label: "Dashboard", path: "/" },
-  { icon: BarChart2, label: "PCR Dashboard", path: "/pcr-dashboard" },
-  { icon: CandlestickChart, label: "Charts", path: "/charts" },
-  { icon: Scan, label: "Scan All", path: "/scan-all" },
-  { icon: Activity, label: "Options Analyzer", path: "/analyzer" },
-  { icon: ClipboardList, label: "Watchlist", path: "/watchlist" },
-  { icon: Radio, label: "Earnings Calendar", path: "/earnings-calendar" },
-];
+const NAV_SECTIONS = [
+  {
+    key: "analysis",
+    label: "Analysis",
+    defaultOpen: true,
+    items: [
+      { icon: Home, label: "Dashboard", path: "/" },
+      { icon: BarChart2, label: "PCR Dashboard", path: "/pcr-dashboard" },
+      { icon: CandlestickChart, label: "Charts", path: "/charts" },
+      { icon: Scan, label: "Scan All", path: "/scan-all" },
+      { icon: Activity, label: "Options Analyzer", path: "/analyzer" },
+      { icon: ClipboardList, label: "Watchlist", path: "/watchlist" },
+      { icon: Radio, label: "Earnings Calendar", path: "/earnings-calendar" },
+    ],
+  },
+  {
+    key: "strategies",
+    label: "Strategies",
+    defaultOpen: true,
+    items: [
+      { icon: TrendingUp, label: "PCR Strategy", path: "/pcr-strategy" },
+      { icon: GitMerge, label: "VCP Strategy", path: "/vcp-strategy" },
+      { icon: LineChart, label: "Velez Scanner", path: "/velez-scanner" },
+      { icon: Activity, label: "Intraday Scanner", path: "/intraday-scanner" },
+      { icon: Zap, label: "Catalyst Watch", path: "/catalyst-watch" },
+      { icon: Target, label: "Opening Range Scalper", path: "/velez-scanner?tab=ors" },
+    ],
+  },
+  {
+    key: "alerts",
+    label: "Alerts",
+    defaultOpen: true,
+    items: [
+      { icon: Bell, label: "IVR Alerts", path: "/ivr-alerts" },
+      { icon: Bell, label: "VCP Alerts", path: "/vcp-alerts" },
+      { icon: Sparkles, label: "Fib+EMA Alerts", path: "/fib-ema-alerts" },
+    ],
+  },
+  {
+    key: "execution",
+    label: "Execution",
+    defaultOpen: true,
+    items: [
+      { icon: MessageSquare, label: "Pit Advisor", path: "/pit-advisor" },
+      { icon: Zap, label: "AI Agent", path: "/agent" },
+      { icon: ClipboardList, label: "Trade Log", path: "/trade-log" },
+      { icon: Upload, label: "Trade Upload", path: "/trade-upload" },
+      { icon: BarChart2, label: "Performance", path: "/performance" },
+      { icon: BookOpen, label: "Trade Proposals", path: "/trade-proposals" },
+    ],
+  },
+  {
+    key: "data",
+    label: "Data & Settings",
+    defaultOpen: true,
+    items: [
+      { icon: Database, label: "COT Dashboard", path: "/cot-dashboard" },
+      { icon: Building2, label: "Broker Settings", path: "/broker-settings" },
+    ],
+  },
+  {
+    key: "reference",
+    label: "Reference",
+    defaultOpen: false,
+    items: [
+      { icon: BookOpen, label: "Methodology", path: "/methodology" },
+      { icon: HelpCircle, label: "Glossary", path: "/glossary" },
+      { icon: HelpCircle, label: "How-To", path: "/how-to" },
+    ],
+  },
+] as const;
 
-const strategyItems = [
-  { icon: TrendingUp, label: "PCR Strategy", path: "/pcr-strategy" },
-  { icon: GitMerge, label: "VCP Strategy", path: "/vcp-strategy" },
-  { icon: LineChart, label: "Velez Scanner", path: "/velez-scanner" },
-  { icon: Activity, label: "Intraday Scanner", path: "/intraday-scanner" },
-  { icon: Zap, label: "Catalyst Watch", path: "/catalyst-watch" },
-  { icon: Target, label: "Opening Range Scalper", path: "/velez-scanner?tab=ors" },
-];
+type SectionKey = (typeof NAV_SECTIONS)[number]["key"];
 
-const alertItems = [
-  { icon: Bell, label: "IVR Alerts", path: "/ivr-alerts" },
-  { icon: Bell, label: "VCP Alerts", path: "/vcp-alerts" },
-  { icon: Sparkles, label: "Fib+EMA Alerts", path: "/fib-ema-alerts" },
-];
+// ─── CollapsibleNavSection ─────────────────────────────────────────────────────
 
-const executionItems = [
-  { icon: MessageSquare, label: "Pit Advisor", path: "/pit-advisor" },
-  { icon: Zap, label: "AI Agent", path: "/agent" },
-  { icon: ClipboardList, label: "Trade Log", path: "/trade-log" },
-  { icon: Upload, label: "Trade Upload", path: "/trade-upload" },
-  { icon: BarChart2, label: "Performance", path: "/performance" },
-  { icon: BookOpen, label: "Trade Proposals", path: "/trade-proposals" },
-];
-
-const dataItems = [
-  { icon: Database, label: "COT Dashboard", path: "/cot-dashboard" },
-  { icon: Building2, label: "Broker Settings", path: "/broker-settings" },
-];
-
-const referenceItems = [
-  { icon: BookOpen, label: "Methodology", path: "/methodology" },
-  { icon: HelpCircle, label: "Glossary", path: "/glossary" },
-  { icon: HelpCircle, label: "How-To", path: "/how-to" },
-];
-
-// ─── NavGroup ─────────────────────────────────────────────────────────────────
-
-function NavGroup({
+function CollapsibleNavSection({
+  sectionKey,
+  label,
   items,
+  isOpen,
+  onToggle,
 }: {
-  items: { icon: React.ElementType; label: string; path: string }[];
+  sectionKey: SectionKey;
+  label: string;
+  items: readonly { icon: React.ElementType; label: string; path: string }[];
+  isOpen: boolean;
+  onToggle: (key: SectionKey) => void;
 }) {
   const [location, navigate] = useLocation();
+
   return (
-    <SidebarMenu>
-      {items.map((item) => {
-        // Support query-string paths: /velez-scanner?tab=ors
-        const [itemPath, itemQuery] = item.path.split("?");
-        const fullLocation = typeof window !== "undefined"
-          ? window.location.pathname + (window.location.search || "")
-          : location;
-        const isActive = itemQuery
-          ? fullLocation === item.path || fullLocation.startsWith(item.path)
-          : location === item.path;
-        return (
-          <SidebarMenuItem key={item.path}>
-            <SidebarMenuButton
-              isActive={isActive}
-              onClick={() => navigate(item.path)}
-              className="cursor-pointer"
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span>{item.label}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        );
-      })}
-    </SidebarMenu>
+    <SidebarGroup className="py-0">
+      <Collapsible open={isOpen} onOpenChange={() => onToggle(sectionKey)}>
+        <CollapsibleTrigger asChild>
+          <button
+            className="flex items-center justify-between w-full px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/50 group"
+          >
+            <span>{label}</span>
+            <ChevronDown
+              className={`h-3 w-3 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-0" : "-rotate-90"}`}
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-none">
+          <SidebarGroupContent className="pt-0.5 pb-1">
+            <SidebarMenu>
+              {items.map((item) => {
+                const [, itemQuery] = item.path.split("?");
+                const fullLocation =
+                  typeof window !== "undefined"
+                    ? window.location.pathname + (window.location.search || "")
+                    : location;
+                const isActive = itemQuery
+                  ? fullLocation === item.path || fullLocation.startsWith(item.path)
+                  : location === item.path;
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      onClick={() => navigate(item.path)}
+                      className="cursor-pointer h-8 text-sm"
+                    >
+                      <item.icon className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </SidebarGroup>
   );
 }
 
@@ -153,7 +208,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const [refOpen, setRefOpen] = useState(false);
+
+  // Persist which sections are open/closed
+  const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(SIDEBAR_SECTIONS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return Object.fromEntries(
+      NAV_SECTIONS.map((s) => [s.key, s.defaultOpen])
+    ) as Record<SectionKey, boolean>;
+  });
+
+  const toggleSection = (key: SectionKey) => {
+    setOpenSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem(SIDEBAR_SECTIONS_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const { loading, user, logout } = useAuth();
   const [, navigate] = useLocation();
   const isMobile = useIsMobile();
@@ -194,11 +268,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   if (loading) return <DashboardLayoutSkeleton />;
-
-  if (!user) {
-    // AuthGuard handles redirect; show skeleton while redirecting
-    return <DashboardLayoutSkeleton />;
-  }
+  if (!user) return <DashboardLayoutSkeleton />;
 
   const initials = user.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -209,8 +279,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
     >
       <Sidebar variant="inset" collapsible={isMobile ? "offcanvas" : "none"}>
-        {/* Header — PitDesk logo */}
-        <SidebarHeader className="border-b border-border px-4 py-3">
+        {/* Header */}
+        <SidebarHeader className="border-b border-border px-4 py-3 shrink-0">
           <div className="flex items-center gap-2">
             <PitDeskLogo size={40} />
             <div>
@@ -220,67 +290,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </SidebarHeader>
 
-        <SidebarContent className="overflow-y-auto">
-          {/* ANALYSIS */}
-          <SidebarGroup>
-            <SidebarGroupLabel>Analysis</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <NavGroup items={analysisItems} />
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          {/* STRATEGIES */}
-          <SidebarGroup>
-            <SidebarGroupLabel>Strategies</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <NavGroup items={strategyItems} />
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          {/* ALERTS */}
-          <SidebarGroup>
-            <SidebarGroupLabel>Alerts</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <NavGroup items={alertItems} />
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          {/* EXECUTION */}
-          <SidebarGroup>
-            <SidebarGroupLabel>Execution</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <NavGroup items={executionItems} />
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          {/* DATA */}
-          <SidebarGroup>
-            <SidebarGroupLabel>Data &amp; Settings</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <NavGroup items={dataItems} />
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          {/* REFERENCE — collapsible */}
-          <SidebarGroup>
-            <Collapsible open={refOpen} onOpenChange={setRefOpen}>
-              <CollapsibleTrigger asChild>
-                <SidebarGroupLabel className="cursor-pointer flex items-center justify-between w-full">
-                  <span>Reference</span>
-                  {refOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                </SidebarGroupLabel>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <NavGroup items={referenceItems} />
-                </SidebarGroupContent>
-              </CollapsibleContent>
-            </Collapsible>
-          </SidebarGroup>
+        {/* Nav — all sections collapsible */}
+        <SidebarContent className="overflow-y-auto px-2 py-2 gap-0">
+          {NAV_SECTIONS.map((section) => (
+            <CollapsibleNavSection
+              key={section.key}
+              sectionKey={section.key}
+              label={section.label}
+              items={section.items}
+              isOpen={openSections[section.key] ?? section.defaultOpen}
+              onToggle={toggleSection}
+            />
+          ))}
         </SidebarContent>
 
         {/* Footer — user profile */}
-        <SidebarFooter className="border-t border-border p-3">
+        <SidebarFooter className="border-t border-border p-3 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 w-full rounded-lg px-2 py-1.5 hover:bg-accent transition-colors text-left">
@@ -291,10 +316,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="text-xs font-medium truncate">{user.name ?? "Sridhar"}</div>
                   <div className="text-[10px] text-muted-foreground truncate">{user.email ?? ""}</div>
                 </div>
+                <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              {/* User info header */}
               <div className="px-2 py-1.5 border-b border-border mb-1">
                 <div className="text-xs font-semibold truncate">{user.name ?? "Sridhar"}</div>
                 <div className="text-[10px] text-muted-foreground truncate">{user.email ?? ""}</div>
@@ -328,7 +353,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </SidebarFooter>
       </Sidebar>
 
-      {/* Resize handle */}
+      {/* Desktop resize handle */}
       {!isMobile && (
         <div
           className="w-1 cursor-col-resize bg-transparent hover:bg-green-400 transition-colors z-10 shrink-0"
@@ -337,13 +362,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       <SidebarInset className="flex flex-col h-screen overflow-hidden">
-        {/* Top bar */}
+        {/* Mobile top bar with hamburger */}
         {isMobile && (
-          <header className="flex items-center gap-2 px-4 py-3 border-b border-border bg-background sticky top-0 z-10">
-            <SidebarTrigger>
+          <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-background shrink-0 z-10">
+            <SidebarTrigger className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors">
               <PanelLeft className="h-5 w-5" />
             </SidebarTrigger>
-            <span className="font-semibold text-sm">PitDesk</span>
+            <div className="flex items-center gap-2">
+              <PitDeskLogo size={28} />
+              <span className="font-semibold text-sm">PitDesk</span>
+            </div>
           </header>
         )}
         <main className="flex-1 overflow-hidden min-h-0">{children}</main>
