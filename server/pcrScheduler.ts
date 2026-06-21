@@ -345,7 +345,7 @@ export async function runIntradayScan(): Promise<{ processed: number; actionable
   console.log(`[PCR Intraday Scan] Starting for ${tickers.length} tickers on ${today}`);
 
   const extremeSignals: Array<{ ticker: string; signal: PCRSignal; pcr: number; coiDelta: number }> = [];
-  const allResults: Array<{ ticker: string; signal: PCRSignal; pcr: number; pcrDeltaVsPrior: number | null; priorSignal: string | null; strategyHint: string; signalChanged: boolean }> = [];
+  const allResults: Array<{ ticker: string; signal: PCRSignal; pcr: number; pcrDeltaVsPrior: number | null; priorSignal: string | null; strategyHint: string; signalChanged: boolean; coiImbalancePct: number; coiSignal: string; atmStrike: number; atmCallDelta: number | null; atmPutDelta: number | null; expiration: string | null; recommendation: string }> = [];
 
   // Process in batches of 5
   for (let i = 0; i < tickers.length; i += 5) {
@@ -498,6 +498,13 @@ export async function runIntradayScan(): Promise<{ processed: number; actionable
           priorSignal,
           strategyHint,
           signalChanged: !!(priorSignal && priorSignal !== signal),
+          coiImbalancePct: chain.coiImbalancePct,
+          coiSignal: chain.coiSignal,
+          atmStrike: chain.atmStrike,
+          atmCallDelta: chain.atmCallDelta,
+          atmPutDelta: chain.atmPutDelta,
+          expiration: chain.expiration,
+          recommendation,
         });
         if (signal === "EXTREME_FEAR" || signal === "EXTREME_GREED") {
           actionable++;
@@ -601,6 +608,50 @@ export async function runIntradayScan(): Promise<{ processed: number; actionable
       `View full Scan Detail on the PCR Strategy page → Scan Detail tab.`,
     ].join("\n"),
   }).catch(() => {});
+
+  // ── COI Signal Digest: tickers with ≥45% COI imbalance ──────────────────────
+  // Only fires when Tradier is active (coiImbalancePct > 0 means real data)
+  const coiSignals = allResults
+    .filter(r => r.coiImbalancePct >= 45)
+    .sort((a, b) => b.coiImbalancePct - a.coiImbalancePct);
+
+  if (coiSignals.length > 0) {
+    const coiLines = coiSignals.map((r, i) => {
+      const direction = r.coiSignal === "BUY_CALL" ? "🟢 BUY CALL" : r.coiSignal === "BUY_PUT" ? "🔴 BUY PUT" : "⚪ NEUTRAL";
+      const atmStr = r.atmStrike > 0 ? `ATM $${r.atmStrike.toFixed(2)}` : "ATM N/A";
+      const deltaStr = r.coiSignal === "BUY_CALL" && r.atmCallDelta !== null
+        ? `Δ ${r.atmCallDelta.toFixed(2)}`
+        : r.coiSignal === "BUY_PUT" && r.atmPutDelta !== null
+        ? `Δ ${r.atmPutDelta.toFixed(2)}`
+        : "";
+      const expiryStr = r.expiration ? ` | Exp: ${r.expiration}` : "";
+      return [
+        `${i + 1}. ${direction} — ${r.ticker} (${r.coiImbalancePct.toFixed(0)}% imbalance)`,
+        `   ${atmStr}${deltaStr ? " | " + deltaStr : ""}${expiryStr}`,
+        `   ${r.recommendation}`,
+      ].join("\n");
+    }).join("\n\n");
+
+    await notifyOwner({
+      title: `🚨 COI Signal Alert — ${coiSignals.length} Strong Setup${coiSignals.length > 1 ? "s" : ""} — ${today}`,
+      content: [
+        `COI Imbalance Digest — ${today} 11:30 AM ET`,
+        `${coiSignals.length} ticker${coiSignals.length > 1 ? "s" : ""} with ≥45% COI imbalance detected:`,
+        ``,
+        coiLines,
+        ``,
+        `── Entry Rule ──`,
+        `Wait for price to pull back to VWAP before entering. Square off by 3:20 PM ET.`,
+        `Avoid trades in first 30 min of NY open (before 10:00 AM ET).`,
+        ``,
+        `View full details on the PCR Strategy page → Signal Board.`,
+      ].join("\n"),
+    }).catch(() => {});
+
+    console.log(`[PCR Intraday Scan] COI Signal Digest sent: ${coiSignals.length} tickers with ≥45% imbalance`);
+  } else {
+    console.log(`[PCR Intraday Scan] No COI signals ≥45% — skipping COI digest email`);
+  }
 
   return { processed, actionable, errors };
 }

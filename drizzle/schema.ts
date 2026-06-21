@@ -478,3 +478,37 @@ export const cotAlerts = mysqlTable("cot_alerts", {
 });
 export type CotAlert = typeof cotAlerts.$inferSelect;
 export type InsertCotAlert = typeof cotAlerts.$inferInsert;
+
+// ─── Trade Upload (CSV import + community insights) ───────────────────────────
+export const tradeUploadBatches = mysqlTable("trade_upload_batches", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  rowCount: int("rowCount").notNull().default(0),
+  source: varchar("source", { length: 64 }).default("csv"), // "csv" | "etrade" | "schwab"
+  status: mysqlEnum("status", ["pending", "processed", "failed"]).default("processed").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type TradeUploadBatch = typeof tradeUploadBatches.$inferSelect;
+export type InsertTradeUploadBatch = typeof tradeUploadBatches.$inferInsert;
+
+export const uploadedTrades = mysqlTable("uploaded_trades", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  batchId: int("batchId").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  tradeDate: varchar("tradeDate", { length: 10 }).notNull(), // YYYY-MM-DD
+  side: mysqlEnum("side", ["BUY", "SELL", "LONG", "SHORT"]).notNull(),
+  qty: decimal("qty", { precision: 12, scale: 4 }).notNull(),
+  entryPrice: decimal("entryPrice", { precision: 12, scale: 4 }).notNull(),
+  exitPrice: decimal("exitPrice", { precision: 12, scale: 4 }),
+  pnl: decimal("pnl", { precision: 12, scale: 4 }),
+  pnlPct: decimal("pnlPct", { precision: 8, scale: 4 }),
+  strategy: varchar("strategy", { length: 64 }),
+  assetType: mysqlEnum("assetType", ["stock", "option", "etf", "other"]).default("stock").notNull(),
+  notes: varchar("notes", { length: 512 }),
+  isWin: boolean("isWin"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type UploadedTrade = typeof uploadedTrades.$inferSelect;
+export type InsertUploadedTrade = typeof uploadedTrades.$inferInsert;

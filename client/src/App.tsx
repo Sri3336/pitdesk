@@ -57,6 +57,8 @@ const BrokerSettings = lazy(() => import("./pages/BrokerSettings"));
 const Methodology = lazy(() => import("./pages/Methodology").catch(() => ({ default: () => <ComingSoon title="Methodology" /> })));
 const Glossary = lazy(() => import("./pages/Glossary").catch(() => ({ default: () => <ComingSoon title="Glossary" /> })));
 const HowTo = lazy(() => import("./pages/HowTo"));
+const PitAdvisor = lazy(() => import("./pages/PitAdvisor"));
+const TradeUpload = lazy(() => import("./pages/TradeUpload"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -139,6 +141,8 @@ function Router() {
                 <Route path="/methodology" component={Methodology} />
                 <Route path="/glossary" component={Glossary} />
                 <Route path="/how-to" component={HowTo} />
+                <Route path="/pit-advisor" component={PitAdvisor} />
+                <Route path="/trade-upload" component={TradeUpload} />
 
                 {/* Admin */}
                 <Route path="/admin/users" component={AdminUsers} />

@@ -83,6 +83,8 @@ import { runVelezDailyScanner, runVelezIntradayScanner } from "./velezScanner";
 import { runOpeningRangeScalperScan, scanOpeningRangeScalper } from "./openingRangeScalper";
 import { runPRPScanner, scanPreviousRangePullback } from "./previousRangeScanner";
 import { brokerRouter, agentRouter, tradeLogRouter } from "./routers/agent";
+import { tradeUploadRouter } from "./routers/tradeUpload";
+import { pitAdvisorRouter } from "./routers/pitAdvisor";
 import { catalystBreakoutRouter } from "./routers/catalystBreakout";
 import { cotRouter } from "./routers/cot";
 import { cotAlertsRouter } from "./routers/cotAlerts";
@@ -1425,7 +1427,8 @@ export const appRouter = router({
   vcp: vcpRouter,
   earningsCalendar: earningsCalendarRouter,
   openingRangeScalper: openingRangeScalperRouter,
-  previousRange: previousRangeRouter,
+    previousRange: previousRangeRouter,
+  tradeUpload: tradeUploadRouter,
+  pitAdvisor: pitAdvisorRouter,
 });
-
 export type AppRouter = typeof appRouter;

@@ -46,9 +46,11 @@ import {
   PanelLeft,
   Radio,
   Scan,
+  MessageSquare,
   Sparkles,
   Target,
   TrendingUp,
+  Upload,
   Zap,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -89,8 +91,10 @@ const alertItems = [
 ];
 
 const executionItems = [
+  { icon: MessageSquare, label: "Pit Advisor", path: "/pit-advisor" },
   { icon: Zap, label: "AI Agent", path: "/agent" },
   { icon: ClipboardList, label: "Trade Log", path: "/trade-log" },
+  { icon: Upload, label: "Trade Upload", path: "/trade-upload" },
   { icon: BarChart2, label: "Performance", path: "/performance" },
   { icon: BookOpen, label: "Trade Proposals", path: "/trade-proposals" },
 ];
