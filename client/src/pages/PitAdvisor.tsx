@@ -215,9 +215,21 @@ What would you like to research today?`,
       timestamp: new Date(),
     },
   ]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const p = new URLSearchParams(window.location.search);
+    const prompt = p.get("prompt");
+    return prompt ? decodeURIComponent(prompt) : "";
+  });
   const [includeTradeContext, setIncludeTradeContext] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Clear the ?prompt= URL param after reading it so back-navigation works cleanly
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("prompt")) {
+      window.history.replaceState({}, "", "/pit-advisor");
+    }
+  }, []);
 
   const chatMutation = trpc.pitAdvisor.chat.useMutation({
     onSuccess: (data) => {

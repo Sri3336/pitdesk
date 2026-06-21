@@ -33,13 +33,14 @@ import {
   Clock,
   Info,
   Lightbulb,
+  MessageSquare,
   Plus,
   Sparkles,
   TrendingDown,
   TrendingUp,
   X,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -560,6 +561,7 @@ function TradeRow({
   const [showClose, setShowClose] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [editingTime, setEditingTime] = useState(false);
+  const [, navigate] = useLocation();
   const [timeInput, setTimeInput] = useState(trade.entryTime ?? "");
   const updateTimeMutation = trpc.trades.updateEntryTime.useMutation({
     onSuccess: () => { setEditingTime(false); onRefresh(); },
@@ -667,6 +669,37 @@ function TradeRow({
                 <CheckCircle className="h-3.5 w-3.5" />
               </Button>
             )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                  onClick={() => {
+                    const pnlStr = trade.pnl ? ` P&L: $${parseFloat(String(trade.pnl)).toFixed(2)}.` : '';
+                    const statusStr = trade.status === 'closed' ? 'closed' : 'open';
+                    const prompt = encodeURIComponent(
+                      `Analyze this trade for me:\n` +
+                      `Ticker: ${trade.ticker}\n` +
+                      `Direction: ${trade.direction}\n` +
+                      `Strategy: ${trade.strategy ?? 'N/A'}\n` +
+                      `Entry: ${trade.entryPrice ?? 'N/A'}\n` +
+                      `Stop: ${trade.stopLoss ?? 'N/A'}\n` +
+                      `Target 1: ${trade.target1 ?? 'N/A'}\n` +
+                      `Target 2: ${trade.target2 ?? 'N/A'}\n` +
+                      `Status: ${statusStr}${pnlStr}\n` +
+                      `Date: ${new Date(trade.enteredAt).toLocaleDateString()}\n` +
+                      (trade.entryTime ? `Entry Time: ${trade.entryTime} ET\n` : '') +
+                      `\nPlease review this trade across all 5 dimensions (Technical, Fundamental, Geopolitical, Sentiment, Quant/Math) and tell me what I did right, what I did wrong, and what I should do differently next time.`
+                    );
+                    navigate(`/pit-advisor?prompt=${prompt}`);
+                  }}
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">Ask Pit Advisor to analyze this trade</TooltipContent>
+            </Tooltip>
           </div>
         </td>
       </tr>

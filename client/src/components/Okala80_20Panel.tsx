@@ -226,7 +226,7 @@ function RRCalculator({ currentPrice }: { currentPrice: number }) {
 export function Okala80_20Panel() {
   const [selectedSetup, setSelectedSetup] = useState<string | null>(null);
   const [manualPrice, setManualPrice] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"levels" | "setups" | "rr">("levels");
+  const [activeTab, setActiveTab] = useState<"levels" | "setups" | "rr" | "chart">("levels");
 
   const { data: futuresData, isLoading, refetch, dataUpdatedAt } = trpc.openingRangeScalper.getFuturesPrice.useQuery(
     undefined,
@@ -330,7 +330,7 @@ export function Okala80_20Panel() {
 
       {/* Tab selector */}
       <div className="flex gap-1 bg-muted/30 rounded-lg p-1">
-        {(["levels", "setups", "rr"] as const).map(tab => (
+        {(["levels", "setups", "rr", "chart"] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -340,7 +340,7 @@ export function Okala80_20Panel() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {tab === "levels" ? "80/20 Levels" : tab === "setups" ? "Setups" : "R:R Calc"}
+            {tab === "levels" ? "80/20 Levels" : tab === "setups" ? "Setups" : tab === "rr" ? "R:R Calc" : "NQ Chart"}
           </button>
         ))}
       </div>
@@ -494,6 +494,44 @@ export function Okala80_20Panel() {
               Best setups occur when the 80/20 level aligns with PCR extreme signal on QQQ/SPY.
               Check the PCR Dashboard before entering — EXTREME_GREED PCR + 80 level = strong long bias.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── NQ CHART TAB ── */}
+      {activeTab === "chart" && (
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <Info className="h-3.5 w-3.5" />
+            TradingView NQ Futures — use 200-second chart for Okala setups
+          </div>
+          {/* TradingView Mini Widget */}
+          <div className="rounded-lg overflow-hidden border border-border" style={{ height: 340 }}>
+            <iframe
+              src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_nq&symbol=CME_MINI%3ANQ1%21&interval=200S&hidesidetoolbar=1&hidetoptoolbar=0&symboledit=0&saveimage=0&toolbarbg=f1f3f6&studies=%5B%5D&theme=light&style=1&timezone=America%2FNew_York&withdateranges=0&showpopupbutton=0&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=en&utm_source=pitdesk.ai"
+              style={{ width: '100%', height: '100%', border: 0 }}
+              allowTransparency
+              scrolling="no"
+              allowFullScreen
+              title="NQ Futures 200s Chart"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-[10px]">
+            <div className="bg-muted/30 rounded p-2 text-center">
+              <div className="font-semibold text-muted-foreground">Timeframe</div>
+              <div className="font-bold mt-0.5">200 seconds</div>
+            </div>
+            <div className="bg-muted/30 rounded p-2 text-center">
+              <div className="font-semibold text-muted-foreground">Symbol</div>
+              <div className="font-bold mt-0.5">NQ1! (CME)</div>
+            </div>
+            <div className="bg-muted/30 rounded p-2 text-center">
+              <div className="font-semibold text-muted-foreground">Session</div>
+              <div className="font-bold mt-0.5">NY Open only</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-muted-foreground bg-amber-50 border border-amber-200 rounded p-2">
+            <span className="font-semibold text-amber-700">Tip:</span> Look for price approaching the 80 or 20 levels shown in the Levels tab. Enter only during the NY Open window (9:30–10:30 AM ET).
           </div>
         </div>
       )}

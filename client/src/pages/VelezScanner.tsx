@@ -218,8 +218,22 @@ function SignalRow({ signal }: { signal: DailySignal }) {
         onClick={() => setExpanded((v) => !v)}
       >
         <td className="px-3 py-2.5">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-sm text-foreground">{signal.ticker}</span>
+            {/* A+ Sweep Confluence Score: Velez signal + Fib/EMA confluence + PDH/PDL sweep */}
+            {signal.hasConfluence && (signal.sweptPDH || signal.sweptPDL) && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <Badge className="text-[10px] px-1.5 py-0 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 font-bold shadow-sm">
+                    ⭐ A+
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[220px]">
+                  <p className="font-semibold">A+ Sweep Confluence Setup</p>
+                  <p className="text-xs mt-0.5">Velez drop signal + Fib/EMA confluence + {signal.sweptPDH ? '↑PDH liquidity sweep' : '↓PDL liquidity sweep'} — highest-conviction setup</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
             {signal.hasConfluence && (
               <Tooltip>
                 <TooltipTrigger>
