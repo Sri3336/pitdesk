@@ -57,11 +57,11 @@ interface CriterionResult {
 
 interface IntradayScorecard {
   ticker: string;
-  direction: "Bullish" | "Bearish" | "Neutral";
+  direction: "Bullish" | "Bearish" | "Neutral" | "bullish" | "bearish" | "neutral";
   score: number;
   maxScore: number;
   grade: "A" | "B" | "C" | "D";
-  criteria: CriterionResult[];
+  criteria: CriterionResult[] | Record<string, CriterionResult>;
   currentPrice: number;
   vwap: number;
   atr: number;
@@ -95,15 +95,29 @@ function gradeRingColor(grade: string) {
   }
 }
 
+function normalizeDirection(direction: string): "Bullish" | "Bearish" | "Neutral" {
+  const d = direction.toLowerCase();
+  if (d === "bullish") return "Bullish";
+  if (d === "bearish") return "Bearish";
+  return "Neutral";
+}
+
+function normalizeCriteria(criteria: CriterionResult[] | Record<string, CriterionResult>): CriterionResult[] {
+  if (Array.isArray(criteria)) return criteria;
+  return Object.entries(criteria).map(([name, c]) => ({ ...c, name: c.name ?? name }));
+}
+
 function directionIcon(direction: string) {
-  if (direction === "Bullish") return <TrendingUp className="w-4 h-4 text-green-600" />;
-  if (direction === "Bearish") return <TrendingDown className="w-4 h-4 text-red-500" />;
+  const d = normalizeDirection(direction);
+  if (d === "Bullish") return <TrendingUp className="w-4 h-4 text-green-600" />;
+  if (d === "Bearish") return <TrendingDown className="w-4 h-4 text-red-500" />;
   return <Minus className="w-4 h-4 text-gray-400" />;
 }
 
 function directionBadge(direction: string) {
-  if (direction === "Bullish") return "bg-green-100 text-green-800";
-  if (direction === "Bearish") return "bg-red-100 text-red-800";
+  const d = normalizeDirection(direction);
+  if (d === "Bullish") return "bg-green-100 text-green-800";
+  if (d === "Bearish") return "bg-red-100 text-red-800";
   return "bg-gray-100 text-gray-600";
 }
 
@@ -132,7 +146,9 @@ function formatScanTime(ts: number | null) {
 
 function ScorecardModal({ card, onClose }: { card: IntradayScorecard | null; onClose: () => void }) {
   if (!card) return null;
-  const passCount = card.criteria.filter((c) => c.passed).length;
+  const criteriaArr = normalizeCriteria(card.criteria);
+  const passCount = criteriaArr.filter((c) => c.passed).length;
+  const dir = normalizeDirection(card.direction);
   return (
     <Dialog open={!!card} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-xl">
@@ -142,8 +158,8 @@ function ScorecardModal({ card, onClose }: { card: IntradayScorecard | null; onC
             <span className={`px-2 py-0.5 rounded-full text-sm font-semibold border ${gradeColor(card.grade)}`}>
               Grade {card.grade}
             </span>
-            <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-sm ${directionBadge(card.direction)}`}>
-              {directionIcon(card.direction)} {card.direction}
+            <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-sm ${directionBadge(dir)}`}>
+              {directionIcon(dir)} {dir}
             </span>
           </DialogTitle>
         </DialogHeader>
@@ -163,7 +179,7 @@ function ScorecardModal({ card, onClose }: { card: IntradayScorecard | null; onC
         </div>
         <Separator />
         <div className="space-y-1 max-h-80 overflow-y-auto">
-          {card.criteria.map((c) => (
+          {criteriaArr.map((c) => (
             <div key={c.name} className={`flex items-start gap-3 px-3 py-2 rounded-lg ${c.passed ? "bg-green-50" : "bg-red-50"}`}>
               <div className="mt-0.5 flex-shrink-0">
                 {c.passed ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-500" />}
@@ -181,7 +197,7 @@ function ScorecardModal({ card, onClose }: { card: IntradayScorecard | null; onC
           ))}
         </div>
         <div className="text-xs text-gray-400 text-center pt-1">
-          {passCount} of {card.criteria.length} criteria passed · ATR ${card.atr.toFixed(2)}
+          {passCount} of {criteriaArr.length} criteria passed · ATR ${card.atr.toFixed(2)}
         </div>
       </DialogContent>
     </Dialog>
@@ -385,9 +401,9 @@ function ResultsTable({
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className={`flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-xs w-fit mx-auto ${directionBadge(r.direction)}`}>
+                      <div className={`flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-xs w-fit mx-auto ${directionBadge(normalizeDirection(r.direction))}`}>
                         {directionIcon(r.direction)}
-                        <span>{r.direction}</span>
+                        <span>{normalizeDirection(r.direction)}</span>
                       </div>
                     </TableCell>
                     <TableCell className="min-w-[160px]">{scoreBar(r.score, r.maxScore ?? 11)}</TableCell>
@@ -844,7 +860,7 @@ export default function IntradayScanner() {
       ticker: r.ticker,
       score: parseFloat(r.weightedScore ?? "0"),
       grade: r.grade,
-      direction: r.direction,
+      direction: normalizeDirection(r.direction ?? "neutral"),
       criteria: r.criteria ?? {},
       currentPrice: parseFloat(r.price ?? "0"),
       vwap: parseFloat(r.vwap ?? "0"),
@@ -862,12 +878,12 @@ export default function IntradayScanner() {
         ticker: r.ticker,
         score: r.score,
         grade: r.grade,
-        direction: r.direction,
-        criteria: {},
-        currentPrice: 0,
-        vwap: 0,
-        atr: 0,
-        maxScore: 11,
+        direction: normalizeDirection(r.direction ?? "neutral"),
+        criteria: r.criteria ?? {},
+        currentPrice: parseFloat(r.price ?? r.currentPrice ?? "0"),
+        vwap: parseFloat(r.vwap ?? "0"),
+        atr: parseFloat(r.atr ?? "0"),
+        maxScore: r.maxScore ?? 11,
         error: null,
       }));
       setLiveResults(normalized as any as IntradayScorecard[]);
@@ -1054,8 +1070,8 @@ export default function IntradayScanner() {
                         <span className={`px-2 py-0.5 rounded-full text-sm font-semibold border ${gradeColor(singleCard.grade)}`}>
                           Grade {singleCard.grade}
                         </span>
-                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-sm ${directionBadge(singleCard.direction)}`}>
-                          {directionIcon(singleCard.direction)} {singleCard.direction}
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-sm ${directionBadge(normalizeDirection(singleCard.direction))}`}>
+                          {directionIcon(singleCard.direction)} {normalizeDirection(singleCard.direction)}
                         </span>
                         <span className="text-sm text-gray-500 ml-auto">
                           ${singleCard.currentPrice.toFixed(2)} · VWAP ${singleCard.vwap.toFixed(2)}
@@ -1063,7 +1079,7 @@ export default function IntradayScanner() {
                       </div>
                       {scoreBar(singleCard.score, singleCard.maxScore)}
                       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        {singleCard.criteria.map((c) => (
+                        {normalizeCriteria(singleCard.criteria).map((c) => (
                           <div
                             key={c.name}
                             className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs ${c.passed ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}
