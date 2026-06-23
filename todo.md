@@ -276,3 +276,17 @@
 - [x] Trade Replay: Add mini TradingView iframe chart dialog to closed Trade Log rows (zoom to entry/exit date range)
 - [x] PCR Dashboard: Add "Ask Pit Advisor" button to each ticker row (pre-fills chat with PCR signal context)
 - [x] Weekly Briefing: Heartbeat cron every Sunday 7 PM ET — LLM generates market outlook email, sends to akulasridhar@gmail.com
+
+## Phase 27: Three Enhancements — Options Flow, Post-Market Debrief, EAS Build
+
+- [x] Options Flow / Dark Pool screen: server/routers/optionsFlow.ts (Tradier options chains, unusual score)
+- [x] Options Flow / Dark Pool screen: client/src/pages/OptionsFlow.tsx (filter/sort UI, Ask Pit Advisor per row)
+- [x] Options Flow: add route /options-flow in App.tsx + sidebar nav item (DATA & SETTINGS section)
+- [x] Post-Market Debrief: server/scheduledPostMarketDebrief.ts (weekday 4:30 PM ET heartbeat, LLM debrief email)
+- [x] Post-Market Debrief: register heartbeat endpoint in server/_core/index.ts
+- [x] Post-Market Debrief: server/setupPostMarketJob.ts (one-time heartbeat registration script)
+- [x] EAS build config: pitdesk-mobile/eas.json (production profile for iOS + Android)
+- [x] EAS build config: pitdesk-mobile/.easignore
+- [x] Update PITDESK_CONTEXT.md with new features
+- [x] TypeScript check: 0 errors
+- [x] Checkpoint save

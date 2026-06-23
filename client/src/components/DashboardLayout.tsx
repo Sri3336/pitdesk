@@ -118,6 +118,7 @@ const NAV_SECTIONS = [
     label: "Data & Settings",
     defaultOpen: true,
     items: [
+      { icon: Zap, label: "Options Flow", path: "/options-flow" },
       { icon: Database, label: "COT Dashboard", path: "/cot-dashboard" },
       { icon: Building2, label: "Broker Settings", path: "/broker-settings" },
     ],

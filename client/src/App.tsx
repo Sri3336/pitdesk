@@ -61,6 +61,7 @@ const TradeLog = lazy(() => import("./pages/TradeLog"));
 const FibEmaAlerts = lazy(() => import("./pages/FibEmaAlerts"));
 
 // Data / Reference pages
+const OptionsFlow = lazy(() => import("./pages/OptionsFlow"));
 const COTDashboard = lazy(() => import("./pages/COTDashboard"));
 const COTAlerts = lazy(() => import("./pages/COTAlerts"));
 const COTReference = lazy(() => import("./pages/COTReference").catch(() => ({ default: () => <ComingSoon title="COT Reference" /> })));
@@ -146,6 +147,7 @@ function Router() {
                 <Route path="/trade-log" component={TradeLog} />
 
                 {/* Data / Reference */}
+                <Route path="/options-flow" component={OptionsFlow} />
                 <Route path="/cot-dashboard" component={COTDashboard} />
                 <Route path="/cot-alerts" component={COTAlerts} />
                 <Route path="/cot-reference" component={COTReference} />

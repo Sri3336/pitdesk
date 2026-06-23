@@ -12,6 +12,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { intradayScanHandler } from "../scheduledIntradayScan";
 import { weeklyBriefingHandler } from "../scheduledWeeklyBriefing";
+import { postMarketDebriefHandler } from "../scheduledPostMarketDebrief";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -56,6 +57,7 @@ async function startServer() {
   // Scheduled heartbeat handlers — must be before tRPC and Vite fallthrough
   app.post("/api/scheduled/intraday-scan", intradayScanHandler);
   app.post("/api/scheduled/weekly-briefing", weeklyBriefingHandler);
+  app.post("/api/scheduled/post-market-debrief", postMarketDebriefHandler);
   // tRPC API
   app.use(
     "/api/trpc",
