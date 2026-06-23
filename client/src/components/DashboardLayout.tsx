@@ -158,7 +158,7 @@ function CollapsibleNavSection({
       <Collapsible open={isOpen} onOpenChange={() => onToggle(sectionKey)}>
         <CollapsibleTrigger asChild>
           <button
-            className="flex items-center justify-between w-full px-2 py-1.5 mt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent/50 group"
+            className="flex items-center justify-between w-full px-2 py-1.5 mt-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 hover:text-muted-foreground transition-colors rounded-md group"
           >
             <span>{label}</span>
             <ChevronDown
@@ -182,7 +182,8 @@ function CollapsibleNavSection({
                   <SidebarMenuButton
                     isActive={isActive}
                     onClick={() => navigate(item.path)}
-                    className="cursor-pointer h-8 text-sm"
+                    className={`cursor-pointer h-8 text-sm transition-all duration-150 ${isActive ? 'text-green-700 font-semibold' : ''}`}
+                    style={isActive ? { background: 'oklch(0.60 0.175 145 / 10%)', borderLeft: '2px solid oklch(0.60 0.175 145)' } : {}}
                   >
                     <item.icon className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">{item.label}</span>
@@ -287,7 +288,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </SidebarHeader>
 
         {/* Nav — all sections collapsible */}
-        <SidebarContent className="overflow-y-auto px-2 py-2 gap-0">
+        <SidebarContent className="overflow-y-auto px-2 py-2 gap-0 scrollbar-thin">
           {NAV_SECTIONS.map((section) => (
             <CollapsibleNavSection
               key={section.key}
