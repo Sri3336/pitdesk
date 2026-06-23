@@ -198,11 +198,33 @@ export const intradayScannerRouter = router({
       ORDER BY s.weightedScore DESC
     `);
     const arr = Array.isArray(rows) ? (rows as unknown as any[][])[0] ?? [] : [];
-    return arr.map((r: any) => ({
-      ...r,
-      criteria: (() => { try { return JSON.parse(r.criteriaJson ?? "{}"); } catch { return {}; } })(),
-      criteriaJson: undefined,
-    }));
+    return arr.map((r: any) => {
+      // Parse criteria and normalize field names: server uses {pass, description} but frontend expects {passed, name}
+      const rawCriteria: Record<string, any> = (() => {
+        try { return JSON.parse(r.criteriaJson ?? "{}"); } catch { return {}; }
+      })();
+      const criteria = Object.entries(rawCriteria).map(([key, c]: [string, any]) => ({
+        name: c.name ?? c.description ?? key,
+        passed: c.passed ?? c.pass ?? false,
+        weight: c.weight ?? 1,
+        points: c.points ?? 0,
+        value: typeof c.value === 'object' ? JSON.stringify(c.value) : String(c.value ?? ''),
+        description: c.description ?? '',
+      }));
+      // Return only the fields the UI needs — never spread the full DB row
+      return {
+        ticker: r.ticker,
+        grade: r.grade,
+        direction: r.direction,
+        weightedScore: r.weightedScore,
+        maxScore: r.maxScore,
+        price: r.price,
+        vwap: r.vwap,
+        atr: r.atr,
+        scannedAt: r.scannedAt,
+        criteria,
+      };
+    });
   }),
 
   /** Get a single scan result with full detail + fresh live data */

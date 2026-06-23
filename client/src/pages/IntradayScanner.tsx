@@ -102,9 +102,28 @@ function normalizeDirection(direction: string): "Bullish" | "Bearish" | "Neutral
   return "Neutral";
 }
 
-function normalizeCriteria(criteria: CriterionResult[] | Record<string, CriterionResult>): CriterionResult[] {
-  if (Array.isArray(criteria)) return criteria;
-  return Object.entries(criteria).map(([name, c]) => ({ ...c, name: c.name ?? name }));
+function normalizeCriteria(criteria: CriterionResult[] | Record<string, CriterionResult> | null | undefined): CriterionResult[] {
+  if (!criteria) return [];
+  if (Array.isArray(criteria)) {
+    // Ensure each item has safe scalar values
+    return criteria.map((c: any) => ({
+      name: String(c.name ?? c.description ?? ''),
+      passed: Boolean(c.passed ?? c.pass ?? false),
+      weight: Number(c.weight ?? 1),
+      points: Number(c.points ?? 0),
+      value: typeof c.value === 'object' ? JSON.stringify(c.value) : String(c.value ?? ''),
+      description: String(c.description ?? ''),
+    }));
+  }
+  // Legacy: convert Record<string, CriterionResult> to array
+  return Object.entries(criteria).map(([key, c]: [string, any]) => ({
+    name: String(c.name ?? c.description ?? key),
+    passed: Boolean(c.passed ?? c.pass ?? false),
+    weight: Number(c.weight ?? 1),
+    points: Number(c.points ?? 0),
+    value: typeof c.value === 'object' ? JSON.stringify(c.value) : String(c.value ?? ''),
+    description: String(c.description ?? ''),
+  }));
 }
 
 function directionIcon(direction: string) {
@@ -861,7 +880,7 @@ export default function IntradayScanner() {
       score: parseFloat(r.weightedScore ?? "0"),
       grade: r.grade,
       direction: normalizeDirection(r.direction ?? "neutral"),
-      criteria: r.criteria ?? {},
+      criteria: Array.isArray(r.criteria) ? r.criteria : [],
       currentPrice: parseFloat(r.price ?? "0"),
       vwap: parseFloat(r.vwap ?? "0"),
       atr: parseFloat(r.atr ?? "0"),
