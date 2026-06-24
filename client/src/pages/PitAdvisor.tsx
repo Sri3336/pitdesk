@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -330,7 +329,7 @@ What would you like to research today?`,
         </div>
 
         {/* Messages */}
-        <ScrollArea className="flex-1 px-5 py-4" ref={scrollRef as any}>
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
           <div className="space-y-4 max-w-4xl mx-auto pb-4">
             {messages.map((msg, i) => (
               <MessageBubble key={i} msg={msg} />
@@ -349,7 +348,7 @@ What would you like to research today?`,
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Suggested Prompts */}
         <div className="px-5 py-2 border-t border-border bg-muted/30 shrink-0">
