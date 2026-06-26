@@ -334,6 +334,38 @@ export default function TickerAnalysis() {
                         ? "Consider shorter DTE or defined-risk spreads to limit earnings exposure"
                         : "Earnings approaching — factor implied move into your position sizing"}
                     </div>
+                    {/* Earnings Play suggestion */}
+                    {earnings.daysToEarnings <= 7 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(() => {
+                          const ivRank = regime?.ivPercentileRank ?? 50;
+                          const impliedMove = earnings.expectedEarningsMove ?? 0;
+                          const plays: { label: string; color: string }[] = [];
+                          if (ivRank >= 60) {
+                            // IV elevated — sell premium around the move
+                            plays.push({ label: "Iron Condor (sell the move)", color: "#dc2626" });
+                            plays.push({ label: "Short Strangle (if high conviction range)", color: "#dc2626" });
+                          } else if (ivRank <= 35) {
+                            // IV compressed — buy the move
+                            plays.push({ label: "Long Straddle (buy the move)", color: "#16a34a" });
+                            plays.push({ label: "Long Strangle (cheaper, wider strikes)", color: "#16a34a" });
+                          } else {
+                            // Neutral IV — directional or calendar
+                            plays.push({ label: "Calendar Spread (sell near, buy back)", color: "#7c3aed" });
+                            plays.push({ label: "Bull/Bear Spread (if directional bias)", color: "#7c3aed" });
+                          }
+                          if (impliedMove > 0.08) {
+                            plays.push({ label: `Implied ±${(impliedMove * 100).toFixed(0)}% — set strikes outside this range`, color: "#b45309" });
+                          }
+                          return plays.map((p, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border"
+                              style={{ borderColor: p.color + "55", background: p.color + "12", color: p.color }}>
+                              ⚡ {p.label}
+                            </span>
+                          ));
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
 

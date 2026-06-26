@@ -1,9 +1,12 @@
+import React from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { PitDeskLogo } from "@/components/PitDeskLogo";
+import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import {
   BarChart2,
   BookOpen,
+  CalendarDays,
   MessageSquare,
   TrendingUp,
   Upload,
@@ -82,6 +85,29 @@ const actions = [
 export default function Home() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+
+  // Fetch watchlist tickers for earnings scan
+  const { data: watchlistItems } = trpc.watchlist.list.useQuery(undefined, { retry: 1 });
+  const watchlistTickers = React.useMemo(
+    () => (watchlistItems ?? []).map((w: { ticker: string }) => w.ticker),
+    [watchlistItems]
+  );
+
+  // Scan watchlist for earnings this week (≤7 days)
+  const earningsMutation = trpc.earningsCalendar.scanTickers.useMutation();
+  React.useEffect(() => {
+    if (watchlistTickers.length > 0 && !earningsMutation.data && !earningsMutation.isPending) {
+      earningsMutation.mutate({ tickers: watchlistTickers.slice(0, 20) });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchlistTickers.join(",")]);
+
+  const thisWeekEarnings = (earningsMutation.data ?? []).filter(
+    (r: { daysToEarnings: number | null; ticker: string }) =>
+      r.daysToEarnings != null && r.daysToEarnings >= 0 && r.daysToEarnings <= 7
+  ).sort((a: { daysToEarnings: number | null }, b: { daysToEarnings: number | null }) =>
+    (a.daysToEarnings ?? 99) - (b.daysToEarnings ?? 99)
+  );
 
   const firstName = user?.name?.split(" ")[0] ?? "Sridhar";
   const hour = new Date().getHours();
@@ -194,6 +220,49 @@ export default function Home() {
           );
         })}
       </div>
+
+      {/* ── This Week's Earnings ──────────────────────────────────── */}
+      {thisWeekEarnings.length > 0 && (
+        <div className="w-full max-w-3xl mt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarDays className="w-4 h-4" style={{ color: "#f59e0b" }} />
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#f59e0b" }}>
+              Earnings This Week — Your Watchlist
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {thisWeekEarnings.map((r: { ticker: string; daysToEarnings: number | null }) => (
+              <button
+                key={r.ticker}
+                onClick={() => navigate(`/ticker-analysis?ticker=${r.ticker}`)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm font-medium transition-all duration-150 hover:scale-105 active:scale-95"
+                style={{
+                  background: r.daysToEarnings != null && r.daysToEarnings <= 2
+                    ? "rgba(239,68,68,0.10)"
+                    : r.daysToEarnings != null && r.daysToEarnings <= 4
+                    ? "rgba(249,115,22,0.10)"
+                    : "rgba(245,158,11,0.10)",
+                  borderColor: r.daysToEarnings != null && r.daysToEarnings <= 2
+                    ? "rgba(239,68,68,0.35)"
+                    : r.daysToEarnings != null && r.daysToEarnings <= 4
+                    ? "rgba(249,115,22,0.35)"
+                    : "rgba(245,158,11,0.35)",
+                  color: r.daysToEarnings != null && r.daysToEarnings <= 2
+                    ? "#dc2626"
+                    : r.daysToEarnings != null && r.daysToEarnings <= 4
+                    ? "#ea580c"
+                    : "#b45309",
+                }}
+              >
+                <span className="font-bold">{r.ticker}</span>
+                <span className="opacity-70 text-xs">
+                  {r.daysToEarnings === 0 ? "today" : r.daysToEarnings === 1 ? "tomorrow" : `in ${r.daysToEarnings}d`}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Footer hint ──────────────────────────────────────────────── */}
       <p

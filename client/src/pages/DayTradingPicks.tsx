@@ -50,11 +50,17 @@ function gradeColor(grade: string) {
 function SetAlertButton({ ticker, direction }: { ticker: string; direction: string }) {
   const [alertSet, setAlertSet] = useState(false);
   const utils = trpc.useUtils();
+
+  // Smart threshold: bullish setups alert at IVR 65 (IV spike = premium selling opp)
+  // bearish/neutral alert at IVR 55 (elevated fear = potential reversal)
+  const dir = direction?.toLowerCase();
+  const smartThreshold = dir === "bullish" ? 65 : 55;
+
   const createAlert = trpc.ivrAlerts.create.useMutation({
     onSuccess: () => {
       setAlertSet(true);
       toast.success(`IVR alert set for ${ticker}`, {
-        description: `You'll be notified when ${ticker} IV rank crosses the threshold.`,
+        description: `Alert fires when ${ticker} IV rank crosses ${smartThreshold} — smart threshold based on ${dir} setup.`,
       });
       utils.ivrAlerts.list.invalidate();
     },
@@ -71,12 +77,11 @@ function SetAlertButton({ ticker, direction }: { ticker: string; direction: stri
 
   function handleSetAlert() {
     if (alertSet) return;
-    const dir = direction?.toLowerCase();
     createAlert.mutate({
       ticker,
-      ivrThreshold: 50,
-      direction: dir === "bearish" ? "above" : "above",
-      notes: `Auto-set from Day Trading Picks — Grade A ${dir === "bullish" ? "bullish" : "bearish"} setup`,
+      ivrThreshold: smartThreshold,
+      direction: "above",
+      notes: `Auto-set from Day Trading Picks — Grade A ${dir} setup. Smart threshold: IVR ${smartThreshold} (${dir === "bullish" ? "IV spike = premium selling opp" : "elevated fear = reversal watch"})`,
     });
   }
 
@@ -94,7 +99,7 @@ function SetAlertButton({ ticker, direction }: { ticker: string; direction: stri
     >
       {alertSet
         ? <><BellRing className="w-3.5 h-3.5" /> Alert Set</>  
-        : <><Bell className="w-3.5 h-3.5" /> Set Alert</>
+        : <><Bell className="w-3.5 h-3.5" /> Alert @ IVR {smartThreshold}</>
       }
     </Button>
   );
