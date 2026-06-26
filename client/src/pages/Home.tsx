@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { PitDeskLogo } from "@/components/PitDeskLogo";
 import { useLocation } from "wouter";
 import {
   BarChart2,
@@ -82,26 +83,9 @@ export default function Home() {
     >
       {/* ── Brand header ─────────────────────────────────────────────── */}
       <div className="flex flex-col items-center mb-10 select-none">
-        {/* Shark-fin logo mark */}
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 shadow-lg"
-          style={{ background: "linear-gradient(135deg,#16a34a 0%,#22c55e 100%)" }}
-        >
-          <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none">
-            {/* A-shaped shark fin */}
-            <path
-              d="M16 4 L26 26 H20 L16 16 L12 26 H6 Z"
-              fill="white"
-              opacity="0.95"
-            />
-            <path
-              d="M10 20 H22"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              opacity="0.6"
-            />
-          </svg>
+        {/* Real PitDesk logo */}
+        <div className="mb-4">
+          <PitDeskLogo size={56} className="rounded-2xl shadow-lg" />
         </div>
         <h1
           className="text-3xl font-bold tracking-tight"
