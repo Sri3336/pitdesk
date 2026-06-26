@@ -274,6 +274,96 @@ export default function TickerAnalysis() {
         {hasData && (
           <div className="space-y-4">
 
+            {/* ══ EARNINGS COUNTDOWN BANNER ════════════════════════════════ */}
+            {earnings?.daysToEarnings != null && earnings.daysToEarnings <= 21 && (
+              <div
+                className="rounded-2xl border-2 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3"
+                style={{
+                  background: earnings.daysToEarnings <= 7
+                    ? "rgba(239,68,68,0.08)"
+                    : earnings.daysToEarnings <= 14
+                    ? "rgba(249,115,22,0.08)"
+                    : "rgba(234,179,8,0.07)",
+                  borderColor: earnings.daysToEarnings <= 7
+                    ? "rgba(239,68,68,0.45)"
+                    : earnings.daysToEarnings <= 14
+                    ? "rgba(249,115,22,0.40)"
+                    : "rgba(234,179,8,0.38)",
+                }}
+              >
+                {/* Icon + countdown */}
+                <div className="flex items-center gap-3 flex-1">
+                  <div
+                    className="w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 font-bold"
+                    style={{
+                      background: earnings.daysToEarnings <= 7
+                        ? "rgba(239,68,68,0.15)"
+                        : earnings.daysToEarnings <= 14
+                        ? "rgba(249,115,22,0.15)"
+                        : "rgba(234,179,8,0.15)",
+                      color: earnings.daysToEarnings <= 7 ? "#dc2626"
+                        : earnings.daysToEarnings <= 14 ? "#ea580c"
+                        : "#b45309",
+                    }}
+                  >
+                    <span className="text-xl leading-none">{earnings.daysToEarnings}</span>
+                    <span className="text-[9px] uppercase tracking-wide leading-none mt-0.5">days</span>
+                  </div>
+                  <div>
+                    <div
+                      className="font-bold text-base leading-tight"
+                      style={{
+                        color: earnings.daysToEarnings <= 7 ? "#dc2626"
+                          : earnings.daysToEarnings <= 14 ? "#ea580c"
+                          : "#b45309",
+                      }}
+                    >
+                      {earnings.daysToEarnings === 0
+                        ? `${activeTicker} reports TODAY`
+                        : earnings.daysToEarnings === 1
+                        ? `${activeTicker} reports TOMORROW`
+                        : `${activeTicker} earnings in ${earnings.daysToEarnings} days`}
+                      {earnings.nextEarningsDate && (
+                        <span className="font-normal text-sm ml-2 opacity-70">({earnings.nextEarningsDate})</span>
+                      )}
+                    </div>
+                    <div className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
+                      {earnings.daysToEarnings <= 7
+                        ? "High risk — avoid new positions or use defined-risk strategies only"
+                        : earnings.daysToEarnings <= 14
+                        ? "Consider shorter DTE or defined-risk spreads to limit earnings exposure"
+                        : "Earnings approaching — factor implied move into your position sizing"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Implied move stats */}
+                {(earnings.expectedEarningsMove != null || earnings.avgHistoricalMove != null) && (
+                  <div className="flex gap-4 shrink-0 sm:border-l sm:pl-4" style={{ borderColor: "var(--border)" }}>
+                    {earnings.expectedEarningsMove != null && (
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground">Implied Move</div>
+                        <div
+                          className="text-lg font-bold font-mono"
+                          style={{ color: earnings.daysToEarnings <= 7 ? "#dc2626" : "#ea580c" }}
+                        >
+                          ±{(earnings.expectedEarningsMove * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    )}
+                    {earnings.avgHistoricalMove != null && (
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground">Avg Historical</div>
+                        <div className="text-lg font-bold font-mono text-muted-foreground">
+                          ±{(earnings.avgHistoricalMove * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ══ HERO: Instant Recommendation ════════════════════════════ */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
