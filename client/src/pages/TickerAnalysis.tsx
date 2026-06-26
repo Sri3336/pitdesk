@@ -88,7 +88,9 @@ function TradingViewChart({ ticker }: { ticker: string }) {
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.async = true;
     script.innerHTML = JSON.stringify({
-      autosize: true,
+      autosize: false,
+      width: "100%",
+      height: 500,
       symbol: ticker,
       interval: "D",
       timezone: "America/New_York",
@@ -106,7 +108,7 @@ function TradingViewChart({ ticker }: { ticker: string }) {
       container.innerHTML = "";
     };
   }, [ticker]);
-  return <div ref={containerRef} className="tradingview-widget-container w-full" style={{ height: 520, minHeight: 520 }} />;
+  return <div ref={containerRef} className="tradingview-widget-container w-full" style={{ height: 500, minHeight: 500 }} />;
 }
 
 // ── Collapsible drill-down card ───────────────────────────────────────────────
