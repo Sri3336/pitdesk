@@ -1,3 +1,4 @@
+import { ActionLayout } from "@/components/ActionLayout";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -641,6 +642,7 @@ export default function Glossary() {
   };
 
   return (
+    <ActionLayout toolName="Glossary & Education" toolColor="#14b8a6">
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
       <div className="space-y-1">
@@ -821,5 +823,6 @@ export default function Glossary() {
         </div>
       )}
     </div>
+    </ActionLayout>
   );
 }

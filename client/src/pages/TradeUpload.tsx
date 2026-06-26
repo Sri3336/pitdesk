@@ -1,3 +1,4 @@
+import { ActionLayout } from "@/components/ActionLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -500,6 +501,7 @@ export default function TradeUpload() {
   };
 
   return (
+    <ActionLayout toolName="Analyze My Trades" toolColor="#ec4899">
     <div className="p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -659,5 +661,6 @@ export default function TradeUpload() {
         </TabsContent>
       </Tabs>
     </div>
+    </ActionLayout>
   );
 }

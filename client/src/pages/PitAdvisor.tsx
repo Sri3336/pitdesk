@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { ActionLayout } from "@/components/ActionLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -295,7 +296,8 @@ What would you like to research today?`,
   };
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <ActionLayout toolName="Ask Pit Advisor" toolColor="#8b5cf6">
+    <div className="flex overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
       {/* ─── Main Chat Area ─── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
@@ -463,5 +465,6 @@ What would you like to research today?`,
         </div>
       </div>
     </div>
+    </ActionLayout>
   );
 }
