@@ -81,6 +81,8 @@ function TradingViewChart({ ticker }: { ticker: string }) {
     container.innerHTML = "";
     const widgetDiv = document.createElement("div");
     widgetDiv.className = "tradingview-widget-container__widget";
+    widgetDiv.style.height = "100%";
+    widgetDiv.style.width = "100%";
     container.appendChild(widgetDiv);
     const script = document.createElement("script");
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
@@ -104,7 +106,7 @@ function TradingViewChart({ ticker }: { ticker: string }) {
       container.innerHTML = "";
     };
   }, [ticker]);
-  return <div ref={containerRef} className="tradingview-widget-container w-full" style={{ height: 460 }} />;
+  return <div ref={containerRef} className="tradingview-widget-container w-full" style={{ height: 520, minHeight: 520 }} />;
 }
 
 // ── Collapsible drill-down card ───────────────────────────────────────────────
@@ -120,7 +122,7 @@ function DrillCard({
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div
-      className="rounded-xl border bg-white overflow-hidden shadow-sm transition-shadow hover:shadow-md"
+      className="rounded-xl border bg-white shadow-sm transition-shadow hover:shadow-md"
       style={{ borderColor: open ? accent + "44" : "var(--border)" }}
     >
       <button
