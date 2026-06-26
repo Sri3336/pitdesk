@@ -188,7 +188,13 @@ export default function Home() {
         className="mt-10 text-xs text-center"
         style={{ color: "var(--muted-foreground)", opacity: 0.5 }}
       >
-        All tools are still accessible via the sidebar →
+        All power tools available at{" "}
+        <button
+          className="underline hover:opacity-80 transition-opacity"
+          onClick={() => navigate("/dashboard")}
+        >
+          /dashboard
+        </button>
       </p>
     </div>
   );

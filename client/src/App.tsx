@@ -27,6 +27,11 @@ const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
+// Action pages (use ActionLayout — no sidebar)
+const TickerAnalysis = lazy(() => import("./pages/TickerAnalysis"));
+const DayTradingPicks = lazy(() => import("./pages/DayTradingPicks"));
+const SwingTradingPicks = lazy(() => import("./pages/SwingTradingPicks"));
+
 // Core pages
 const Home = lazy(() => import("./pages/Home"));
 const PitDeskHome = lazy(() => import("./pages/PitDeskHome"));
@@ -114,6 +119,50 @@ function Router() {
         </AuthGuard>
       </Route>
 
+      {/* ── Action pages (ActionLayout — slim top nav, no sidebar) ─────── */}
+      <Route path="/ticker-analysis">
+        <AuthGuard>
+          <Suspense fallback={<PageLoader />}>
+            <TickerAnalysis />
+          </Suspense>
+        </AuthGuard>
+      </Route>
+      <Route path="/day-picks">
+        <AuthGuard>
+          <Suspense fallback={<PageLoader />}>
+            <DayTradingPicks />
+          </Suspense>
+        </AuthGuard>
+      </Route>
+      <Route path="/swing-picks">
+        <AuthGuard>
+          <Suspense fallback={<PageLoader />}>
+            <SwingTradingPicks />
+          </Suspense>
+        </AuthGuard>
+      </Route>
+      <Route path="/pit-advisor">
+        <AuthGuard>
+          <Suspense fallback={<PageLoader />}>
+            <PitAdvisor />
+          </Suspense>
+        </AuthGuard>
+      </Route>
+      <Route path="/trade-upload">
+        <AuthGuard>
+          <Suspense fallback={<PageLoader />}>
+            <TradeUpload />
+          </Suspense>
+        </AuthGuard>
+      </Route>
+      <Route path="/glossary">
+        <AuthGuard>
+          <Suspense fallback={<PageLoader />}>
+            <Glossary />
+          </Suspense>
+        </AuthGuard>
+      </Route>
+
       {/* ── Protected routes (require auth) ───────────────────────────── */}
       <Route>
         <AuthGuard>
@@ -163,10 +212,7 @@ function Router() {
                 <Route path="/watchlist" component={WatchList} />
                 <Route path="/broker-settings" component={BrokerSettings} />
                 <Route path="/methodology" component={Methodology} />
-                <Route path="/glossary" component={Glossary} />
                 <Route path="/how-to" component={HowTo} />
-                <Route path="/pit-advisor" component={PitAdvisor} />
-                <Route path="/trade-upload" component={TradeUpload} />
 
                 {/* Admin */}
                 <Route path="/admin/users" component={AdminUsers} />
