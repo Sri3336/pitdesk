@@ -292,14 +292,14 @@
 - [x] Checkpoint save
 
 ## Phase 28 — Option B: Reimagined Navigation (Action-Focused Layout)
-- [ ] Build ActionLayout.tsx — slim top bar: PitDesk logo (→ /), tool name, All Tools dropdown, Ask Pit Advisor shortcut
-- [ ] Build /ticker-analysis page — ticker search, TradingView chart, PCR signal, options strategy recommendation, Pit Advisor pre-fill
-- [ ] Build /day-picks page — auto-runs intraday scan on load, top 5 Grade-A cards with entry/stop/target/direction
-- [ ] Build /swing-picks page — combined Velez + VCP + BCOS scan results, ranked multi-day setups
-- [ ] Wire /trade-upload to ActionLayout (remove sidebar)
-- [ ] Wire /glossary to ActionLayout (remove sidebar)
-- [ ] Wire /pit-advisor to ActionLayout (remove sidebar)
-- [ ] Update Home.tsx — add 6th card: Ask Pit Advisor → /pit-advisor
-- [ ] Update App.tsx — 6 action routes use ActionLayout, /dashboard retains DashboardLayout sidebar
-- [ ] Add "Back to Home" logo click in DashboardLayout sidebar header
-- [ ] TypeScript 0 errors check
+- [x] Build ActionLayout.tsx — slim top bar: PitDesk logo (→ /), tool name, All Tools dropdown, Ask Pit Advisor shortcut
+- [x] Build /ticker-analysis page — ticker search, TradingView chart, PCR signal, options strategy recommendation, Pit Advisor pre-fill
+- [x] Build /day-picks page — auto-runs intraday scan on load, top 5 Grade-A cards with entry/stop/target/direction
+- [x] Build /swing-picks page — combined Velez + VCP + BCOS scan results, ranked multi-day setups
+- [x] Wire /trade-upload to ActionLayout (remove sidebar)
+- [x] Wire /glossary to ActionLayout (remove sidebar)
+- [x] Wire /pit-advisor to ActionLayout (remove sidebar)
+- [x] Update Home.tsx — add 6th card: Ask Pit Advisor → /pit-advisor
+- [x] Update App.tsx — 6 action routes use ActionLayout, /dashboard retains DashboardLayout sidebar
+- [x] Add "Back to Home" logo click in DashboardLayout sidebar header
+- [x] TypeScript 0 errors check
