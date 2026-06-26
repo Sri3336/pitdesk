@@ -70,30 +70,38 @@ function strategyColor(name: string) {
 }
 
 // ── TradingView Chart ─────────────────────────────────────────────────────────
+// Key-based remount: when ticker changes, React unmounts the old instance
+// entirely and mounts a fresh one — no stale widget residue.
 function TradingViewChart({ ticker }: { ticker: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const widgetRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (!containerRef.current || !ticker) return;
-    if (widgetRef.current) { widgetRef.current.remove(); widgetRef.current = null; }
-    const div = document.createElement("div");
-    div.className = "tradingview-widget-container__widget";
-    containerRef.current.appendChild(div);
-    widgetRef.current = div;
+    const container = containerRef.current;
+    if (!container || !ticker) return;
+    // Wipe any previous content (scripts, iframes, divs) completely
+    container.innerHTML = "";
+    const widgetDiv = document.createElement("div");
+    widgetDiv.className = "tradingview-widget-container__widget";
+    container.appendChild(widgetDiv);
     const script = document.createElement("script");
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.async = true;
     script.innerHTML = JSON.stringify({
-      autosize: true, symbol: ticker, interval: "D",
-      timezone: "America/New_York", theme: "light", style: "1", locale: "en",
-      enable_publishing: false, allow_symbol_change: false, calendar: false,
+      autosize: true,
+      symbol: ticker,
+      interval: "D",
+      timezone: "America/New_York",
+      theme: "light",
+      style: "1",
+      locale: "en",
+      enable_publishing: false,
+      allow_symbol_change: false,
+      calendar: false,
       support_host: "https://www.tradingview.com",
       studies: ["RSI@tv-basicstudies", "MACD@tv-basicstudies", "Volume@tv-basicstudies"],
     });
-    containerRef.current.appendChild(script);
+    container.appendChild(script);
     return () => {
-      script.remove();
-      if (widgetRef.current) { widgetRef.current.remove(); widgetRef.current = null; }
+      container.innerHTML = "";
     };
   }, [ticker]);
   return <div ref={containerRef} className="tradingview-widget-container w-full" style={{ height: 460 }} />;

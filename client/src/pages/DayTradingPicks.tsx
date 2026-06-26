@@ -7,10 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import {
   Activity,
   ArrowDown,
   ArrowUp,
+  Bell,
+  BellRing,
   CheckCircle2,
   MessageSquare,
   RefreshCw,
@@ -41,6 +44,60 @@ function gradeColor(grade: string) {
   if (grade === "B") return { bg: "rgba(59,130,246,0.10)", border: "rgba(59,130,246,0.30)", text: "#2563eb" };
   if (grade === "C") return { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.30)", text: "#d97706" };
   return { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.25)", text: "#dc2626" };
+}
+
+// ── Set Alert button — one-click IVR alert creation ─────────────────────────
+function SetAlertButton({ ticker, direction }: { ticker: string; direction: string }) {
+  const [alertSet, setAlertSet] = useState(false);
+  const utils = trpc.useUtils();
+  const createAlert = trpc.ivrAlerts.create.useMutation({
+    onSuccess: () => {
+      setAlertSet(true);
+      toast.success(`IVR alert set for ${ticker}`, {
+        description: `You'll be notified when ${ticker} IV rank crosses the threshold.`,
+      });
+      utils.ivrAlerts.list.invalidate();
+    },
+    onError: (err) => {
+      // If alert already exists, still show success
+      if (err.message?.includes("duplicate") || err.message?.includes("already")) {
+        setAlertSet(true);
+        toast.info(`Alert already exists for ${ticker}`);
+      } else {
+        toast.error(`Failed to set alert for ${ticker}`);
+      }
+    },
+  });
+
+  function handleSetAlert() {
+    if (alertSet) return;
+    const dir = direction?.toLowerCase();
+    createAlert.mutate({
+      ticker,
+      ivrThreshold: 50,
+      direction: dir === "bearish" ? "above" : "above",
+      notes: `Auto-set from Day Trading Picks — Grade A ${dir === "bullish" ? "bullish" : "bearish"} setup`,
+    });
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-8 text-xs gap-1.5 transition-all"
+      style={alertSet
+        ? { borderColor: "rgba(34,197,94,0.4)", color: "#16a34a", background: "rgba(34,197,94,0.08)" }
+        : { borderColor: "rgba(245,158,11,0.4)", color: "#d97706" }
+      }
+      onClick={handleSetAlert}
+      disabled={createAlert.isPending || alertSet}
+    >
+      {alertSet
+        ? <><BellRing className="w-3.5 h-3.5" /> Alert Set</>  
+        : <><Bell className="w-3.5 h-3.5" /> Set Alert</>
+      }
+    </Button>
+  );
 }
 
 export default function DayTradingPicks() {
@@ -264,6 +321,7 @@ export default function DayTradingPicks() {
                         <MessageSquare className="w-3.5 h-3.5" />
                         Ask Pit
                       </Button>
+                      <SetAlertButton ticker={scan.ticker} direction={scan.direction} />
                     </div>
                   </div>
                 </div>

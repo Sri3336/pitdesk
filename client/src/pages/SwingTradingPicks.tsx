@@ -16,8 +16,10 @@ import {
   CheckCircle2,
   MessageSquare,
   RefreshCw,
+  Star,
   Target,
   TrendingUp,
+  Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -71,6 +73,12 @@ export default function SwingTradingPicks() {
     { enabled: hasTriggered, refetchOnWindowFocus: false }
   );
 
+  // BCOS catalyst watchlist — cross-reference with swing results
+  const { data: bcosData, refetch: refetchBcos } = trpc.catalystBreakout.list.useQuery(
+    undefined,
+    { enabled: hasTriggered, refetchOnWindowFocus: false }
+  );
+
   const isLoading = vcpLoading || velezLoading;
 
   // Auto-trigger on mount
@@ -82,6 +90,7 @@ export default function SwingTradingPicks() {
   function refresh() {
     refetchVcp();
     refetchVelez();
+    refetchBcos();
   }
 
   // Build combined ranked list
@@ -99,6 +108,8 @@ export default function SwingTradingPicks() {
     optionsPlay: string;
     hasVelezSignal: boolean;
     velezSignal?: string;
+    hasBcosSignal: boolean;
+    bcosStatus?: string;
   };
 
   const setups: SwingSetup[] = [];
@@ -118,8 +129,15 @@ export default function SwingTradingPicks() {
       );
       const hasVelezSignal = !!velezMatch;
 
-      // Composite score: VCP score (0-10) + Velez bonus (0-2)
-      const compositeScore = Math.min(10, v.vcpScore + (hasVelezSignal ? 1.5 : 0));
+      // Check if BCOS watchlist has this ticker with a breakout signal
+      const bcosMatch = (bcosData as any[] | undefined)?.find(
+        (b: any) => b?.ticker?.toUpperCase() === v.ticker &&
+          (b?.status === "BREAKOUT" || b?.status === "NEAR_BREAKOUT" || b?.status === "WATCHING")
+      );
+      const hasBcosSignal = !!bcosMatch;
+
+      // Composite score: VCP score (0-10) + Velez bonus (0-1.5) + BCOS bonus (0-1.5)
+      const compositeScore = Math.min(10, v.vcpScore + (hasVelezSignal ? 1.5 : 0) + (hasBcosSignal ? 1.5 : 0));
 
       setups.push({
         ticker: v.ticker,
@@ -135,6 +153,8 @@ export default function SwingTradingPicks() {
         optionsPlay: v.optionsPlay ?? "",
         hasVelezSignal,
         velezSignal: velezMatch?.signal,
+        hasBcosSignal,
+        bcosStatus: bcosMatch?.status,
       });
     }
   }
@@ -256,10 +276,29 @@ export default function SwingTradingPicks() {
                         >
                           {vcpStageLabel(setup.stage)}
                         </Badge>
-                        {setup.hasVelezSignal && (
-                          <Badge className="text-xs bg-amber-50 text-amber-700 border-amber-200">
-                            + Velez Signal
+                        {setup.hasVelezSignal && setup.hasBcosSignal ? (
+                          <Badge
+                            className="text-xs font-bold flex items-center gap-1"
+                            style={{ background: "rgba(234,179,8,0.15)", color: "#b45309", border: "1px solid rgba(234,179,8,0.4)" }}
+                          >
+                            <Star className="w-3 h-3" /> Triple Confirmation
                           </Badge>
+                        ) : (
+                          <>
+                            {setup.hasVelezSignal && (
+                              <Badge className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                + Velez
+                              </Badge>
+                            )}
+                            {setup.hasBcosSignal && (
+                              <Badge
+                                className="text-xs flex items-center gap-1"
+                                style={{ background: "rgba(239,68,68,0.10)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.25)" }}
+                              >
+                                <Zap className="w-3 h-3" /> BCOS
+                              </Badge>
+                            )}
+                          </>
                         )}
                         <span className="text-xs text-muted-foreground font-mono">
                           VCP: {setup.vcpScore.toFixed(1)}/10 · Score: {setup.score.toFixed(1)}/10
