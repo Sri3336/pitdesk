@@ -1,19 +1,30 @@
 /**
- * TickerAnalysis — Action 1: "Analyze a Ticker"
- * Full-page: ticker search → TradingView chart + PCR signal + options strategy + Pit Advisor pre-fill
+ * TickerAnalysis — Decision Hub
+ * Search → Instant Recommendation Hero (options + stock direction)
+ * → Drill-down cards: Chart, PCR, Greeks, Earnings, Pit Advisor
  */
 import { ActionLayout } from "@/components/ActionLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
 import {
   Activity,
+  AlertTriangle,
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
   BarChart2,
-  MessageSquare,
+  BookOpen,
+  Brain,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  Minus,
   Search,
+  Sparkles,
   TrendingDown,
   TrendingUp,
   Zap,
@@ -21,74 +32,119 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 
-// Popular tickers for quick-pick
-const QUICK_TICKERS = ["NVDA", "AAPL", "TSLA", "PLTR", "AMD", "META", "MSFT", "SPY", "QQQ", "APP"];
+// ── Quick-pick tickers ────────────────────────────────────────────────────────
+const QUICK_TICKERS = ["NVDA", "AAPL", "TSLA", "PLTR", "AMD", "META", "SPY", "QQQ", "APP", "SOFI"];
 
-// PCR signal color
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function pcrColor(signal: string) {
-  if (signal?.includes("EXTREME_FEAR") || signal?.includes("FEAR")) return "#22c55e";
-  if (signal?.includes("EXTREME_GREED") || signal?.includes("GREED")) return "#ef4444";
-  return "#94a3b8";
+  if (!signal) return "#94a3b8";
+  if (signal.includes("EXTREME_FEAR") || signal.includes("FEAR")) return "#22c55e";
+  if (signal.includes("EXTREME_GREED") || signal.includes("GREED")) return "#ef4444";
+  return "#f59e0b";
 }
 function pcrLabel(signal: string) {
   if (!signal) return "No Signal";
   return signal.replace(/_/g, " ");
 }
+function biasColor(bias: string) {
+  if (bias === "Bullish") return "#22c55e";
+  if (bias === "Bearish") return "#ef4444";
+  return "#94a3b8";
+}
+function biasIcon(bias: string) {
+  if (bias === "Bullish") return <ArrowUp className="w-5 h-5" />;
+  if (bias === "Bearish") return <ArrowDown className="w-5 h-5" />;
+  return <Minus className="w-5 h-5" />;
+}
+function ivLabel(ivRv: number) {
+  if (ivRv > 1.3) return { label: "IV Elevated — sell premium", color: "#ef4444" };
+  if (ivRv > 0.9) return { label: "IV Fair — balanced", color: "#f59e0b" };
+  return { label: "IV Compressed — buy premium", color: "#22c55e" };
+}
+function strategyColor(name: string) {
+  if (name?.includes("Bull") || name?.includes("Naked Put") || name?.includes("Cash-Secured")) return "#22c55e";
+  if (name?.includes("Bear") || name?.includes("Naked Call")) return "#ef4444";
+  if (name?.includes("Condor") || name?.includes("Strangle") || name?.includes("Butterfly")) return "#6366f1";
+  if (name?.includes("Straddle") || name?.includes("Long")) return "#f59e0b";
+  return "#3b82f6";
+}
 
-// TradingView widget embed
+// ── TradingView Chart ─────────────────────────────────────────────────────────
 function TradingViewChart({ ticker }: { ticker: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<HTMLDivElement | null>(null);
-
   useEffect(() => {
     if (!containerRef.current || !ticker) return;
-    // Remove previous widget
-    if (widgetRef.current) {
-      widgetRef.current.remove();
-      widgetRef.current = null;
-    }
+    if (widgetRef.current) { widgetRef.current.remove(); widgetRef.current = null; }
     const div = document.createElement("div");
     div.className = "tradingview-widget-container__widget";
     containerRef.current.appendChild(div);
     widgetRef.current = div;
-
     const script = document.createElement("script");
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.async = true;
     script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol: ticker,
-      interval: "D",
-      timezone: "America/New_York",
-      theme: "light",
-      style: "1",
-      locale: "en",
-      enable_publishing: false,
-      allow_symbol_change: false,
-      calendar: false,
+      autosize: true, symbol: ticker, interval: "D",
+      timezone: "America/New_York", theme: "light", style: "1", locale: "en",
+      enable_publishing: false, allow_symbol_change: false, calendar: false,
       support_host: "https://www.tradingview.com",
       studies: ["RSI@tv-basicstudies", "MACD@tv-basicstudies", "Volume@tv-basicstudies"],
     });
     containerRef.current.appendChild(script);
-
     return () => {
       script.remove();
-      if (widgetRef.current) {
-        widgetRef.current.remove();
-        widgetRef.current = null;
-      }
+      if (widgetRef.current) { widgetRef.current.remove(); widgetRef.current = null; }
     };
   }, [ticker]);
+  return <div ref={containerRef} className="tradingview-widget-container w-full" style={{ height: 460 }} />;
+}
 
+// ── Collapsible drill-down card ───────────────────────────────────────────────
+function DrillCard({
+  icon, title, accent, children, defaultOpen = false,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  accent: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div
-      ref={containerRef}
-      className="tradingview-widget-container w-full"
-      style={{ height: 480 }}
-    />
+      className="rounded-xl border bg-white overflow-hidden shadow-sm transition-shadow hover:shadow-md"
+      style={{ borderColor: open ? accent + "44" : "var(--border)" }}
+    >
+      <button
+        className="w-full flex items-center justify-between px-5 py-4 text-left"
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: accent + "18", color: accent }}>
+            {icon}
+          </div>
+          <span className="font-semibold text-sm text-foreground">{title}</span>
+        </div>
+        {open
+          ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+      </button>
+      {open && <div className="px-5 pb-5 pt-1 border-t" style={{ borderColor: accent + "22" }}>{children}</div>}
+    </div>
   );
 }
 
+// ── Stat cell ─────────────────────────────────────────────────────────────────
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</div>
+      <div className="font-semibold text-sm font-mono" style={{ color: color ?? "var(--foreground)" }}>{value}</div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function TickerAnalysis() {
   const searchStr = useSearch();
   const params = new URLSearchParams(searchStr);
@@ -98,26 +154,24 @@ export default function TickerAnalysis() {
   const [activeTicker, setActiveTicker] = useState(initialTicker);
   const [, navigate] = useLocation();
 
-  // PCR data for the ticker (getBatch with single ticker)
+  // PCR data
   const { data: pcrBatch, isLoading: pcrLoading } = trpc.pcr.getBatch.useQuery(
     { tickers: [activeTicker] },
     { enabled: !!activeTicker, retry: 1 }
   );
   const pcrData = pcrBatch?.[0] ?? null;
 
-  // Options analysis (run analysis engine)
+  // Options + regime analysis
   const analysisMutation = trpc.analysis.run.useMutation();
   const analysisData = analysisMutation.data;
   const analysisLoading = analysisMutation.isPending;
-  const runAnalysis = analysisMutation.mutate;
 
   function handleSearch(ticker?: string) {
     const t = (ticker ?? inputValue).toUpperCase().trim();
     if (!t) return;
     setActiveTicker(t);
     setInputValue(t);
-    // Auto-run options analysis
-    runAnalysis({ ticker: t });
+    analysisMutation.mutate({ ticker: t });
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -126,52 +180,68 @@ export default function TickerAnalysis() {
 
   function openPitAdvisor() {
     if (!activeTicker) return;
-    const pcrSignal = pcrData?.signal ?? "N/A";
-    const pcr = pcrData?.pcr ?? "N/A";
+    const bias = analysisData?.regime?.directionalBias ?? "N/A";
     const strategy = analysisData?.recommendation?.name ?? "N/A";
-    const prompt = `Analyze ${activeTicker} across all 5 dimensions (Technical, Fundamental, Geopolitical, Sentiment, Quantitative). PCR: ${pcr} (${pcrSignal}). Recommended options strategy: ${strategy}. Give me specific entry price, stop loss, T1 and T2 targets, and position sizing for a $10,000 account.`;
+    const pcrSignal = pcrData?.signal ?? "N/A";
+    const rsi = analysisData?.regime?.rsi14?.toFixed(0) ?? "N/A";
+    const prompt = `Analyze ${activeTicker} for a trade decision right now.\n\nKey signals:\n- Stock direction bias: ${bias}\n- RSI(14): ${rsi}\n- PCR signal: ${pcrSignal}\n- Top options strategy: ${strategy}\n\nGive me:\n1. Stock trade recommendation (long/short/skip) with entry, stop, T1, T2\n2. Options trade setup with specific strikes, expiry, entry price, max loss, target exit\n3. Key risks I should know before entering`;
     navigate(`/pit-advisor?prompt=${encodeURIComponent(prompt)}`);
   }
 
+  const regime = analysisData?.regime;
+  const rec = analysisData?.recommendation;
+  const earnings = analysisData?.earningsInfo;
   const hasData = !!activeTicker;
+  const isLoading = analysisLoading || pcrLoading;
 
   return (
     <ActionLayout toolName="Analyze a Ticker" toolColor="#22c55e">
-      <div className="max-w-6xl mx-auto px-4 py-6 space-y-5">
+      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
 
-        {/* ── Search bar ─────────────────────────────────────────────── */}
-        <div className="flex flex-col items-center gap-3">
-          <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>
-            Analyze a Ticker
-          </h1>
-          <p className="text-sm text-muted-foreground text-center max-w-lg">
-            Enter any ticker to get a full chart, PCR signal, options strategy recommendation, and entry/exit levels.
-          </p>
-          <div className="flex gap-2 w-full max-w-md">
+        {/* ── Search ─────────────────────────────────────────────────────── */}
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-center space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              {activeTicker ? activeTicker : "Analyze a Ticker"}
+            </h1>
+            {!activeTicker && (
+              <p className="text-sm text-muted-foreground">
+                Get an instant trade recommendation — options strategy + stock direction + all the signals to decide.
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-2 w-full max-w-sm">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                className="pl-9 h-11 text-base font-mono uppercase"
+                className="pl-9 h-12 text-base font-mono uppercase tracking-widest"
                 placeholder="NVDA, AAPL, TSLA..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value.toUpperCase())}
                 onKeyDown={handleKeyDown}
+                autoFocus
               />
             </div>
             <Button
-              className="h-11 px-5 bg-green-500 hover:bg-green-600 text-white font-semibold"
+              className="h-12 px-6 font-semibold text-white"
+              style={{ background: "#22c55e" }}
               onClick={() => handleSearch()}
+              disabled={analysisLoading}
             >
-              Analyze
+              {analysisLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : "Analyze"}
             </Button>
           </div>
-          {/* Quick-pick tickers */}
+
+          {/* Quick picks */}
           <div className="flex flex-wrap gap-1.5 justify-center">
             {QUICK_TICKERS.map((t) => (
               <button
                 key={t}
                 onClick={() => handleSearch(t)}
-                className="px-2.5 py-1 rounded-md text-xs font-mono font-medium border transition-colors hover:border-green-400 hover:text-green-600"
+                className="px-2.5 py-1 rounded-md text-xs font-mono font-medium border transition-all hover:scale-105"
                 style={{
                   borderColor: activeTicker === t ? "#22c55e" : "var(--border)",
                   color: activeTicker === t ? "#22c55e" : "var(--muted-foreground)",
@@ -184,217 +254,402 @@ export default function TickerAnalysis() {
           </div>
         </div>
 
+        {/* ── Empty state ─────────────────────────────────────────────────── */}
         {!hasData && (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
-            <BarChart2 className="w-12 h-12 opacity-20" />
-            <p className="text-sm">Enter a ticker above to begin analysis</p>
+            <BarChart2 className="w-14 h-14 opacity-15" />
+            <p className="text-sm">Enter a ticker above — get a trade recommendation in seconds</p>
           </div>
         )}
 
+        {/* ── Results ─────────────────────────────────────────────────────── */}
         {hasData && (
-          <>
-            {/* ── Top signal strip ──────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {/* PCR Signal */}
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground mb-1">PCR Signal</div>
-                  {pcrLoading ? (
-                    <Skeleton className="h-6 w-24" />
-                  ) : (
-                    <div className="font-bold text-sm" style={{ color: pcrColor(pcrData?.signal ?? "") }}>
-                      {pcrLabel(pcrData?.signal ?? "No data")}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+          <div className="space-y-4">
 
-              {/* PCR Value */}
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground mb-1">Put/Call Ratio</div>
-                  {pcrLoading ? (
-                    <Skeleton className="h-6 w-16" />
-                  ) : (
-                    <div className="font-bold text-sm font-mono">
-                      {pcrData?.pcr != null ? Number(pcrData.pcr).toFixed(2) : "—"}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            {/* ══ HERO: Instant Recommendation ════════════════════════════ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-              {/* Recommended Strategy */}
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground mb-1">Options Strategy</div>
-                  {analysisLoading ? (
-                    <Skeleton className="h-6 w-28" />
-                  ) : (
-                    <div className="font-bold text-sm text-blue-600">
-                      {analysisData?.recommendation?.name ?? "Run analysis"}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Ask Pit Advisor CTA */}
-              <Card
-                className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                style={{ background: "rgba(139,92,246,0.06)", borderColor: "rgba(139,92,246,0.2)" }}
-                onClick={openPitAdvisor}
+              {/* Stock Direction */}
+              <div
+                className="rounded-2xl p-5 border-2 flex flex-col gap-3"
+                style={{
+                  borderColor: regime ? biasColor(regime.directionalBias) + "44" : "var(--border)",
+                  background: regime ? biasColor(regime.directionalBias) + "08" : "var(--card)",
+                }}
               >
-                <CardContent className="p-4 flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 shrink-0" style={{ color: "#8b5cf6" }} />
-                  <div>
-                    <div className="text-xs text-muted-foreground">Deep Analysis</div>
-                    <div className="font-bold text-sm" style={{ color: "#8b5cf6" }}>Ask Pit Advisor</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Stock Direction</div>
+                  {regime && (
+                    <div
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold"
+                      style={{
+                        background: biasColor(regime.directionalBias) + "18",
+                        color: biasColor(regime.directionalBias),
+                      }}
+                    >
+                      {biasIcon(regime.directionalBias)}
+                      {regime.directionalBias}
+                    </div>
+                  )}
+                </div>
+
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-4 w-48" />
                   </div>
-                </CardContent>
-              </Card>
+                ) : regime ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      <Stat label="Price" value={`$${regime.lastPrice.toFixed(2)}`} />
+                      <Stat label="RSI 14" value={regime.rsi14.toFixed(0)}
+                        color={regime.rsi14 > 70 ? "#ef4444" : regime.rsi14 < 30 ? "#22c55e" : undefined} />
+                      <Stat label="vs SMA50"
+                        value={regime.lastPrice > regime.sma50 ? "Above ↑" : "Below ↓"}
+                        color={regime.lastPrice > regime.sma50 ? "#22c55e" : "#ef4444"} />
+                      <Stat label="MACD"
+                        value={regime.macdHist > 0 ? "Bullish ↑" : "Bearish ↓"}
+                        color={regime.macdHist > 0 ? "#22c55e" : "#ef4444"} />
+                      <Stat label="SMA20" value={`$${regime.sma20.toFixed(2)}`} />
+                      <Stat label="SMA200" value={`$${regime.sma200.toFixed(2)}`} />
+                    </div>
+                    <div className="text-xs text-muted-foreground pt-1 border-t" style={{ borderColor: "var(--border)" }}>
+                      Directional score: <span className="font-semibold" style={{ color: biasColor(regime.directionalBias) }}>{regime.directionalScore > 0 ? "+" : ""}{regime.directionalScore}/3</span>
+                      {" · "}Expected ±move: <span className="font-semibold">{analysisData?.expectedMovePct != null ? `${(analysisData.expectedMovePct * 100).toFixed(1)}%` : "—"}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No regime data</p>
+                )}
+              </div>
+
+              {/* Options Trade Recommendation */}
+              <div
+                className="rounded-2xl p-5 border-2 flex flex-col gap-3"
+                style={{
+                  borderColor: rec ? strategyColor(rec.name) + "44" : "var(--border)",
+                  background: rec ? strategyColor(rec.name) + "06" : "var(--card)",
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Options Trade</div>
+                  {rec && (
+                    <Badge
+                      className="text-xs font-bold px-3 py-1"
+                      style={{
+                        background: strategyColor(rec.name) + "18",
+                        color: strategyColor(rec.name),
+                        border: `1px solid ${strategyColor(rec.name)}44`,
+                      }}
+                    >
+                      {rec.name}
+                    </Badge>
+                  )}
+                </div>
+
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                ) : rec ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      <Stat label="Max Profit"
+                        value={rec.maxProfit != null ? `$${rec.maxProfit.toFixed(0)}` : "Unlimited"}
+                        color="#22c55e" />
+                      <Stat label="Max Loss"
+                        value={rec.maxLoss != null ? `$${rec.maxLoss.toFixed(0)}` : "Unlimited"}
+                        color="#ef4444" />
+                      <Stat label="Prob Profit" value={`${(rec.pop * 100).toFixed(0)}%`} />
+                      <Stat label="Net Credit" value={rec.netCredit > 0 ? `+$${rec.netCredit.toFixed(2)}` : `-$${Math.abs(rec.netCredit).toFixed(2)}`}
+                        color={rec.netCredit > 0 ? "#22c55e" : "#f59e0b"} />
+                      <Stat label="Score" value={`${rec.compositeScore.toFixed(1)}/10`} />
+                      <Stat label="Expiry" value={analysisData?.expiryUsed ?? "—"} />
+                    </div>
+                    <div className="text-xs text-muted-foreground leading-relaxed pt-1 border-t" style={{ borderColor: "var(--border)" }}>
+                      {rec.rationale}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Run analysis to see recommendation</p>
+                )}
+              </div>
             </div>
 
-            {/* ── TradingView Chart ──────────────────────────────────── */}
-            <Card className="border shadow-sm overflow-hidden">
-              <CardHeader className="pb-0 pt-3 px-4">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-green-500" />
-                  {activeTicker} — Daily Chart
-                  <Badge variant="outline" className="text-xs ml-1">TradingView</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0 pt-2">
-                <TradingViewChart ticker={activeTicker} />
-              </CardContent>
-            </Card>
-
-            {/* ── Options Strategy Detail ────────────────────────────── */}
-            {(analysisData || analysisLoading) && (
-              <Card className="border shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-amber-500" />
-                    Options Strategy Recommendation
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {analysisLoading ? (
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
+            {/* ══ IV Environment banner ════════════════════════════════════ */}
+            {regime && (
+              <div
+                className="rounded-xl px-5 py-3 flex items-center justify-between gap-4 border"
+                style={{
+                  background: ivLabel(regime.ivRvRatio).color + "0d",
+                  borderColor: ivLabel(regime.ivRvRatio).color + "33",
+                }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Zap className="w-4 h-4 shrink-0" style={{ color: ivLabel(regime.ivRvRatio).color }} />
+                  <div>
+                    <span className="text-sm font-semibold" style={{ color: ivLabel(regime.ivRvRatio).color }}>
+                      {ivLabel(regime.ivRvRatio).label}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      IV/RV: {regime.ivRvRatio.toFixed(2)} · Median IV: {(regime.medianIV * 100).toFixed(1)}% · IV Rank: {regime.ivPercentileRank.toFixed(0)}
+                    </span>
+                  </div>
+                </div>
+                {pcrData && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-xs text-muted-foreground">PCR:</div>
+                    <div className="text-sm font-bold" style={{ color: pcrColor(pcrData.signal) }}>
+                      {pcrLabel(pcrData.signal)}
                     </div>
-                  ) : analysisData?.recommendation ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-0.5">Strategy</div>
-                        <div className="font-semibold text-blue-600">{analysisData.recommendation.name}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-0.5">Net Credit / Debit</div>
-                        <div className="font-semibold font-mono">
-                          {analysisData.recommendation.netCredit != null
-                            ? `$${Number(analysisData.recommendation.netCredit).toFixed(2)}`
-                            : "—"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-0.5">Max Profit</div>
-                        <div className="font-semibold font-mono text-green-600">
-                          {analysisData.recommendation.maxProfit != null
-                            ? `$${Number(analysisData.recommendation.maxProfit).toFixed(2)}`
-                            : "Unlimited"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-0.5">Prob of Profit</div>
-                        <div className="font-semibold font-mono">
-                          {(analysisData.recommendation.pop * 100).toFixed(0)}%
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-0.5">Max Loss</div>
-                        <div className="font-semibold font-mono text-red-500">
-                          {analysisData.recommendation.maxLoss != null
-                            ? `$${Number(analysisData.recommendation.maxLoss).toFixed(2)}`
-                            : "Unlimited"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-0.5">Score</div>
-                        <div className="font-semibold font-mono">
-                          {analysisData.recommendation.compositeScore.toFixed(1)}/10
-                        </div>
-                      </div>
-                      <div className="col-span-2 sm:col-span-4">
-                        <div className="text-xs text-muted-foreground mb-0.5">Rationale</div>
-                        <div className="text-sm text-foreground leading-relaxed">{analysisData.recommendation.rationale}</div>
-                      </div>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* ── PCR Detail ────────────────────────────────────────── */}
-            {pcrData && !pcrLoading && (
-              <Card className="border shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-purple-500" />
-                    PCR Signal Detail — {activeTicker}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-0.5">PCR</div>
-                      <div className="font-semibold font-mono">{Number(pcrData.pcr).toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-0.5">Signal</div>
-                      <div className="font-semibold" style={{ color: pcrColor(pcrData.signal) }}>
-                        {pcrLabel(pcrData.signal)}
-                      </div>
-                    </div>
-                    {pcrData.strategyHint && (
-                      <div className="col-span-2 sm:col-span-4">
-                        <div className="text-xs text-muted-foreground mb-0.5">Strategy Hint</div>
-                        <div className="text-sm text-foreground">{pcrData.strategyHint}</div>
+            {/* ══ Earnings warning ════════════════════════════════════════ */}
+            {earnings?.daysToEarnings != null && earnings.daysToEarnings <= 14 && (
+              <div className="rounded-xl px-5 py-3 flex items-center gap-3 border border-amber-200 bg-amber-50">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                <div className="text-sm">
+                  <span className="font-semibold text-amber-700">Earnings in {earnings.daysToEarnings} days</span>
+                  {earnings.expectedEarningsMove != null && (
+                    <span className="text-amber-600 ml-2">
+                      — implied move ±{(earnings.expectedEarningsMove * 100).toFixed(1)}%
+                      {earnings.avgHistoricalMove != null && ` (avg historical: ±${(earnings.avgHistoricalMove * 100).toFixed(1)}%)`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ══ Ask Pit Advisor CTA ══════════════════════════════════════ */}
+            <button
+              onClick={openPitAdvisor}
+              className="w-full rounded-xl px-5 py-4 flex items-center gap-4 border-2 transition-all hover:shadow-md active:scale-[0.99]"
+              style={{ borderColor: "#8b5cf644", background: "#8b5cf608" }}
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: "#8b5cf618" }}>
+                <Sparkles className="w-5 h-5" style={{ color: "#8b5cf6" }} />
+              </div>
+              <div className="flex-1 text-left">
+                <div className="font-semibold text-sm" style={{ color: "#8b5cf6" }}>Ask Pit Advisor for a full trade plan</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  Get specific entry price, stop loss, T1/T2 targets, position sizing, and risk assessment — pre-filled with {activeTicker}'s signals
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 shrink-0" style={{ color: "#8b5cf6" }} />
+            </button>
+
+            {/* ══ Drill-down cards ════════════════════════════════════════ */}
+            <div className="space-y-3">
+
+              {/* Chart */}
+              <DrillCard icon={<Activity className="w-4 h-4" />} title={`${activeTicker} — Daily Chart (RSI · MACD · Volume)`} accent="#22c55e" defaultOpen>
+                <TradingViewChart ticker={activeTicker} />
+              </DrillCard>
+
+              {/* Options Strategy Detail */}
+              {rec && (
+                <DrillCard icon={<Zap className="w-4 h-4" />} title="Options Strategy — Full Breakdown" accent={strategyColor(rec.name)}>
+                  <div className="space-y-4">
+                    {/* Legs */}
+                    {rec.legs.length > 0 && (
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Trade Legs</div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="text-muted-foreground border-b">
+                                <th className="text-left pb-1.5 pr-3">Type</th>
+                                <th className="text-right pb-1.5 pr-3">Strike</th>
+                                <th className="text-left pb-1.5 pr-3">Expiry</th>
+                                <th className="text-right pb-1.5 pr-3">Mid</th>
+                                <th className="text-right pb-1.5 pr-3">Delta</th>
+                                <th className="text-right pb-1.5 pr-3">IV</th>
+                                <th className="text-right pb-1.5">OI</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rec.legs.map((leg, i) => (
+                                <tr key={i} className="border-b border-border/50">
+                                  <td className="py-1.5 pr-3">
+                                    <span className={`font-semibold capitalize ${leg.type === "call" ? "text-green-600" : "text-red-500"}`}>
+                                      {leg.type}
+                                    </span>
+                                  </td>
+                                  <td className="py-1.5 pr-3 text-right font-mono">${leg.strike}</td>
+                                  <td className="py-1.5 pr-3">{leg.expiry}</td>
+                                  <td className="py-1.5 pr-3 text-right font-mono">${leg.mid.toFixed(2)}</td>
+                                  <td className="py-1.5 pr-3 text-right font-mono">{leg.delta.toFixed(2)}</td>
+                                  <td className="py-1.5 pr-3 text-right font-mono">{(leg.iv * 100).toFixed(0)}%</td>
+                                  <td className="py-1.5 text-right font-mono">{leg.openInterest.toLocaleString()}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
+                    {/* Breakevens */}
+                    {rec.breakevens.length > 0 && (
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Breakeven{rec.breakevens.length > 1 ? "s" : ""}:</span>
+                        {rec.breakevens.map((be, i) => (
+                          <span key={i} className="font-mono font-semibold">${be.toFixed(2)}</span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Score breakdown */}
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Score Breakdown</div>
+                      <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
+                        {Object.entries(rec.scores).map(([k, v]) => (
+                          <div key={k} className="text-center">
+                            <div className="text-[10px] text-muted-foreground capitalize">{k.replace(/([A-Z])/g, " $1")}</div>
+                            <div className="font-bold text-sm font-mono">{(v as number).toFixed(1)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* All 13 strategies ranked */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">All 13 Strategies Ranked</div>
+                        <button
+                          className="text-xs text-blue-500 hover:underline"
+                          onClick={() => navigate(`/analyzer?ticker=${activeTicker}`)}
+                        >
+                          Open full analyzer →
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        {analysisData?.strategies
+                          .sort((a, b) => b.compositeScore - a.compositeScore)
+                          .slice(0, 5)
+                          .map((s, i) => (
+                            <div key={s.name} className="flex items-center gap-3 text-xs">
+                              <span className="text-muted-foreground w-4 shrink-0">#{i + 1}</span>
+                              <div className="flex-1 bg-muted/40 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${(s.compositeScore / 10) * 100}%`,
+                                    background: strategyColor(s.name),
+                                  }}
+                                />
+                              </div>
+                              <span className="font-medium w-36 shrink-0">{s.name}</span>
+                              <span className="font-mono text-muted-foreground w-10 text-right">{s.compositeScore.toFixed(1)}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </DrillCard>
+              )}
 
-            {/* ── Full analysis CTA ─────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row gap-3 pb-4">
-              <Button
-                className="flex-1 h-11 bg-green-500 hover:bg-green-600 text-white font-semibold gap-2"
-                onClick={() => navigate(`/analyzer?ticker=${activeTicker}`)}
-              >
-                <Activity className="w-4 h-4" />
-                Full Options Analysis (13 Strategies)
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1 h-11 font-semibold gap-2"
-                style={{ borderColor: "#8b5cf644", color: "#8b5cf6" }}
-                onClick={openPitAdvisor}
-              >
-                <MessageSquare className="w-4 h-4" />
-                Deep Dive with Pit Advisor
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1 h-11 font-semibold gap-2"
-                onClick={() => navigate(`/pcr-strategy?ticker=${activeTicker}`)}
-              >
-                <TrendingDown className="w-4 h-4" />
-                PCR Signal Board
-              </Button>
+              {/* Greeks */}
+              {rec && (
+                <DrillCard icon={<Brain className="w-4 h-4" />} title="Greeks & Risk Metrics" accent="#6366f1">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                    <Stat label="Delta" value={rec.delta.toFixed(3)} color={rec.delta > 0 ? "#22c55e" : "#ef4444"} />
+                    <Stat label="Gamma" value={rec.gamma.toFixed(4)} />
+                    <Stat label="Theta" value={`$${rec.theta.toFixed(2)}/day`} color="#22c55e" />
+                    <Stat label="Vega" value={rec.vega.toFixed(3)} />
+                    <Stat label="Rho" value={rec.rho.toFixed(3)} />
+                    <Stat label="Buying Power" value={`$${rec.buyingPower.toFixed(0)}`} />
+                    <Stat label="IV Rank" value={`${regime?.ivPercentileRank?.toFixed(0) ?? "—"}`} />
+                    <Stat label="IV/RV Ratio" value={regime?.ivRvRatio?.toFixed(2) ?? "—"} />
+                    <Stat label="Realized Vol" value={regime ? `${(regime.rv20 * 100).toFixed(1)}%` : "—"} />
+                    <Stat label="Median IV" value={regime ? `${(regime.medianIV * 100).toFixed(1)}%` : "—"} />
+                  </div>
+                </DrillCard>
+              )}
+
+              {/* PCR Signal */}
+              {pcrData && (
+                <DrillCard icon={<TrendingUp className="w-4 h-4" />} title="PCR Signal — Put/Call Ratio" accent={pcrColor(pcrData.signal)}>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <Stat label="PCR" value={Number(pcrData.pcr).toFixed(2)} />
+                      <Stat label="Signal" value={pcrLabel(pcrData.signal)} color={pcrColor(pcrData.signal)} />
+                      {pcrData.totalCallVolume != null && <Stat label="Call Vol" value={Number(pcrData.totalCallVolume).toLocaleString()} />}
+                      {pcrData.totalPutVolume != null && <Stat label="Put Vol" value={Number(pcrData.totalPutVolume).toLocaleString()} />}
+                    </div>
+                    {pcrData.strategyHint && (
+                      <div className="text-sm text-foreground bg-muted/40 rounded-lg px-4 py-3">
+                        {pcrData.strategyHint}
+                      </div>
+                    )}
+                    <button
+                      className="text-xs text-blue-500 hover:underline"
+                      onClick={() => navigate(`/pcr-strategy?ticker=${activeTicker}`)}
+                    >
+                      View full PCR dashboard →
+                    </button>
+                  </div>
+                </DrillCard>
+              )}
+
+              {/* Earnings */}
+              {earnings && (
+                <DrillCard icon={<Calendar className="w-4 h-4" />} title="Earnings Info" accent="#f59e0b">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <Stat label="Next Earnings" value={earnings.nextEarningsDate ?? "Unknown"} />
+                    <Stat label="Days Away" value={earnings.daysToEarnings != null ? `${earnings.daysToEarnings}d` : "—"}
+                      color={earnings.daysToEarnings != null && earnings.daysToEarnings <= 7 ? "#ef4444" : undefined} />
+                    <Stat label="Implied Move" value={earnings.expectedEarningsMove != null ? `±${(earnings.expectedEarningsMove * 100).toFixed(1)}%` : "—"} />
+                    <Stat label="Avg Historical" value={earnings.avgHistoricalMove != null ? `±${(earnings.avgHistoricalMove * 100).toFixed(1)}%` : "—"} />
+                  </div>
+                  {earnings.historicalEarningsMoves.length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-xs text-muted-foreground mb-1.5">Last {earnings.historicalEarningsMoves.length} earnings moves:</div>
+                      <div className="flex gap-2">
+                        {earnings.historicalEarningsMoves.map((m, i) => (
+                          <div key={i} className="px-2.5 py-1 rounded-md text-xs font-mono font-semibold"
+                            style={{ background: "#f59e0b18", color: "#f59e0b" }}>
+                            ±{(m * 100).toFixed(1)}%
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </DrillCard>
+              )}
+
+              {/* More tools */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
+                {[
+                  { label: "Full Options Analyzer", desc: "All 13 strategies ranked", icon: <Zap className="w-4 h-4" />, color: "#3b82f6", path: `/analyzer?ticker=${activeTicker}` },
+                  { label: "Velez Scanner", desc: "Daily Fib + EMA signals", icon: <TrendingUp className="w-4 h-4" />, color: "#22c55e", path: "/velez-scanner" },
+                  { label: "Intraday Scanner", desc: "5-min Grade-A setups", icon: <Activity className="w-4 h-4" />, color: "#f59e0b", path: "/intraday-scanner" },
+                  { label: "VCP Strategy", desc: "Volatility contraction", icon: <BarChart2 className="w-4 h-4" />, color: "#6366f1", path: "/vcp-strategy" },
+                  { label: "Catalyst Watch", desc: "BCOS breakout signals", icon: <TrendingDown className="w-4 h-4" />, color: "#ec4899", path: "/catalyst-watch" },
+                  { label: "Glossary", desc: "Options terminology", icon: <BookOpen className="w-4 h-4" />, color: "#14b8a6", path: "/glossary" },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => navigate(item.path)}
+                    className="rounded-xl border p-4 text-left flex items-start gap-3 transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.99]"
+                    style={{ borderColor: item.color + "33", background: item.color + "06" }}
+                  >
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                      style={{ background: item.color + "18", color: item.color }}>
+                      {item.icon}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">{item.label}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
             </div>
-          </>
+          </div>
         )}
       </div>
     </ActionLayout>
