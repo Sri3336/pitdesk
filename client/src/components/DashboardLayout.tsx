@@ -68,7 +68,7 @@ const NAV_SECTIONS = [
     label: "Analysis",
     defaultOpen: true,
     items: [
-      { icon: Home, label: "Dashboard", path: "/" },
+      { icon: Home, label: "Dashboard", path: "/dashboard" },
       { icon: BarChart2, label: "PCR Dashboard", path: "/pcr-dashboard" },
       { icon: CandlestickChart, label: "Charts", path: "/charts" },
       { icon: Scan, label: "Scan All", path: "/scan-all" },
@@ -279,13 +279,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar variant="inset" collapsible={isMobile ? "offcanvas" : "none"}>
         {/* Header */}
         <SidebarHeader className="border-b border-border px-4 py-3 shrink-0">
-          <div className="flex items-center gap-2">
+          <button
+            className="flex items-center gap-2 w-full text-left rounded-lg hover:bg-muted/50 transition-colors -mx-1 px-1 py-0.5 group"
+            onClick={() => navigate("/")}
+            title="Back to Home"
+          >
             <PitDeskLogo size={40} />
             <div>
-              <div className="font-bold text-sm leading-tight">PitDesk</div>
-              <div className="text-[10px] text-muted-foreground leading-tight">Trading Intelligence</div>
+              <div className="font-bold text-sm leading-tight group-hover:text-green-600 transition-colors">PitDesk</div>
+              <div className="text-[10px] text-muted-foreground leading-tight">← Home</div>
             </div>
-          </div>
+          </button>
         </SidebarHeader>
 
         {/* Nav — all sections collapsible */}

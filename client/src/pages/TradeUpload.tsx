@@ -33,9 +33,11 @@ import {
   Upload,
   Users,
   XCircle,
+  Sparkles,
 } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -456,6 +458,8 @@ export default function TradeUpload() {
   const [tab, setTab] = useState("upload");
   const [csvText, setCsvText] = useState("");
   const [filename, setFilename] = useState("trades.csv");
+  const [importedCount, setImportedCount] = useState<number | null>(null);
+  const [, navigate] = useLocation();
   const [parseResult, setParseResult] = useState<{
     headers: string[];
     columnMap: Record<string, number>;
@@ -484,6 +488,7 @@ export default function TradeUpload() {
       setParseResult(null);
       setCsvText("");
       setShowConfirmDialog(false);
+      setImportedCount(data.rowsInserted);
       setTab("my-trades");
     },
     onError: (e) => toast.error(`Import failed: ${e.message}`),
@@ -652,6 +657,30 @@ export default function TradeUpload() {
 
         {/* ─── My Trades Tab ─── */}
         <TabsContent value="my-trades" className="mt-4">
+          {/* AI Analysis CTA — shown after successful import */}
+          {importedCount !== null && (
+            <div
+              className="mb-4 rounded-xl border-2 px-5 py-4 flex items-center gap-4 cursor-pointer transition-all hover:shadow-md active:scale-[0.99]"
+              style={{ borderColor: "#8b5cf644", background: "#8b5cf608" }}
+              onClick={() => {
+                const prompt = `I just imported ${importedCount} trades into PitDesk. Please analyze my trading performance:\n\n1. What is my overall win rate and P&L trend?\n2. Which strategies are working best and worst for me?\n3. What are my top 3 specific improvements to make?\n4. Are there any patterns in my losing trades I should fix?\n\nBe direct and specific — I want actionable feedback, not generic advice.`;
+                navigate(`/pit-advisor?prompt=${encodeURIComponent(prompt)}`);
+              }}
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: "#8b5cf618" }}>
+                <Sparkles className="h-5 w-5" style={{ color: "#8b5cf6" }} />
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-sm" style={{ color: "#8b5cf6" }}>
+                  {importedCount} trades imported — Ask Pit Advisor to analyze your performance
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  Get win rate breakdown, strategy gaps, and 3 specific improvements — pre-filled with your trade data
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0" style={{ color: "#8b5cf6" }} />
+            </div>
+          )}
           <MyTradesTab />
         </TabsContent>
 
