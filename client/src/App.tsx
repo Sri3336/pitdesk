@@ -105,6 +105,15 @@ function Router() {
         </Suspense>
       </Route>
 
+      {/* ── Home landing page (no sidebar) ────────────────────────────── */}
+      <Route path="/">
+        <AuthGuard>
+          <Suspense fallback={<PageLoader />}>
+            <Home />
+          </Suspense>
+        </AuthGuard>
+      </Route>
+
       {/* ── Protected routes (require auth) ───────────────────────────── */}
       <Route>
         <AuthGuard>
@@ -112,8 +121,7 @@ function Router() {
             <ScrollableRoute>
             <Suspense fallback={<PageLoader />}>
               <Switch>
-                {/* Home */}
-                <Route path="/" component={Home} />
+                {/* Dashboard */}
                 <Route path="/dashboard" component={PitDeskHome} />
 
                 {/* Scanners */}
