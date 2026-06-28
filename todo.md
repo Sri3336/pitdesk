@@ -303,3 +303,19 @@
 - [x] Update App.tsx — 6 action routes use ActionLayout, /dashboard retains DashboardLayout sidebar
 - [x] Add "Back to Home" logo click in DashboardLayout sidebar header
 - [x] TypeScript 0 errors check
+
+## Phase 29 — Design System Refactor (ROUTES.ts + pitdesk/ Components)
+- [x] Create client/src/lib/routes.ts — ROUTES constants, HOME_ACTIONS array, ALL_TOOLS_MENU array
+- [x] Create client/src/components/pitdesk/TradingViewChart.tsx — canonical chart (500px height, key-based remount, no autosize)
+- [x] Create client/src/components/pitdesk/AskPitCTA.tsx — canonical Ask Pit Advisor CTA (banner + button variants)
+- [x] Create client/src/components/pitdesk/tradingUtils.ts — canonical color/label helpers (gradeColor, gradeStyle, pcrColor, biasColor, ivLabel, ivColor, strategyColor, directionColor, directionIcon, vcpStageLabel, vcpStageColor, scoreColor, scoreStyle)
+- [x] Create client/src/components/pitdesk/index.ts — barrel export for all pitdesk components
+- [x] Update TickerAnalysis.tsx — import from @/components/pitdesk (ivLabel, ivColor, pcrColor, etc.)
+- [x] Update DayTradingPicks.tsx — import gradeStyle, directionColor from @/components/pitdesk; import ROUTES from @/lib/routes; remove inline duplicates
+- [x] Update SwingTradingPicks.tsx — import vcpStageLabel, vcpStageColor, scoreStyle from @/components/pitdesk; import ROUTES from @/lib/routes; remove inline duplicates
+- [x] Update Home.tsx — import ROUTES and HOME_ACTIONS from @/lib/routes; replace hardcoded card definitions
+- [x] Update ActionLayout.tsx — import ROUTES and ALL_TOOLS_MENU from @/lib/routes; replace hardcoded path strings
+- [x] Update DashboardLayout.tsx — import ROUTES from @/lib/routes; replace hardcoded "/" navigate call
+- [x] TypeScript check: 0 errors
+- [x] Production build: clean (12s)
+- [x] Skill updated: options-trading-analyzer-builder SKILL.md — Design System section added

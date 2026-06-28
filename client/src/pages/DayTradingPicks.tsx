@@ -24,26 +24,15 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { directionColor, gradeStyle } from "@/components/pitdesk";
+import { ROUTES } from "@/lib/routes";
 
+/** Inline JSX icon — kept local since it returns JSX (not a string) */
 function directionIcon(dir: string) {
   const d = dir?.toLowerCase();
   if (d === "bullish") return <TrendingUp className="w-4 h-4 text-green-500" />;
   if (d === "bearish") return <TrendingDown className="w-4 h-4 text-red-500" />;
   return <Activity className="w-4 h-4 text-slate-400" />;
-}
-
-function directionColor(dir: string) {
-  const d = dir?.toLowerCase();
-  if (d === "bullish") return "#22c55e";
-  if (d === "bearish") return "#ef4444";
-  return "#94a3b8";
-}
-
-function gradeColor(grade: string) {
-  if (grade === "A") return { bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.35)", text: "#16a34a" };
-  if (grade === "B") return { bg: "rgba(59,130,246,0.10)", border: "rgba(59,130,246,0.30)", text: "#2563eb" };
-  if (grade === "C") return { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.30)", text: "#d97706" };
-  return { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.25)", text: "#dc2626" };
 }
 
 // ── Set Alert button — one-click IVR alert creation ─────────────────────────
@@ -142,7 +131,7 @@ export default function DayTradingPicks() {
 
   function openPitAdvisor(ticker: string, direction: string, score: number) {
     const prompt = `I'm looking at ${ticker} for a day trade today. Intraday scan grade: A, direction: ${direction}, score: ${score}. Give me a 5-dimension analysis (Technical, Fundamental, Geopolitical, Sentiment, Quantitative) and a specific day trade setup with entry price, stop loss, T1 and T2 targets, and options strategy if applicable.`;
-    navigate(`/pit-advisor?prompt=${encodeURIComponent(prompt)}`);
+    navigate(`${ROUTES.PIT_ADVISOR}?prompt=${encodeURIComponent(prompt)}`);
   }
 
   return (
@@ -217,7 +206,7 @@ export default function DayTradingPicks() {
             </div>
 
             {gradeA.map((scan, i) => {
-              const gc = gradeColor(scan.grade);
+              const gc = gradeStyle(scan.grade);
               const price = Number(scan.price ?? 0);
               const vwap = Number(scan.vwap ?? 0);
               const atr = Number(scan.atr ?? 0);
@@ -311,7 +300,7 @@ export default function DayTradingPicks() {
                       <Button
                         size="sm"
                         className="h-8 text-xs gap-1.5 bg-amber-500 hover:bg-amber-600 text-white"
-                        onClick={() => navigate(`/ticker-analysis?ticker=${scan.ticker}`)}
+                        onClick={() => navigate(`${ROUTES.TICKER_ANALYSIS}?ticker=${scan.ticker}`)}
                       >
                         <Activity className="w-3.5 h-3.5" />
                         Analyze
@@ -355,12 +344,12 @@ export default function DayTradingPicks() {
                 </thead>
                 <tbody>
                   {allSorted.map((scan) => {
-                    const gc = gradeColor(scan.grade);
+                    const gc = gradeStyle(scan.grade);
                     return (
                       <tr
                         key={scan.ticker}
                         className="border-b last:border-0 hover:bg-accent/50 cursor-pointer transition-colors"
-                        onClick={() => navigate(`/ticker-analysis?ticker=${scan.ticker}`)}
+                        onClick={() => navigate(`${ROUTES.TICKER_ANALYSIS}?ticker=${scan.ticker}`)}
                       >
                         <td className="px-3 py-2 font-mono font-semibold">{scan.ticker}</td>
                         <td className="px-3 py-2">

@@ -53,6 +53,7 @@ import {
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import { ROUTES } from "@/lib/routes";
 
 const SIDEBAR_WIDTH_KEY = "pitdesk-sidebar-width";
 const SIDEBAR_SECTIONS_KEY = "pitdesk-sidebar-sections-v2";
@@ -281,7 +282,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SidebarHeader className="border-b border-border px-4 py-3 shrink-0">
           <button
             className="flex items-center gap-2 w-full text-left rounded-lg hover:bg-muted/50 transition-colors -mx-1 px-1 py-0.5 group"
-            onClick={() => navigate("/")}
+            onClick={() => navigate(ROUTES.HOME)}
             title="Back to Home"
           >
             <PitDeskLogo size={40} />
@@ -334,14 +335,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               {user.role === "admin" && (
                 <>
-                  <DropdownMenuItem onClick={() => navigate("/admin/users")} className="cursor-pointer">
+                  <DropdownMenuItem     onClick={() => navigate("/admin/users")} className="cursor-pointer">
                     <Shield className="h-4 w-4 mr-2 text-green-600" />
                     User Management
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem onClick={() => navigate("/profile")} className="cursor-pointer">
+              <DropdownMenuItem     onClick={() => navigate("/profile")} className="cursor-pointer">
                 <Settings className="h-4 w-4 mr-2" />
                 Account Settings
               </DropdownMenuItem>

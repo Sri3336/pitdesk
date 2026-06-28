@@ -1,7 +1,9 @@
 /**
- * ActionLayout — slim top-nav shell for the 5 core action pages.
+ * ActionLayout — slim top-nav shell for the 6 core action pages.
  * No sidebar. Clean, focused, distraction-free.
  * Includes: PitDesk logo (→ /), current tool name, All Tools dropdown, Ask Pit Advisor shortcut.
+ *
+ * Route strings come from ROUTES / ALL_TOOLS_MENU in @/lib/routes — never hardcoded here.
  */
 import { PitDeskLogo } from "@/components/PitDeskLogo";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { ROUTES, ALL_TOOLS_MENU } from "@/lib/routes";
 
 interface ActionLayoutProps {
   toolName: string;
@@ -34,32 +37,33 @@ interface ActionLayoutProps {
   children: React.ReactNode;
 }
 
-const ALL_TOOLS = [
-  {
-    group: "Core Actions",
-    items: [
-      { label: "Analyze a Ticker", path: "/ticker-analysis", icon: BarChart2, color: "#22c55e" },
-      { label: "Day Trading Picks", path: "/day-picks", icon: Zap, color: "#f59e0b" },
-      { label: "Swing Trading Picks", path: "/swing-picks", icon: TrendingUp, color: "#6366f1" },
-      { label: "Analyze My Trades", path: "/trade-upload", icon: Upload, color: "#ec4899" },
-      { label: "Glossary & Education", path: "/glossary", icon: BookOpen, color: "#14b8a6" },
-      { label: "Ask Pit Advisor", path: "/pit-advisor", icon: MessageSquare, color: "#8b5cf6" },
-    ],
-  },
-  {
-    group: "Power Tools",
-    items: [
-      { label: "PCR Signal Board", path: "/pcr-strategy", icon: Radio, color: "#a855f7" },
-      { label: "Options Analyzer", path: "/analyzer", icon: Activity, color: "#06b6d4" },
-      { label: "Options Flow", path: "/options-flow", icon: BarChart2, color: "#f97316" },
-      { label: "IVR Alerts", path: "/ivr-alerts", icon: AlertTriangle, color: "#ef4444" },
-      { label: "Full Dashboard", path: "/dashboard", icon: Grid3X3, color: "#64748b" },
-    ],
-  },
-];
+// Map path → Lucide icon for the dropdown menu
+const TOOL_ICONS: Record<string, React.ElementType> = {
+  [ROUTES.TICKER_ANALYSIS]: BarChart2,
+  [ROUTES.DAY_PICKS]: Zap,
+  [ROUTES.SWING_PICKS]: TrendingUp,
+  [ROUTES.TRADE_UPLOAD]: Upload,
+  [ROUTES.GLOSSARY]: BookOpen,
+  [ROUTES.PIT_ADVISOR]: MessageSquare,
+  [ROUTES.PCR_STRATEGY]: Radio,
+  [ROUTES.ANALYZER]: Activity,
+  [ROUTES.OPTIONS_FLOW]: BarChart2,
+  [ROUTES.IVR_ALERTS]: AlertTriangle,
+  [ROUTES.DASHBOARD]: Grid3X3,
+};
 
 export function ActionLayout({ toolName, toolColor = "#22c55e", children }: ActionLayoutProps) {
   const [, navigate] = useLocation();
+
+  // Group tools by their group label
+  const groups = ALL_TOOLS_MENU.reduce<Record<string, typeof ALL_TOOLS_MENU[number][]>>(
+    (acc, item) => {
+      if (!acc[item.group]) acc[item.group] = [];
+      acc[item.group].push(item);
+      return acc;
+    },
+    {}
+  );
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: "var(--background)" }}>
@@ -74,7 +78,7 @@ export function ActionLayout({ toolName, toolColor = "#22c55e", children }: Acti
       >
         {/* Logo → Home */}
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate(ROUTES.HOME)}
           className="flex items-center gap-2.5 shrink-0 group"
           title="Back to Home"
         >
@@ -107,7 +111,7 @@ export function ActionLayout({ toolName, toolColor = "#22c55e", children }: Acti
           variant="outline"
           className="hidden sm:flex items-center gap-1.5 h-8 text-xs"
           style={{ borderColor: "#8b5cf644", color: "#8b5cf6" }}
-          onClick={() => navigate("/pit-advisor")}
+          onClick={() => navigate(ROUTES.PIT_ADVISOR)}
         >
           <MessageSquare className="w-3.5 h-3.5" />
           Ask Pit Advisor
@@ -127,25 +131,25 @@ export function ActionLayout({ toolName, toolColor = "#22c55e", children }: Acti
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            {ALL_TOOLS.map((group) => (
-              <div key={group.group}>
+            {Object.entries(groups).map(([groupName, items], gi) => (
+              <div key={groupName}>
+                {gi > 0 && <DropdownMenuSeparator />}
                 <DropdownMenuLabel className="text-xs text-muted-foreground font-medium">
-                  {group.group}
+                  {groupName}
                 </DropdownMenuLabel>
-                {group.items.map((item) => {
-                  const Icon = item.icon;
+                {items.map((item) => {
+                  const Icon = TOOL_ICONS[item.path] ?? Activity;
                   return (
                     <DropdownMenuItem
                       key={item.path}
                       onClick={() => navigate(item.path)}
                       className="flex items-center gap-2 cursor-pointer"
                     >
-                      <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: item.color }} />
+                      <Icon className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                       <span className="text-sm">{item.label}</span>
                     </DropdownMenuItem>
                   );
                 })}
-                <DropdownMenuSeparator />
               </div>
             ))}
           </DropdownMenuContent>

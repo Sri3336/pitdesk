@@ -3,6 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { PitDeskLogo } from "@/components/PitDeskLogo";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
+import { ROUTES, HOME_ACTIONS } from "@/lib/routes";
 import {
   BarChart2,
   BookOpen,
@@ -13,74 +14,15 @@ import {
   Zap,
 } from "lucide-react";
 
-const actions = [
-  {
-    id: "analyze-ticker",
-    icon: BarChart2,
-    label: "Analyze a Ticker",
-    desc: "Full chart analysis, options strategy recommendation, entry & exit levels across all 5 dimensions.",
-    path: "/ticker-analysis",
-    accent: "#22c55e",
-    accentBg: "rgba(34,197,94,0.08)",
-    accentBorder: "rgba(34,197,94,0.25)",
-    number: "01",
-  },
-  {
-    id: "day-trading",
-    icon: Zap,
-    label: "Day Trading Picks",
-    desc: "Apply all strategies across our watchlist. Get the top 5 Grade-A intraday setups for today.",
-    path: "/day-picks",
-    accent: "#f59e0b",
-    accentBg: "rgba(245,158,11,0.08)",
-    accentBorder: "rgba(245,158,11,0.25)",
-    number: "02",
-  },
-  {
-    id: "swing-trading",
-    icon: TrendingUp,
-    label: "Swing Trading Picks",
-    desc: "Multi-day setups — VCP, Velez signals, BCOS breakouts. Best tickers for the next 3–10 days.",
-    path: "/swing-picks",
-    accent: "#6366f1",
-    accentBg: "rgba(99,102,241,0.08)",
-    accentBorder: "rgba(99,102,241,0.25)",
-    number: "03",
-  },
-  {
-    id: "analyze-trades",
-    icon: Upload,
-    label: "Analyze My Trades",
-    desc: "Upload your brokerage CSV or paste trade data. Get a full breakdown of performance and strategy gaps.",
-    path: "/trade-upload",
-    accent: "#ec4899",
-    accentBg: "rgba(236,72,153,0.08)",
-    accentBorder: "rgba(236,72,153,0.25)",
-    number: "04",
-  },
-  {
-    id: "education",
-    icon: BookOpen,
-    label: "Glossary & Education",
-    desc: "Options terminology, strategy playbooks, PCR signal zones, Okala rules, and Velez methodology.",
-    path: "/glossary",
-    accent: "#14b8a6",
-    accentBg: "rgba(20,184,166,0.08)",
-    accentBorder: "rgba(20,184,166,0.25)",
-    number: "05",
-  },
-  {
-    id: "pit-advisor",
-    icon: MessageSquare,
-    label: "Ask Pit Advisor",
-    desc: "Your AI trading buddy. Get a full trade plan — entry, stop, targets, position sizing, and risk assessment.",
-    path: "/pit-advisor",
-    accent: "#8b5cf6",
-    accentBg: "rgba(139,92,246,0.08)",
-    accentBorder: "rgba(139,92,246,0.25)",
-    number: "06",
-  },
-];
+// Map action key → Lucide icon component
+const ACTION_ICONS: Record<string, React.ElementType> = {
+  "ticker-analysis": BarChart2,
+  "day-picks": Zap,
+  "swing-picks": TrendingUp,
+  "trade-upload": Upload,
+  "glossary": BookOpen,
+  "pit-advisor": MessageSquare,
+};
 
 export default function Home() {
   const { user } = useAuth();
@@ -136,29 +78,31 @@ export default function Home() {
         </p>
       </div>
 
-      {/* ── 5 Action Cards ───────────────────────────────────────────── */}
+      {/* ── 6 Action Cards (from ROUTES.HOME_ACTIONS) ────────────────── */}
       <div className="w-full max-w-3xl grid grid-cols-1 gap-3">
-        {actions.map((action, i) => {
-          const Icon = action.icon;
+        {HOME_ACTIONS.map((action, i) => {
+          const Icon = ACTION_ICONS[action.key] ?? BarChart2;
+          const accentBg = action.color + "14";
+          const accentBorder = action.color + "40";
           return (
             <button
-              key={action.id}
+              key={action.key}
               onClick={() => navigate(action.path)}
               className="group w-full text-left rounded-2xl border transition-all duration-200"
               style={{
-                background: action.accentBg,
-                borderColor: action.accentBorder,
+                background: accentBg,
+                borderColor: accentBorder,
                 animationDelay: `${i * 60}ms`,
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 32px ${action.accent}22`;
-                (e.currentTarget as HTMLElement).style.borderColor = action.accent;
+                (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 32px ${action.color}22`;
+                (e.currentTarget as HTMLElement).style.borderColor = action.color;
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
                 (e.currentTarget as HTMLElement).style.boxShadow = "none";
-                (e.currentTarget as HTMLElement).style.borderColor = action.accentBorder;
+                (e.currentTarget as HTMLElement).style.borderColor = accentBorder;
               }}
               onMouseDown={(e) => {
                 (e.currentTarget as HTMLElement).style.transform = "scale(0.99)";
@@ -171,7 +115,7 @@ export default function Home() {
                 {/* Number badge */}
                 <span
                   className="text-xs font-mono font-bold opacity-30 w-6 shrink-0"
-                  style={{ color: action.accent }}
+                  style={{ color: action.color }}
                 >
                   {action.number}
                 </span>
@@ -179,9 +123,9 @@ export default function Home() {
                 {/* Icon */}
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
-                  style={{ background: action.accent + "22" }}
+                  style={{ background: action.color + "22" }}
                 >
-                  <Icon className="w-5 h-5" style={{ color: action.accent }} />
+                  <Icon className="w-5 h-5" style={{ color: action.color }} />
                 </div>
 
                 {/* Text */}
@@ -196,14 +140,14 @@ export default function Home() {
                     className="text-sm mt-0.5 leading-snug"
                     style={{ color: "var(--muted-foreground)" }}
                   >
-                    {action.desc}
+                    {action.description}
                   </div>
                 </div>
 
                 {/* Arrow */}
                 <svg
                   className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-1"
-                  style={{ color: action.accent }}
+                  style={{ color: action.color }}
                   fill="none"
                   viewBox="0 0 16 16"
                 >
@@ -234,7 +178,7 @@ export default function Home() {
             {thisWeekEarnings.map((r: { ticker: string; daysToEarnings: number | null }) => (
               <button
                 key={r.ticker}
-                onClick={() => navigate(`/ticker-analysis?ticker=${r.ticker}`)}
+                onClick={() => navigate(`${ROUTES.TICKER_ANALYSIS}?ticker=${r.ticker}`)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm font-medium transition-all duration-150 hover:scale-105 active:scale-95"
                 style={{
                   background: r.daysToEarnings != null && r.daysToEarnings <= 2
@@ -272,7 +216,7 @@ export default function Home() {
         All power tools available at{" "}
         <button
           className="underline hover:opacity-80 transition-opacity"
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate(ROUTES.DASHBOARD)}
         >
           /dashboard
         </button>

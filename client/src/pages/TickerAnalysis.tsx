@@ -4,6 +4,7 @@
  * → Drill-down cards: Chart, PCR, Greeks, Earnings, Pit Advisor
  */
 import { ActionLayout } from "@/components/ActionLayout";
+import { AskPitCTA, TradingViewChart, biasColor, biasIcon as biasIconStr, ivLabel, ivColor, pcrColor, pcrLabel, strategyColor } from "@/components/pitdesk";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,86 +30,17 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useLocation, useSearch } from "wouter";
 
 // ── Quick-pick tickers ────────────────────────────────────────────────────────
 const QUICK_TICKERS = ["NVDA", "AAPL", "TSLA", "PLTR", "AMD", "META", "SPY", "QQQ", "APP", "SOFI"];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function pcrColor(signal: string) {
-  if (!signal) return "#94a3b8";
-  if (signal.includes("EXTREME_FEAR") || signal.includes("FEAR")) return "#22c55e";
-  if (signal.includes("EXTREME_GREED") || signal.includes("GREED")) return "#ef4444";
-  return "#f59e0b";
-}
-function pcrLabel(signal: string) {
-  if (!signal) return "No Signal";
-  return signal.replace(/_/g, " ");
-}
-function biasColor(bias: string) {
-  if (bias === "Bullish") return "#22c55e";
-  if (bias === "Bearish") return "#ef4444";
-  return "#94a3b8";
-}
+// ── Local biasIcon helper (uses JSX, so kept here) ────────────────────────────
 function biasIcon(bias: string) {
   if (bias === "Bullish") return <ArrowUp className="w-5 h-5" />;
   if (bias === "Bearish") return <ArrowDown className="w-5 h-5" />;
   return <Minus className="w-5 h-5" />;
-}
-function ivLabel(ivRv: number) {
-  if (ivRv > 1.3) return { label: "IV Elevated — sell premium", color: "#ef4444" };
-  if (ivRv > 0.9) return { label: "IV Fair — balanced", color: "#f59e0b" };
-  return { label: "IV Compressed — buy premium", color: "#22c55e" };
-}
-function strategyColor(name: string) {
-  if (name?.includes("Bull") || name?.includes("Naked Put") || name?.includes("Cash-Secured")) return "#22c55e";
-  if (name?.includes("Bear") || name?.includes("Naked Call")) return "#ef4444";
-  if (name?.includes("Condor") || name?.includes("Strangle") || name?.includes("Butterfly")) return "#6366f1";
-  if (name?.includes("Straddle") || name?.includes("Long")) return "#f59e0b";
-  return "#3b82f6";
-}
-
-// ── TradingView Chart ─────────────────────────────────────────────────────────
-// Key-based remount: when ticker changes, React unmounts the old instance
-// entirely and mounts a fresh one — no stale widget residue.
-function TradingViewChart({ ticker }: { ticker: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container || !ticker) return;
-    // Wipe any previous content (scripts, iframes, divs) completely
-    container.innerHTML = "";
-    const widgetDiv = document.createElement("div");
-    widgetDiv.className = "tradingview-widget-container__widget";
-    widgetDiv.style.height = "100%";
-    widgetDiv.style.width = "100%";
-    container.appendChild(widgetDiv);
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      autosize: false,
-      width: "100%",
-      height: 500,
-      symbol: ticker,
-      interval: "D",
-      timezone: "America/New_York",
-      theme: "light",
-      style: "1",
-      locale: "en",
-      enable_publishing: false,
-      allow_symbol_change: false,
-      calendar: false,
-      support_host: "https://www.tradingview.com",
-      studies: ["RSI@tv-basicstudies", "MACD@tv-basicstudies", "Volume@tv-basicstudies"],
-    });
-    container.appendChild(script);
-    return () => {
-      container.innerHTML = "";
-    };
-  }, [ticker]);
-  return <div ref={containerRef} className="tradingview-widget-container w-full" style={{ height: 500, minHeight: 500 }} />;
 }
 
 // ── Collapsible drill-down card ───────────────────────────────────────────────
@@ -517,15 +449,15 @@ export default function TickerAnalysis() {
               <div
                 className="rounded-xl px-5 py-3 flex items-center justify-between gap-4 border"
                 style={{
-                  background: ivLabel(regime.ivRvRatio).color + "0d",
-                  borderColor: ivLabel(regime.ivRvRatio).color + "33",
+                  background: ivColor(regime.ivRvRatio) + "0d",
+                  borderColor: ivColor(regime.ivRvRatio) + "33",
                 }}
               >
                 <div className="flex items-center gap-2.5">
-                  <Zap className="w-4 h-4 shrink-0" style={{ color: ivLabel(regime.ivRvRatio).color }} />
+                  <Zap className="w-4 h-4 shrink-0" style={{ color: ivColor(regime.ivRvRatio) }} />
                   <div>
-                    <span className="text-sm font-semibold" style={{ color: ivLabel(regime.ivRvRatio).color }}>
-                      {ivLabel(regime.ivRvRatio).label}
+                    <span className="text-sm font-semibold" style={{ color: ivColor(regime.ivRvRatio) }}>
+                      {ivLabel(regime.ivRvRatio)}
                     </span>
                     <span className="text-xs text-muted-foreground ml-2">
                       IV/RV: {regime.ivRvRatio.toFixed(2)} · Median IV: {(regime.medianIV * 100).toFixed(1)}% · IV Rank: {regime.ivPercentileRank.toFixed(0)}

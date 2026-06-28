@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { vcpStageLabel, vcpStageColor, scoreStyle } from "@/components/pitdesk";
+import { ROUTES } from "@/lib/routes";
 
 // Curated swing trading watchlist (22 core tickers)
 const SWING_TICKERS = [
@@ -30,32 +32,6 @@ const SWING_TICKERS = [
   "AMZN", "AAPL", "APP", "SOXL", "IONQ", "RKLB", "UNH", "FAS",
   "HOOD", "SOFI", "INTC", "BE", "RGTI", "TEM",
 ];
-
-function vcpStageLabel(stage: string) {
-  const map: Record<string, string> = {
-    VCP_PIVOT: "At Pivot",
-    BREAKOUT: "Breakout",
-    STAGE_2_UPTREND: "Uptrend",
-    STAGE_1_BASE: "Building Base",
-    STAGE_3_TOP: "Topping",
-    STAGE_4_DECLINE: "Declining",
-  };
-  return map[stage] ?? stage;
-}
-
-function vcpStageColor(stage: string) {
-  if (stage === "VCP_PIVOT") return "#22c55e";
-  if (stage === "BREAKOUT") return "#f59e0b";
-  if (stage === "STAGE_2_UPTREND") return "#6366f1";
-  return "#94a3b8";
-}
-
-function scoreColor(score: number) {
-  if (score >= 8) return { bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.35)", text: "#16a34a" };
-  if (score >= 6) return { bg: "rgba(99,102,241,0.10)", border: "rgba(99,102,241,0.30)", text: "#4f46e5" };
-  if (score >= 4) return { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.30)", text: "#d97706" };
-  return { bg: "rgba(148,163,184,0.08)", border: "rgba(148,163,184,0.25)", text: "#64748b" };
-}
 
 export default function SwingTradingPicks() {
   const [, navigate] = useLocation();
@@ -166,7 +142,7 @@ export default function SwingTradingPicks() {
 
   function openPitAdvisor(setup: SwingSetup) {
     const prompt = `I'm looking at ${setup.ticker} for a swing trade. VCP score: ${setup.vcpScore}/10, stage: ${vcpStageLabel(setup.stage)}, distance to pivot: ${setup.distanceToPivot.toFixed(1)}%. Stop loss: $${setup.stopLoss.toFixed(2)}, target: $${setup.priceTarget.toFixed(2)}, R:R ${setup.riskReward.toFixed(1)}:1. ${setup.hasVelezSignal ? "Velez scanner also flagged this ticker. " : ""}Give me a 5-dimension analysis and a specific swing trade entry plan with position sizing for a $25,000 account.`;
-    navigate(`/pit-advisor?prompt=${encodeURIComponent(prompt)}`);
+    navigate(`${ROUTES.PIT_ADVISOR}?prompt=${encodeURIComponent(prompt)}`);
   }
 
   return (
@@ -241,7 +217,7 @@ export default function SwingTradingPicks() {
             </div>
 
             {top5.map((setup, i) => {
-              const sc = scoreColor(setup.score);
+              const sc = scoreStyle(setup.score);
               const rr = setup.riskReward;
               const rrColor = rr >= 3 ? "#22c55e" : rr >= 2 ? "#6366f1" : "#f59e0b";
 
@@ -365,7 +341,7 @@ export default function SwingTradingPicks() {
                       <Button
                         size="sm"
                         className="h-8 text-xs gap-1.5 bg-indigo-500 hover:bg-indigo-600 text-white"
-                        onClick={() => navigate(`/ticker-analysis?ticker=${setup.ticker}`)}
+                        onClick={() => navigate(`${ROUTES.TICKER_ANALYSIS}?ticker=${setup.ticker}`)}
                       >
                         <Activity className="w-3.5 h-3.5" />
                         Analyze
@@ -411,7 +387,7 @@ export default function SwingTradingPicks() {
                     <tr
                       key={setup.ticker}
                       className="border-b last:border-0 hover:bg-accent/50 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/ticker-analysis?ticker=${setup.ticker}`)}
+                      onClick={() => navigate(`${ROUTES.TICKER_ANALYSIS}?ticker=${setup.ticker}`)}
                     >
                       <td className="px-3 py-2 font-mono font-semibold">{setup.ticker}</td>
                       <td className="px-3 py-2">
@@ -444,7 +420,7 @@ export default function SwingTradingPicks() {
             <Button
               variant="outline"
               className="flex-1 h-11 font-semibold gap-2"
-              onClick={() => navigate("/velez-scanner")}
+              onClick={() => navigate(ROUTES.VELEZ_SCANNER)}
             >
               <BarChart2 className="w-4 h-4" />
               Full Velez Scanner
@@ -452,7 +428,7 @@ export default function SwingTradingPicks() {
             <Button
               variant="outline"
               className="flex-1 h-11 font-semibold gap-2"
-              onClick={() => navigate("/vcp-strategy")}
+              onClick={() => navigate(ROUTES.VCP_STRATEGY)}
             >
               <TrendingUp className="w-4 h-4" />
               VCP Strategy Dashboard
