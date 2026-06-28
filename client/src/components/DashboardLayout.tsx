@@ -51,6 +51,7 @@ import {
   Zap,
   Sunrise,
   ListChecks,
+  MapPin,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -113,6 +114,7 @@ const NAV_SECTIONS = [
       { icon: Shield, label: "Pre-Market Checklist", path: "/pre-market" },
       { icon: Sunrise, label: "Morning Session", path: "/morning-session" },
       { icon: ListChecks, label: "Swing Watchlist", path: "/swing-watchlist" },
+      { icon: MapPin, label: "Liquidity Map", path: "/liquidity-map" },
       { icon: ClipboardList, label: "Trade Log", path: "/trade-log" },
       { icon: Upload, label: "Analyze My Trades", path: "/trade-upload" },
       { icon: BarChart2, label: "Performance", path: "/performance" },

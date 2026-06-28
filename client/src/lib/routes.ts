@@ -50,6 +50,7 @@ export const ROUTES = {
   TRADE_PROPOSALS: "/trade-proposals",
 
   // Advanced
+  LIQUIDITY_MAP: "/liquidity-map",
   OPTIONS_FLOW: "/options-flow",
   COT_DASHBOARD: "/cot-dashboard",
   BROKER_SETTINGS: "/broker-settings",
@@ -132,6 +133,7 @@ export const ALL_TOOLS_MENU = [
   { label: "Pre-Market Checklist", path: ROUTES.PRE_MARKET, group: "Power Tools" },
   { label: "Morning Session", path: ROUTES.MORNING_SESSION, group: "Power Tools" },
   { label: "Swing Watchlist", path: ROUTES.SWING_WATCHLIST, group: "Power Tools" },
+  { label: "Liquidity Map", path: ROUTES.LIQUIDITY_MAP, group: "Power Tools" },
   { label: "IVR Alerts", path: ROUTES.IVR_ALERTS, group: "Alerts" },
   { label: "VCP Alerts", path: ROUTES.VCP_ALERTS, group: "Alerts" },
   { label: "Full Dashboard", path: ROUTES.DASHBOARD, group: "Power Tools" },

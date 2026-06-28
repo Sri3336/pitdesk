@@ -90,6 +90,7 @@ import { tradeAnalyticsRouter } from "./routers/tradeAnalytics";
 import { preMarketChecklistRouter } from "./routers/preMarketChecklist";
 import { morningSessionRouter } from "./routers/morningSession";
 import { swingWatchlistRouter } from "./routers/swingWatchlist";
+import { liquidityMapRouter } from "./routers/liquidityMap";
 import { pitAdvisorRouter } from "./routers/pitAdvisor";
 import { optionsFlowRouter } from "./routers/optionsFlow";
 import { catalystBreakoutRouter } from "./routers/catalystBreakout";
@@ -1552,5 +1553,6 @@ export const appRouter = router({
   optionsFlow: optionsFlowRouter,
   morningSession: morningSessionRouter,
   swingWatchlist: swingWatchlistRouter,
+  liquidityMap: liquidityMapRouter,
 });
 export type AppRouter = typeof appRouter;

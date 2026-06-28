@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { TrendingUp, TrendingDown, AlertTriangle, Plus, CheckCircle2, XCircle, Minus, Clock, Settings, BookOpen } from "lucide-react";
+import { TrendingUp, TrendingDown, AlertTriangle, Plus, CheckCircle2, XCircle, Minus, Clock, Settings, BookOpen, MapPin } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -63,13 +64,16 @@ function AddTradeDialog({ onAdded, accountSize, maxRiskPerTrade }: {
     stopPrice: "",
     targetPrice: "",
     notes: "",
+    nearRetailZone: false,
+    liquidityContext: "none" as string,
+    liquidityNotes: "",
   });
 
   const addTrade = trpc.morningSession.addTrade.useMutation({
     onSuccess: () => {
       toast.success("Trade logged");
       setOpen(false);
-      setForm({ ticker: "", setupType: "ORB", direction: "LONG", entryPrice: "", stopPrice: "", targetPrice: "", notes: "" });
+      setForm({ ticker: "", setupType: "ORB", direction: "LONG", entryPrice: "", stopPrice: "", targetPrice: "", notes: "", nearRetailZone: false, liquidityContext: "none", liquidityNotes: "" });
       onAdded();
     },
     onError: (e) => toast.error(e.message),
@@ -192,6 +196,54 @@ function AddTradeDialog({ onAdded, accountSize, maxRiskPerTrade }: {
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} className="mt-1 h-20" />
           </div>
 
+          {/* AJ Liquidity Context */}
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-amber-600" />
+                <span className="text-sm font-medium text-amber-800">Near Retail Zone?</span>
+              </div>
+              <Switch
+                checked={form.nearRetailZone}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, nearRetailZone: v }))}
+              />
+            </div>
+            {form.nearRetailZone && (
+              <>
+                <div>
+                  <Label className="text-xs text-amber-700">Zone Type</Label>
+                  <Select value={form.liquidityContext} onValueChange={(v) => setForm((f) => ({ ...f, liquidityContext: v }))}>
+                    <SelectTrigger className="mt-1 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— Select zone type —</SelectItem>
+                      <SelectItem value="resistance">Resistance</SelectItem>
+                      <SelectItem value="support">Support</SelectItem>
+                      <SelectItem value="supply">Supply Zone</SelectItem>
+                      <SelectItem value="demand">Demand Zone</SelectItem>
+                      <SelectItem value="trendline">Trendline</SelectItem>
+                      <SelectItem value="fibonacci">Fibonacci</SelectItem>
+                      <SelectItem value="vwap">VWAP</SelectItem>
+                      <SelectItem value="previous_high">Previous High</SelectItem>
+                      <SelectItem value="previous_low">Previous Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-amber-700">Liquidity Note (optional)</Label>
+                  <Input
+                    className="mt-1 h-8 text-xs"
+                    placeholder="e.g. 3-touch weekly resistance, heavy OI at $185"
+                    value={form.liquidityNotes}
+                    onChange={(e) => setForm((f) => ({ ...f, liquidityNotes: e.target.value }))}
+                  />
+                </div>
+                <p className="text-xs text-amber-600">💡 AJ: Breakout at a retail zone = higher conviction. Institutions sweep stops here before reversing.</p>
+              </>
+            )}
+          </div>
+
           <Button
             className="w-full"
             disabled={!isValid || addTrade.isPending}
@@ -205,6 +257,9 @@ function AddTradeDialog({ onAdded, accountSize, maxRiskPerTrade }: {
               targetPrice: target,
               shares,
               notes: form.notes || undefined,
+              nearRetailZone: form.nearRetailZone,
+              liquidityContext: form.nearRetailZone && form.liquidityContext !== "none" ? form.liquidityContext as any : undefined,
+              liquidityNotes: form.nearRetailZone && form.liquidityNotes ? form.liquidityNotes : undefined,
             })}
           >
             {addTrade.isPending ? "Logging..." : "Log Trade"}

@@ -73,6 +73,9 @@ export const morningSessionRouter = router({
         targetPrice: z.number().positive(),
         shares: z.number().int().positive(),
         notes: z.string().optional(),
+        nearRetailZone: z.boolean().optional().default(false),
+        liquidityContext: z.enum(["resistance", "support", "supply", "demand", "trendline", "fibonacci", "vwap", "previous_high", "previous_low", "none"]).optional(),
+        liquidityNotes: z.string().max(255).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -96,6 +99,9 @@ export const morningSessionRouter = router({
         riskAmount: String(riskAmount.toFixed(2)),
         rrRatio: String(rrRatio.toFixed(2)),
         notes: input.notes ?? null,
+        nearRetailZone: input.nearRetailZone ? 1 : 0,
+        liquidityContext: input.liquidityContext ?? null,
+        liquidityNotes: input.liquidityNotes ?? null,
         status: "ACTIVE",
       });
       return { id: (result as any).insertId as number };

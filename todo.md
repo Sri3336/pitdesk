@@ -388,3 +388,16 @@
 - [ ] All Tools menu: add both new pages
 - [ ] TypeScript: 0 errors
 - [ ] Production build: clean
+
+## Phase 33 — AJ Liquidity Hunting Features
+
+- [ ] DB: add `liquidity_zones` table (id, userId, ticker, zoneType, priceLevel, priceLevelHigh, notes, isActive, createdAt)
+- [ ] DB: add `liquidity_context` column (varchar 64) and `near_retail_zone` (tinyint) to `morning_session_trades`
+- [ ] Server: liquidityMap router — addZone, editZone, deleteZone, listByTicker, listAll
+- [ ] Server: morningSession.addTrade — accept liquidityContext and nearRetailZone fields
+- [ ] Frontend: Morning Session Log Trade dialog — add "Near Retail Zone?" toggle + zone type selector + context note
+- [ ] Frontend: Liquidity Map page (/liquidity-map) — per-ticker zone manager, zone type badges, active/archived toggle
+- [ ] Sidebar nav: add Liquidity Map under Execution group
+- [ ] All Tools menu: add Liquidity Map entry
+- [ ] TypeScript: 0 errors
+- [ ] Production build: clean

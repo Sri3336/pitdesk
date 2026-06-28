@@ -595,6 +595,9 @@ export const morningSessionTrades = mysqlTable("morning_session_trades", {
   pnl: decimal("pnl", { precision: 12, scale: 2 }),
   status: mysqlEnum("status", ["ACTIVE", "WIN", "LOSS", "SCRATCH"]).default("ACTIVE").notNull(),
   notes: text("notes"),
+  nearRetailZone: tinyint("near_retail_zone").default(0).notNull(),
+  liquidityContext: varchar("liquidity_context", { length: 64 }),
+  liquidityNotes: varchar("liquidity_notes", { length: 255 }),
   enteredAt: timestamp("enteredAt").defaultNow().notNull(),
   exitedAt: timestamp("exitedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -643,3 +646,19 @@ export const swingWatchlist = mysqlTable("swing_watchlist", {
 });
 export type SwingWatchlistEntry = typeof swingWatchlist.$inferSelect;
 export type InsertSwingWatchlistEntry = typeof swingWatchlist.$inferInsert;
+
+// ─── Liquidity Zones (AJ Liquidity Hunting) ───────────────────────────────────
+export const liquidityZones = mysqlTable("liquidity_zones", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  zoneType: varchar("zone_type", { length: 32 }).notNull(), // resistance|support|supply|demand|trendline|fibonacci|vwap|previous_high|previous_low|other
+  priceLevel: decimal("price_level", { precision: 12, scale: 4 }).notNull(),
+  priceLevelHigh: decimal("price_level_high", { precision: 12, scale: 4 }),
+  notes: text("notes"),
+  isActive: tinyint("is_active").default(1).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type LiquidityZone = typeof liquidityZones.$inferSelect;
+export type InsertLiquidityZone = typeof liquidityZones.$inferInsert;
