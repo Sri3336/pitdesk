@@ -18,6 +18,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { ROUTES } from "@/lib/routes";
+import { LosingStreakAnalyzer } from "@/components/pitdesk/LosingStreakAnalyzer";
 import {
   AlertTriangle,
   BarChart2,
@@ -286,6 +287,16 @@ function MyTradesTab() {
           </Button>
         </div>
       )}
+
+      {/* ── Streak Analysis ── */}
+      <div className="rounded-xl border border-border p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <BarChart2 className="h-4 w-4 text-purple-500" />
+          <span className="font-semibold text-sm">Streak Analysis</span>
+          <span className="text-xs text-muted-foreground ml-1">(Rajan Daal 33% Rule)</span>
+        </div>
+        <LosingStreakAnalyzer accountId={selectedAccount !== "all" ? selectedAccount : undefined} />
+      </div>
 
       {/* Trades table */}
       {tradesQuery.isLoading ? (

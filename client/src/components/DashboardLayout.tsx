@@ -108,8 +108,9 @@ const NAV_SECTIONS = [
     items: [
       { icon: MessageSquare, label: "Pit Advisor", path: "/pit-advisor" },
       { icon: Zap, label: "AI Agent", path: "/agent" },
+      { icon: Shield, label: "Pre-Market Checklist", path: "/pre-market" },
       { icon: ClipboardList, label: "Trade Log", path: "/trade-log" },
-      { icon: Upload, label: "Trade Upload", path: "/trade-upload" },
+      { icon: Upload, label: "Analyze My Trades", path: "/trade-upload" },
       { icon: BarChart2, label: "Performance", path: "/performance" },
       { icon: BookOpen, label: "Trade Proposals", path: "/trade-proposals" },
     ],

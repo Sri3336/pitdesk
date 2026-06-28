@@ -334,3 +334,17 @@
 - [x] Frontend: Portfolio Summary card at top of Positions tab — total market value, total unrealized P&L, total realized P&L (from trade history), per-account breakdown
 - [x] TypeScript: 0 errors
 - [x] Production build: clean
+
+## Phase 31 — Trading Psychology & Risk Features (Rajan Daal 33% Rule)
+
+- [x] DB: create `pre_market_checklist_items` table (id, userId, date YYYY-MM-DD, itemKey, label, completed, completedAt)
+- [x] DB: create `drawdown_settings` table (id, userId, maxDrawdownPct, riskPerTradePct, totalCapital, updatedAt)
+- [x] Server: tradeAnalytics router — losingStreakAnalysis (max streak, avg streak, current streak, streak distribution, risk-per-trade vs Rajan formula)
+- [x] Server: tradeAnalytics router — drawdownStats (realized P&L from trade history, unrealized P&L from positions, current drawdown %, daily loss today)
+- [x] Server: preMarketChecklist router — todayChecklist, completeItem, resetDay, saveSettings
+- [x] Frontend: Losing Streak panel in My Trades tab
+- [x] Frontend: new Pre-Market Checklist page (/pre-market)
+- [x] Frontend: Drawdown Monitor card on dashboard home
+- [x] Sidebar nav: add Pre-Market Checklist under Execution group
+- [x] TypeScript: 0 errors
+- [x] Production build: clean

@@ -550,3 +550,29 @@ export const positions = mysqlTable("positions", {
 });
 export type Position = typeof positions.$inferSelect;
 export type InsertPosition = typeof positions.$inferInsert;
+
+// ─── Pre-Market Checklist ─────────────────────────────────────────────────────
+export const preMarketChecklistItems = mysqlTable("pre_market_checklist_items", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(),       // YYYY-MM-DD
+  itemKey: varchar("itemKey", { length: 64 }).notNull(), // e.g. "market_bias"
+  label: varchar("label", { length: 128 }).notNull(),
+  completed: boolean("completed").default(false).notNull(),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PreMarketChecklistItem = typeof preMarketChecklistItems.$inferSelect;
+export type InsertPreMarketChecklistItem = typeof preMarketChecklistItems.$inferInsert;
+
+// ─── Drawdown Settings ────────────────────────────────────────────────────────
+export const drawdownSettings = mysqlTable("drawdown_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  maxDrawdownPct: decimal("maxDrawdownPct", { precision: 6, scale: 2 }).default("20.00").notNull(),
+  riskPerTradePct: decimal("riskPerTradePct", { precision: 6, scale: 2 }).default("0.66").notNull(),
+  totalCapital: decimal("totalCapital", { precision: 14, scale: 2 }).default("350000.00").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type DrawdownSettings = typeof drawdownSettings.$inferSelect;
+export type InsertDrawdownSettings = typeof drawdownSettings.$inferInsert;

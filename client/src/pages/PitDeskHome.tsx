@@ -10,6 +10,7 @@ import {
   LineChart, Scan, Globe, MessageSquare, Bell, ChevronRight,
   Flame, RefreshCw,
 } from "lucide-react";
+import { DrawdownMonitor } from "@/components/pitdesk/DrawdownMonitor";
 import { useLocation } from "wouter";
 import { useState, useEffect, useRef } from "react";
 
@@ -330,6 +331,9 @@ export default function PitDeskHome() {
                 color="#f59e0b"
               />
             </div>
+
+            {/* Drawdown Monitor */}
+            <DrawdownMonitor />
 
             {/* Active trades */}
             <div>

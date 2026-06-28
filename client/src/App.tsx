@@ -78,6 +78,7 @@ const Glossary = lazy(() => import("./pages/Glossary").catch(() => ({ default: (
 const HowTo = lazy(() => import("./pages/HowTo"));
 const PitAdvisor = lazy(() => import("./pages/PitAdvisor"));
 const TradeUpload = lazy(() => import("./pages/TradeUpload"));
+const PreMarketChecklist = lazy(() => import("./pages/PreMarketChecklist"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -198,6 +199,7 @@ function Router() {
                 <Route path="/fib-ema-alerts" component={FibEmaAlerts} />
 
                 {/* Intelligence / Execution */}
+                <Route path="/pre-market" component={PreMarketChecklist} />
                 <Route path="/agent" component={TradeProposals} />
                 <Route path="/trade-proposals" component={TradeProposals} />
                 <Route path="/performance" component={Performance} />
