@@ -49,6 +49,8 @@ import {
   TrendingUp,
   Upload,
   Zap,
+  Sunrise,
+  ListChecks,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -109,6 +111,8 @@ const NAV_SECTIONS = [
       { icon: MessageSquare, label: "Pit Advisor", path: "/pit-advisor" },
       { icon: Zap, label: "AI Agent", path: "/agent" },
       { icon: Shield, label: "Pre-Market Checklist", path: "/pre-market" },
+      { icon: Sunrise, label: "Morning Session", path: "/morning-session" },
+      { icon: ListChecks, label: "Swing Watchlist", path: "/swing-watchlist" },
       { icon: ClipboardList, label: "Trade Log", path: "/trade-log" },
       { icon: Upload, label: "Analyze My Trades", path: "/trade-upload" },
       { icon: BarChart2, label: "Performance", path: "/performance" },

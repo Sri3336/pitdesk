@@ -348,3 +348,43 @@
 - [x] Sidebar nav: add Pre-Market Checklist under Execution group
 - [x] TypeScript: 0 errors
 - [x] Production build: clean
+
+## Phase 32 — Systematic Trading Methodology (Monday-Ready)
+
+### DB
+- [ ] DB: create `morning_session_trades` table (id, userId, date, ticker, setupType, direction, entryPrice, stopPrice, targetPrice, exitPrice, shares, pnl, status, notes, enteredAt, exitedAt)
+- [ ] DB: create `session_settings` table (userId, maxRiskPerTrade, dailyLossLimit, maxTradesPerDay, accountSize)
+- [ ] DB: create `swing_watchlist` table (id, userId, ticker, setupType, entryPrice, stopPrice, targetPrice, shares, status, entryDate, exitDate, exitPrice, pnl, notes, dayCount)
+
+### Server
+- [ ] Server: morningSession router — addTrade, updateTrade, closeTrade, sessionSummary, getSettings, saveSettings
+- [ ] Server: swingWatchlist router — addSetup, updateSetup, closeSetup, getWatchlist, getStats
+
+### Frontend — Morning Session Dashboard (/morning-session)
+- [ ] Session header: date, SPY/QQQ bias badge, VIX level, session P&L card, trades taken counter, risk used bar
+- [ ] Three setup cards: ORB, Gap & Go, VWAP Reclaim — each with rule reminder tooltip
+- [ ] Quick-add trade form: ticker, setup type, direction, entry, stop, target → auto-calculates shares and R/R
+- [ ] Active trades table: ticker, setup, entry, stop, target, current P&L, time in trade, close button
+- [ ] Session log: all trades for today with outcome badges (Win/Loss/Scratch)
+- [ ] Risk enforcement: disable Add Trade when daily loss limit hit or max trades reached
+
+### Frontend — Swing Watchlist (/swing-watchlist)
+- [ ] Four setup type tabs: Post-Earnings, Catalyst Breakout, VCP, Gap Fill
+- [ ] Add Setup form: ticker, setup type, entry zone, stop, target, account, notes
+- [ ] Position sizer: auto-calculates shares from 1.5% account risk rule
+- [ ] Active setups table with day count badge (D1 green / D2 amber / D3 red time-stop warning)
+- [ ] Closed setups history with win/loss stats per setup type
+
+### Frontend — Pre-Market Checklist Update
+- [ ] Item 1: SPY/QQQ bias → sets Long/Short/Flat market bias for the session
+- [ ] Item 2: VIX level → shows size reduction rule (>20: -25%, >25: skip ORB)
+- [ ] Item 3: Gappers scan — input field for top 3 gap candidates with catalyst notes
+- [ ] Item 4: Earnings calendar — any holdings reporting today?
+- [ ] Item 5: Account P&L gate — if down >1% this week, confirm reduced risk mode
+- [ ] Item 6: Watchlist ready — 3-5 tickers with OR levels pre-marked
+
+### Nav & Build
+- [ ] Sidebar nav: add Morning Session and Swing Watchlist under new "Session" group
+- [ ] All Tools menu: add both new pages
+- [ ] TypeScript: 0 errors
+- [ ] Production build: clean

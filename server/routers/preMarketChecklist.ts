@@ -17,12 +17,14 @@ import { and, desc, eq, sql } from "drizzle-orm";
 // ─── Default checklist items ──────────────────────────────────────────────────
 
 const DEFAULT_ITEMS = [
-  { key: "market_bias",     label: "Check market bias (futures, pre-market gap, sector rotation)" },
-  { key: "news_check",      label: "Review overnight news & earnings (Bloomberg, Reuters, CNBC)" },
-  { key: "account_pnl",     label: "Check account P&L vs. daily loss limit" },
-  { key: "watchlist",       label: "Review watchlist — confirm setups still valid" },
-  { key: "risk_sizing",     label: "Set position sizes for today (max risk per trade)" },
-  { key: "mindset",         label: "Mindset check — calm, rested, no revenge mindset" },
+  { key: "vix_check",       label: "Check VIX — note level (skip ORB if >25, reduce size if >20)" },
+  { key: "spy_bias",        label: "SPY/QQQ pre-market bias — above or below yesterday's close?" },
+  { key: "gappers",         label: "Scan top gappers (≥1.5%) — identify catalyst, float, volume" },
+  { key: "account_gate",    label: "Account P&L gate — daily loss limit not hit, no revenge mindset" },
+  { key: "setups_confirmed",label: "Confirm swing watchlist setups still valid (no overnight news)" },
+  { key: "risk_sizing",     label: "Set max risk per trade and max trades for today's session" },
+  { key: "mindset",         label: "Mindset check — calm, rested, no FOMO, ready to follow rules" },
+  { key: "time_block",      label: "Block 9:30–11:30 AM calendar — no meetings, no distractions" },
 ];
 
 function todayET(): string {
@@ -37,7 +39,7 @@ export const preMarketChecklistRouter = router({
   todayChecklist: protectedProcedure
     .query(async ({ ctx }) => {
       const db = await getDb();
-      if (!db) return { date: todayET(), items: [], completedCount: 0, totalCount: 6 };
+      if (!db) return { date: todayET(), items: [], completedCount: 0, totalCount: DEFAULT_ITEMS.length };
 
       const date = todayET();
 

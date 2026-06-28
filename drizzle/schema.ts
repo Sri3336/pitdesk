@@ -576,3 +576,70 @@ export const drawdownSettings = mysqlTable("drawdown_settings", {
 });
 export type DrawdownSettings = typeof drawdownSettings.$inferSelect;
 export type InsertDrawdownSettings = typeof drawdownSettings.$inferInsert;
+
+// ─── Morning Session Trades ───────────────────────────────────────────────────
+export const morningSessionTrades = mysqlTable("morning_session_trades", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  setupType: mysqlEnum("setupType", ["ORB", "GAP_GO", "VWAP_RECLAIM"]).notNull(),
+  direction: mysqlEnum("direction", ["LONG", "SHORT"]).notNull(),
+  entryPrice: decimal("entryPrice", { precision: 12, scale: 4 }).notNull(),
+  stopPrice: decimal("stopPrice", { precision: 12, scale: 4 }).notNull(),
+  targetPrice: decimal("targetPrice", { precision: 12, scale: 4 }).notNull(),
+  exitPrice: decimal("exitPrice", { precision: 12, scale: 4 }),
+  shares: int("shares").notNull(),
+  riskAmount: decimal("riskAmount", { precision: 12, scale: 2 }).notNull(),
+  rrRatio: decimal("rrRatio", { precision: 6, scale: 2 }).notNull(),
+  pnl: decimal("pnl", { precision: 12, scale: 2 }),
+  status: mysqlEnum("status", ["ACTIVE", "WIN", "LOSS", "SCRATCH"]).default("ACTIVE").notNull(),
+  notes: text("notes"),
+  enteredAt: timestamp("enteredAt").defaultNow().notNull(),
+  exitedAt: timestamp("exitedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MorningSessionTrade = typeof morningSessionTrades.$inferSelect;
+export type InsertMorningSessionTrade = typeof morningSessionTrades.$inferInsert;
+
+// ─── Session Settings ─────────────────────────────────────────────────────────
+export const sessionSettings = mysqlTable("session_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  accountSize: decimal("accountSize", { precision: 14, scale: 2 }).default("350000.00").notNull(),
+  maxRiskPerTradePct: decimal("maxRiskPerTradePct", { precision: 6, scale: 2 }).default("1.00").notNull(),
+  dailyLossLimitPct: decimal("dailyLossLimitPct", { precision: 6, scale: 2 }).default("2.00").notNull(),
+  maxTradesPerDay: int("maxTradesPerDay").default(3).notNull(),
+  swingRiskPerTradePct: decimal("swingRiskPerTradePct", { precision: 6, scale: 2 }).default("1.50").notNull(),
+  maxConcurrentSwings: int("maxConcurrentSwings").default(3).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SessionSettings = typeof sessionSettings.$inferSelect;
+export type InsertSessionSettings = typeof sessionSettings.$inferInsert;
+
+// ─── Swing Watchlist ──────────────────────────────────────────────────────────
+export const swingWatchlist = mysqlTable("swing_watchlist", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  setupType: mysqlEnum("setupType", ["POST_EARNINGS", "CATALYST_BREAKOUT", "VCP", "GAP_FILL"]).notNull(),
+  direction: mysqlEnum("direction", ["LONG", "SHORT"]).default("LONG").notNull(),
+  entryPrice: decimal("entryPrice", { precision: 12, scale: 4 }).notNull(),
+  stopPrice: decimal("stopPrice", { precision: 12, scale: 4 }).notNull(),
+  targetPrice: decimal("targetPrice", { precision: 12, scale: 4 }).notNull(),
+  shares: int("shares").notNull(),
+  riskAmount: decimal("riskAmount", { precision: 12, scale: 2 }).notNull(),
+  rrRatio: decimal("rrRatio", { precision: 6, scale: 2 }).notNull(),
+  accountId: varchar("accountId", { length: 32 }), // etrade_4723 | etrade_2738 | schwab
+  status: mysqlEnum("status", ["WATCHING", "ACTIVE", "WIN", "LOSS", "SCRATCH", "EXPIRED"]).default("WATCHING").notNull(),
+  entryDate: varchar("entryDate", { length: 10 }), // YYYY-MM-DD — set when status → ACTIVE
+  exitDate: varchar("exitDate", { length: 10 }),
+  exitPrice: decimal("exitPrice", { precision: 12, scale: 4 }),
+  pnl: decimal("pnl", { precision: 12, scale: 2 }),
+  dayCount: int("dayCount").default(0).notNull(), // days since entry (0 = not yet entered)
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SwingWatchlistEntry = typeof swingWatchlist.$inferSelect;
+export type InsertSwingWatchlistEntry = typeof swingWatchlist.$inferInsert;

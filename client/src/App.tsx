@@ -79,6 +79,8 @@ const HowTo = lazy(() => import("./pages/HowTo"));
 const PitAdvisor = lazy(() => import("./pages/PitAdvisor"));
 const TradeUpload = lazy(() => import("./pages/TradeUpload"));
 const PreMarketChecklist = lazy(() => import("./pages/PreMarketChecklist"));
+const MorningSession = lazy(() => import("./pages/MorningSession"));
+const SwingWatchlist = lazy(() => import("./pages/SwingWatchlist"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -200,6 +202,8 @@ function Router() {
 
                 {/* Intelligence / Execution */}
                 <Route path="/pre-market" component={PreMarketChecklist} />
+                <Route path="/morning-session" component={MorningSession} />
+                <Route path="/swing-watchlist" component={SwingWatchlist} />
                 <Route path="/agent" component={TradeProposals} />
                 <Route path="/trade-proposals" component={TradeProposals} />
                 <Route path="/performance" component={Performance} />

@@ -43,6 +43,8 @@ export const ROUTES = {
   // Execution
   AI_AGENT: "/agent",
   PRE_MARKET: "/pre-market",
+  MORNING_SESSION: "/morning-session",
+  SWING_WATCHLIST: "/swing-watchlist",
   TRADE_LOG: "/trade-log",
   PERFORMANCE: "/performance",
   TRADE_PROPOSALS: "/trade-proposals",
@@ -128,6 +130,8 @@ export const ALL_TOOLS_MENU = [
   { label: "Catalyst Watch", path: ROUTES.CATALYST_WATCH, group: "Power Tools" },
   { label: "Trade Log", path: ROUTES.TRADE_LOG, group: "Power Tools" },
   { label: "Pre-Market Checklist", path: ROUTES.PRE_MARKET, group: "Power Tools" },
+  { label: "Morning Session", path: ROUTES.MORNING_SESSION, group: "Power Tools" },
+  { label: "Swing Watchlist", path: ROUTES.SWING_WATCHLIST, group: "Power Tools" },
   { label: "IVR Alerts", path: ROUTES.IVR_ALERTS, group: "Alerts" },
   { label: "VCP Alerts", path: ROUTES.VCP_ALERTS, group: "Alerts" },
   { label: "Full Dashboard", path: ROUTES.DASHBOARD, group: "Power Tools" },
