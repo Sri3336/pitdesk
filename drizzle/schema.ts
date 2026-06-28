@@ -488,6 +488,8 @@ export const tradeUploadBatches = mysqlTable("trade_upload_batches", {
   rowCount: int("rowCount").notNull().default(0),
   source: varchar("source", { length: 64 }).default("csv"), // "csv" | "etrade" | "schwab"
   status: mysqlEnum("status", ["pending", "processed", "failed"]).default("processed").notNull(),
+  accountId: varchar("accountId", { length: 32 }),   // e.g. "etrade-4723"
+  accountLabel: varchar("accountLabel", { length: 64 }), // e.g. "E*TRADE -4723"
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type TradeUploadBatch = typeof tradeUploadBatches.$inferSelect;
@@ -509,7 +511,42 @@ export const uploadedTrades = mysqlTable("uploaded_trades", {
   assetType: mysqlEnum("assetType", ["stock", "option", "etf", "other"]).default("stock").notNull(),
   notes: varchar("notes", { length: 512 }),
   isWin: boolean("isWin"),
+  accountId: varchar("accountId", { length: 32 }),   // e.g. "etrade-4723"
+  accountLabel: varchar("accountLabel", { length: 64 }), // e.g. "E*TRADE -4723"
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type UploadedTrade = typeof uploadedTrades.$inferSelect;
 export type InsertUploadedTrade = typeof uploadedTrades.$inferInsert;
+
+// ─── Positions (current holdings per account) ─────────────────────────────────
+export const positionBatches = mysqlTable("position_batches", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  rowCount: int("rowCount").notNull().default(0),
+  accountId: varchar("accountId", { length: 32 }).notNull(),
+  accountLabel: varchar("accountLabel", { length: 64 }).notNull(),
+  uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
+});
+export type PositionBatch = typeof positionBatches.$inferSelect;
+export type InsertPositionBatch = typeof positionBatches.$inferInsert;
+
+export const positions = mysqlTable("positions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  batchId: int("batchId").notNull(),
+  accountId: varchar("accountId", { length: 32 }).notNull(),
+  accountLabel: varchar("accountLabel", { length: 64 }).notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  qty: decimal("qty", { precision: 12, scale: 4 }).notNull(),
+  avgCost: decimal("avgCost", { precision: 12, scale: 4 }),
+  currentPrice: decimal("currentPrice", { precision: 12, scale: 4 }),
+  marketValue: decimal("marketValue", { precision: 14, scale: 4 }),
+  unrealizedPnl: decimal("unrealizedPnl", { precision: 14, scale: 4 }),
+  unrealizedPnlPct: decimal("unrealizedPnlPct", { precision: 8, scale: 4 }),
+  assetType: mysqlEnum("assetType", ["stock", "option", "etf", "other"]).default("stock").notNull(),
+  notes: varchar("notes", { length: 512 }),
+  uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
+});
+export type Position = typeof positions.$inferSelect;
+export type InsertPosition = typeof positions.$inferInsert;

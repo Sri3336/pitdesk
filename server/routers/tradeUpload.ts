@@ -16,9 +16,16 @@ import { getDb } from "../db";
 import { uploadedTrades, tradeUploadBatches } from "../../drizzle/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 
+// ─── Known Accounts ────────────────────────────────────────────────────────────
+
+export const KNOWN_ACCOUNTS = [
+  { id: "etrade-4723", label: "E*TRADE -4723" },
+  { id: "etrade-2738", label: "E*TRADE -2738" },
+  { id: "schwab",      label: "Schwab" },
+] as const;
+
 // ─── CSV Parser ───────────────────────────────────────────────────────────────
 
-// Column aliases for auto-detection
 const COLUMN_ALIASES: Record<string, string[]> = {
   ticker:      ["ticker", "symbol", "stock", "instrument", "security", "asset"],
   tradeDate:   ["date", "tradedate", "trade_date", "transactiondate", "transaction_date", "opendate", "open_date", "closedate", "close_date", "time"],
@@ -44,13 +51,10 @@ function detectColumn(headers: string[], field: string): number {
 
 function parseDate(raw: string): string {
   if (!raw) return "";
-  // Try ISO
   const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  // MM/DD/YYYY
   const us = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (us) return `${us[3]}-${us[1].padStart(2, "0")}-${us[2].padStart(2, "0")}`;
-  // DD/MM/YYYY
   const eu = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   if (eu) {
     const year = eu[3].length === 2 ? `20${eu[3]}` : eu[3];
@@ -81,22 +85,10 @@ function parseNumber(raw: string): number | null {
   return isNaN(n) ? null : n;
 }
 
-function parseCsvText(csvText: string): {
-  headers: string[];
-  columnMap: Record<string, number>;
-  rows: Array<Record<string, string>>;
-  preview: Array<{
-    ticker: string; tradeDate: string; side: string; qty: number | null;
-    entryPrice: number | null; exitPrice: number | null; pnl: number | null;
-    pnlPct: number | null; strategy: string; assetType: string; notes: string;
-    _raw: Record<string, string>;
-  }>;
-  unmappedColumns: string[];
-} {
+function parseCsvText(csvText: string) {
   const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) throw new Error("CSV must have at least a header row and one data row");
 
-  // Parse headers — handle quoted fields
   const parseRow = (line: string): string[] => {
     const result: string[] = [];
     let current = "";
@@ -152,11 +144,16 @@ function parseCsvText(csvText: string): {
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const tradeUploadRouter = router({
+  // List known accounts
+  knownAccounts: publicProcedure.query(() => KNOWN_ACCOUNTS),
+
   // Parse CSV text — returns preview without saving
   parseCsv: protectedProcedure
     .input(z.object({
-      csvText: z.string().max(5_000_000), // 5MB max
+      csvText: z.string().max(5_000_000),
       filename: z.string().max(255).default("trades.csv"),
+      accountId: z.string().max(32).optional(),
+      accountLabel: z.string().max(64).optional(),
     }))
     .mutation(async ({ input }) => {
       try {
@@ -183,6 +180,8 @@ export const tradeUploadRouter = router({
     .input(z.object({
       csvText: z.string().max(5_000_000),
       filename: z.string().max(255).default("trades.csv"),
+      accountId: z.string().max(32).optional(),
+      accountLabel: z.string().max(64).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -190,17 +189,17 @@ export const tradeUploadRouter = router({
 
       const { rows, columnMap, headers } = parseCsvText(input.csvText);
 
-      // Create batch record
       const [batchResult] = await db.insert(tradeUploadBatches).values({
         userId: ctx.user.id,
         filename: input.filename,
         rowCount: rows.length,
         source: "csv",
         status: "processed",
+        accountId: input.accountId ?? null,
+        accountLabel: input.accountLabel ?? null,
       });
       const batchId = (batchResult as { insertId: number }).insertId;
 
-      // Insert trades in chunks of 100
       const get = (row: Record<string, string>, field: string) =>
         columnMap[field] !== undefined ? row[headers[columnMap[field]]] ?? "" : "";
 
@@ -230,6 +229,8 @@ export const tradeUploadRouter = router({
             assetType: normalizeAssetType(get(row, "assetType") || "stock") as "stock" | "option" | "etf" | "other",
             notes: get(row, "notes").slice(0, 512) || null,
             isWin,
+            accountId: input.accountId ?? null,
+            accountLabel: input.accountLabel ?? null,
           };
         })
         .filter((r): r is NonNullable<typeof r> => r !== null);
@@ -244,11 +245,12 @@ export const tradeUploadRouter = router({
       return { success: true, batchId, rowsInserted: tradeRows.length };
     }),
 
-  // List current user's trades
+  // List current user's trades — filterable by accountId
   myTrades: protectedProcedure
     .input(z.object({
       batchId: z.number().optional(),
       ticker: z.string().optional(),
+      accountId: z.string().optional(),
       limit: z.number().min(1).max(500).default(200),
     }))
     .query(async ({ ctx, input }) => {
@@ -258,6 +260,7 @@ export const tradeUploadRouter = router({
       const conditions = [eq(uploadedTrades.userId, ctx.user.id)];
       if (input.batchId) conditions.push(eq(uploadedTrades.batchId, input.batchId));
       if (input.ticker) conditions.push(eq(uploadedTrades.ticker, input.ticker.toUpperCase()));
+      if (input.accountId) conditions.push(eq(uploadedTrades.accountId, input.accountId));
 
       const trades = await db
         .select()
@@ -266,7 +269,6 @@ export const tradeUploadRouter = router({
         .orderBy(desc(uploadedTrades.tradeDate))
         .limit(input.limit);
 
-      // Compute summary
       const withPnl = trades.filter(t => t.pnl !== null);
       const wins = withPnl.filter(t => t.isWin === true);
       const totalPnl = withPnl.reduce((s, t) => s + parseFloat(t.pnl as string), 0);
@@ -285,17 +287,21 @@ export const tradeUploadRouter = router({
       return { trades, summary };
     }),
 
-  // List upload batches
-  myBatches: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (!db) return [];
-    return db
-      .select()
-      .from(tradeUploadBatches)
-      .where(eq(tradeUploadBatches.userId, ctx.user.id))
-      .orderBy(desc(tradeUploadBatches.createdAt))
-      .limit(50);
-  }),
+  // List upload batches — filterable by accountId
+  myBatches: protectedProcedure
+    .input(z.object({ accountId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const conditions = [eq(tradeUploadBatches.userId, ctx.user.id)];
+      if (input?.accountId) conditions.push(eq(tradeUploadBatches.accountId, input.accountId));
+      return db
+        .select()
+        .from(tradeUploadBatches)
+        .where(and(...conditions))
+        .orderBy(desc(tradeUploadBatches.createdAt))
+        .limit(50);
+    }),
 
   // Delete a batch
   deleteBatch: protectedProcedure
@@ -304,7 +310,6 @@ export const tradeUploadRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // Verify ownership
       const [batch] = await db
         .select({ id: tradeUploadBatches.id })
         .from(tradeUploadBatches)
@@ -322,7 +327,7 @@ export const tradeUploadRouter = router({
   // Community insights — anonymized aggregation across ALL users
   communityInsights: protectedProcedure
     .input(z.object({
-      minTrades: z.number().min(1).default(3), // only show tickers with ≥3 community trades
+      minTrades: z.number().min(1).default(3),
       limit: z.number().min(1).max(100).default(30),
     }))
     .query(async ({ input }) => {

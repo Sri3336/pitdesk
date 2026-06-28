@@ -85,6 +85,7 @@ import { runOpeningRangeScalperScan, scanOpeningRangeScalper } from "./openingRa
 import { runPRPScanner, scanPreviousRangePullback } from "./previousRangeScanner";
 import { brokerRouter, agentRouter, tradeLogRouter } from "./routers/agent";
 import { tradeUploadRouter } from "./routers/tradeUpload";
+import { positionsRouter } from "./routers/positions";
 import { pitAdvisorRouter } from "./routers/pitAdvisor";
 import { optionsFlowRouter } from "./routers/optionsFlow";
 import { catalystBreakoutRouter } from "./routers/catalystBreakout";
@@ -1540,6 +1541,7 @@ export const appRouter = router({
   openingRangeScalper: openingRangeScalperRouter,
     previousRange: previousRangeRouter,
   tradeUpload: tradeUploadRouter,
+  positions: positionsRouter,
   pitAdvisor: pitAdvisorRouter,
   optionsFlow: optionsFlowRouter,
 });

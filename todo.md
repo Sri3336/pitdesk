@@ -319,3 +319,18 @@
 - [x] TypeScript check: 0 errors
 - [x] Production build: clean (12s)
 - [x] Skill updated: options-trading-analyzer-builder SKILL.md — Design System section added
+
+## Phase 30 — Account-Aware Trade History + Positions Tracking
+- [x] DB: add `account_id` (varchar 32) and `account_label` (varchar 64) to `uploaded_trades` table
+- [x] DB: add `account_id` and `account_label` to `trade_upload_batches` table
+- [x] DB: create `positions` table (id, userId, accountId, accountLabel, ticker, qty, avgCost, currentPrice, marketValue, unrealizedPnl, unrealizedPnlPct, assetType, notes, uploadedAt)
+- [x] DB: create `position_batches` table (id, userId, accountId, accountLabel, filename, rowCount, uploadedAt)
+- [x] Drizzle schema.ts: add account fields to uploadedTrades + tradeUploadBatches, add positions + positionBatches tables
+- [x] Server: tradeUpload router — accept accountId + accountLabel in parseCsv and confirmUpload; filter myTrades and myBatches by accountId
+- [x] Server: positions router — parseCsv (detect qty/avgCost/currentPrice/marketValue/unrealizedPnl columns), confirmUpload, myPositions (with portfolio summary), myBatches, deleteBatch
+- [x] Frontend: Upload CSV tab — add account selector dropdown (E*TRADE -4723, E*TRADE -2738, Schwab, + custom) before drop zone
+- [x] Frontend: My Trades tab — add account filter pill row (All / per-account), pass accountId to myTrades query
+- [x] Frontend: new Positions tab — positions upload zone + current holdings table (ticker, qty, avg cost, current price, market value, unrealized P&L, unrealized P&L%)
+- [x] Frontend: Portfolio Summary card at top of Positions tab — total market value, total unrealized P&L, total realized P&L (from trade history), per-account breakdown
+- [x] TypeScript: 0 errors
+- [x] Production build: clean
