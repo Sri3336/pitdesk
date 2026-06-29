@@ -662,3 +662,36 @@ export const liquidityZones = mysqlTable("liquidity_zones", {
 });
 export type LiquidityZone = typeof liquidityZones.$inferSelect;
 export type InsertLiquidityZone = typeof liquidityZones.$inferInsert;
+
+// ─── Historical Price Bars (5-Year OHLCV for Backtesting) ─────────────────────
+export const priceBars = mysqlTable("price_bars", {
+  id: int("id").autoincrement().primaryKey(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(),
+  open: decimal("open", { precision: 14, scale: 4 }).notNull(),
+  high: decimal("high", { precision: 14, scale: 4 }).notNull(),
+  low: decimal("low", { precision: 14, scale: 4 }).notNull(),
+  close: decimal("close", { precision: 14, scale: 4 }).notNull(),
+  volume: bigint("volume", { mode: "number" }).notNull(),
+  adjClose: decimal("adj_close", { precision: 14, scale: 4 }),
+  interval: varchar("interval", { length: 10 }).default("1d").notNull(),
+  source: varchar("source", { length: 32 }).default("yahoo").notNull(),
+  fetchedAt: bigint("fetched_at", { mode: "number" }).notNull(),
+});
+export type PriceBar = typeof priceBars.$inferSelect;
+export type InsertPriceBar = typeof priceBars.$inferInsert;
+
+// ─── Price Download Jobs ───────────────────────────────────────────────────────
+export const priceDownloadJobs = mysqlTable("price_download_jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  universe: varchar("universe", { length: 32 }).notNull(),
+  status: mysqlEnum("status", ["pending", "running", "done", "error"]).default("pending").notNull(),
+  barsDownloaded: int("bars_downloaded").default(0).notNull(),
+  errorMsg: text("error_msg"),
+  startedAt: bigint("started_at", { mode: "number" }),
+  completedAt: bigint("completed_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type PriceDownloadJob = typeof priceDownloadJobs.$inferSelect;
+export type InsertPriceDownloadJob = typeof priceDownloadJobs.$inferInsert;

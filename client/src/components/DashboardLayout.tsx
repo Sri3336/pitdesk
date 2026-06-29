@@ -52,6 +52,7 @@ import {
   Sunrise,
   ListChecks,
   MapPin,
+  HardDrive,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -128,6 +129,7 @@ const NAV_SECTIONS = [
     items: [
       { icon: Zap, label: "Options Flow", path: "/options-flow" },
       { icon: Database, label: "COT Dashboard", path: "/cot-dashboard" },
+      { icon: HardDrive, label: "Historical Data", path: "/historical-data" },
       { icon: Building2, label: "Broker Settings", path: "/broker-settings" },
     ],
   },

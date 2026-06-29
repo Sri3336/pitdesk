@@ -444,3 +444,16 @@
 - [x] Frontend: Green pulse dot "Auto-scanning every 30 seconds" status indicator
 - [x] TypeScript: 0 errors
 - [x] Production build: clean
+
+## Phase 37 — Historical Price Data Store (5-Year OHLCV for Backtesting)
+- [x] DB: create `price_bars` table (id, ticker, date, open, high, low, close, volume, adjClose, interval, source, fetchedAt)
+- [x] DB: create `price_download_jobs` table (id, ticker, status, barsDownloaded, errorMsg, startedAt, completedAt)
+- [x] Server: historicalData router — startBulkDownload (queues all 212 tickers), getDownloadStatus (per-ticker progress), queryBars (ticker + date range → OHLCV rows), exportCsv (ticker list → CSV string), getUniverseSummary (count bars per ticker)
+- [x] Server: bulk download logic — fetch 5yr daily bars from YahooFinance via callDataApi, upsert into price_bars, update job status
+- [x] Frontend: HistoricalData.tsx page — universe checkboxes, Start Download button, live progress table (ticker, status, bars, error), summary stats card, CSV export panel
+- [ ] Frontend: per-ticker mini chart preview (last 30 bars sparkline) in the data explorer [deferred]
+- [x] Frontend: CSV export — select tickers + date range → download combined CSV
+- [x] Route /historical-data in App.tsx
+- [x] Sidebar nav: add Historical Data under Data & Settings group
+- [x] TypeScript: 0 errors
+- [x] Production build: clean
