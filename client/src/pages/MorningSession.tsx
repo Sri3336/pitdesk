@@ -56,6 +56,15 @@ function AddTradeDialog({ onAdded, accountSize, maxRiskPerTrade }: {
   maxRiskPerTrade: number;
 }) {
   const [open, setOpen] = useState(false);
+  const todayStr = useMemo(() => today(), []);
+  const { data: lastTradeData } = trpc.duxScanner.lastTradeResult.useQuery(
+    { date: todayStr },
+    { enabled: open }
+  );
+  const sizeDownActive = lastTradeData?.isLoss && lastTradeData.sizeDownPct > 0;
+  const effectiveMaxRisk = sizeDownActive
+    ? maxRiskPerTrade * (1 - lastTradeData!.sizeDownPct / 100)
+    : maxRiskPerTrade;
   const [form, setForm] = useState({
     ticker: "",
     setupType: "ORB" as "ORB" | "GAP_GO" | "VWAP_RECLAIM",
@@ -83,7 +92,7 @@ function AddTradeDialog({ onAdded, accountSize, maxRiskPerTrade }: {
   const stop = parseFloat(form.stopPrice) || 0;
   const target = parseFloat(form.targetPrice) || 0;
   const riskPerShare = entry && stop ? Math.abs(entry - stop) : 0;
-  const shares = riskPerShare > 0 ? Math.floor(maxRiskPerTrade / riskPerShare) : 0;
+  const shares = riskPerShare > 0 ? Math.floor(effectiveMaxRisk / riskPerShare) : 0;
   const rr = riskPerShare > 0 && target ? (Math.abs(target - entry) / riskPerShare).toFixed(2) : "—";
   const riskAmt = riskPerShare > 0 ? (riskPerShare * shares).toFixed(0) : "—";
 
@@ -195,6 +204,21 @@ function AddTradeDialog({ onAdded, accountSize, maxRiskPerTrade }: {
             <Textarea placeholder="Catalyst, volume note, setup quality..." value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} className="mt-1 h-20" />
           </div>
+
+          {/* Dux Size-Down Banner */}
+          {sizeDownActive && lastTradeData?.lastTrade && (
+            <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-3 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-yellow-800">⚠ Previous trade was a loss — size reduced 50%</p>
+                <p className="text-yellow-700 text-xs mt-0.5">
+                  Last trade: {lastTradeData.lastTrade.ticker} {lastTradeData.lastTrade.setupType} → ${parseFloat(String(lastTradeData.lastTrade.pnl ?? "0")).toFixed(2)}
+                </p>
+                <p className="text-yellow-700 text-xs">Dux rule: after a loss, cut position size by 50% on next trade.</p>
+                <p className="text-yellow-600 text-xs font-medium mt-1">Effective max risk: ${effectiveMaxRisk.toFixed(0)} (was ${maxRiskPerTrade.toFixed(0)})</p>
+              </div>
+            </div>
+          )}
 
           {/* AJ Liquidity Context */}
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
@@ -410,6 +434,10 @@ export default function MorningSession() {
   const { data: summary, isLoading } = trpc.morningSession.sessionSummary.useQuery({ date: todayStr });
   const { data: history } = trpc.morningSession.history.useQuery();
   const { data: settings } = trpc.morningSession.getSettings.useQuery();
+  const { data: perfectTrader } = trpc.duxScanner.perfectTrader.useQuery(
+    {},
+    { enabled: tab === "history", staleTime: 5 * 60 * 1000 }
+  );
 
   const refresh = () => {
     utils.morningSession.sessionSummary.invalidate();
@@ -623,6 +651,42 @@ export default function MorningSession() {
 
         {/* History */}
         <TabsContent value="history" className="mt-4">
+          {/* Perfect Trader Calculator */}
+          {perfectTrader && perfectTrader.tradeCount > 0 && (
+            <div className="mb-6 rounded-xl border border-orange-200 bg-orange-50 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-lg">🎯</span>
+                <h3 className="font-semibold text-orange-900">Perfect Trader Calculator</h3>
+                <span className="text-xs text-orange-600 ml-auto">Based on {perfectTrader.tradeCount} closed trades</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <div className="bg-white rounded-lg p-3 text-center border border-orange-100">
+                  <div className="text-xs text-muted-foreground">Actual P&L</div>
+                  <div className={`text-lg font-bold ${perfectTrader.actualPnl >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {perfectTrader.actualPnl >= 0 ? "+" : ""}${perfectTrader.actualPnl.toFixed(0)}
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-3 text-center border border-orange-100">
+                  <div className="text-xs text-muted-foreground">Ideal P&L</div>
+                  <div className="text-lg font-bold text-blue-600">${perfectTrader.idealPnl.toFixed(0)}</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 text-center border border-orange-100">
+                  <div className="text-xs text-muted-foreground">Left on Table</div>
+                  <div className="text-lg font-bold text-amber-600">${perfectTrader.leftOnTable.toFixed(0)}</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 text-center border border-orange-100">
+                  <div className="text-xs text-muted-foreground">Execution Score</div>
+                  <div className={`text-lg font-bold ${
+                    perfectTrader.overallExecutionScore >= 80 ? "text-green-600" :
+                    perfectTrader.overallExecutionScore >= 60 ? "text-amber-600" : "text-red-600"
+                  }`}>{perfectTrader.overallExecutionScore}%</div>
+                </div>
+              </div>
+              <div className="text-xs text-orange-700 bg-orange-100 rounded-lg px-3 py-2">
+                <span className="font-medium">What this means:</span> If you had entered at the OR high and exited at exactly 2× range every time, you would have made ${perfectTrader.idealPnl.toFixed(0)}. You actually made ${perfectTrader.actualPnl.toFixed(0)}. The ${perfectTrader.leftOnTable.toFixed(0)} gap is your execution cost.
+              </div>
+            </div>
+          )}
           {!history?.length ? (
             <div className="text-center py-12 text-muted-foreground">No trade history yet.</div>
           ) : (

@@ -422,3 +422,13 @@
 - [ ] Frontend: Mindset Check panel — 1-5 emoji scale, logged over time with history sparkline
 - [ ] TypeScript: 0 errors
 - [ ] Production build: clean
+
+## Phase 35 — Steven Dux Features
+- [ ] Server: duxScanner procedure — Tradier screener filtered to up ≥20%, pre-mkt vol ≥1M, price >$3, mktcap <$1B, float <100M
+- [ ] Server: perfectTrader procedure in morningSession router — compare actual P&L vs ideal (entry at OR high, exit at 2× range)
+- [ ] Server: lastTradeResult helper in morningSession router — returns whether last trade was a loss and recommended size-down amount
+- [ ] Frontend: Dux Scanner tab on Velez Scanner page — 5-filter results table with ticker, price, gap%, pre-mkt vol, float, mktcap, short bias label
+- [ ] Frontend: Perfect Trader Calculator panel in Morning Session History tab — actual P&L vs ideal P&L, execution score %, gap chart
+- [ ] Frontend: Size-Down Rule banner in Morning Session Log Trade dialog — amber warning when last trade was a loss, auto-reduces suggested size by 50%
+- [ ] TypeScript: 0 errors
+- [ ] Production build: clean

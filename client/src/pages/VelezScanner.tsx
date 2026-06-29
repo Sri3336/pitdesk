@@ -39,6 +39,9 @@ import {
   TrendingDown,
   TrendingUp,
   Zap,
+  Flame,
+  ExternalLink,
+  BadgeAlert,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -509,11 +512,222 @@ function PrpHowToModal({ open, onClose }: { open: boolean; onClose: () => void }
   );
 }
 
+// ─── Dux Scanner Tab ─────────────────────────────────────────────────────────
+
+interface DuxResult {
+  symbol: string;
+  name: string;
+  sector: string;
+  price: number;
+  gapPct: number;
+  volume: number;
+  avgVolume: number;
+  volumeRatio: number;
+  mktCapM: number;
+  floatM: number;
+  high: number;
+  low: number;
+  isBiotech: boolean;
+  shortBias: "STRONG" | "MODERATE" | "WATCH";
+  filters: { gap: boolean; volume: boolean; price: boolean; mktCap: boolean; float: boolean };
+}
+
+interface DuxNearMiss {
+  symbol: string;
+  name: string;
+  sector: string;
+  price: number;
+  gapPct: number;
+  volume: number;
+  avgVolume: number;
+  mktCapM: number;
+  floatM: number;
+  isBiotech: boolean;
+  missingFilter: string;
+}
+
+function DuxScannerTab({
+  results,
+  nearMiss,
+  loading,
+  started,
+  passCount,
+  universeSize,
+  scannedAt,
+}: {
+  results: DuxResult[];
+  nearMiss: DuxNearMiss[];
+  loading: boolean;
+  started: boolean;
+  passCount: number;
+  universeSize: number;
+  scannedAt?: string;
+}) {
+  const biasColor = (bias: string) =>
+    bias === "STRONG" ? "bg-red-100 text-red-700 border-red-200" :
+    bias === "MODERATE" ? "bg-orange-100 text-orange-700 border-orange-200" :
+    "bg-yellow-100 text-yellow-700 border-yellow-200";
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="font-semibold text-base flex items-center gap-2">
+            <Flame className="h-4 w-4 text-orange-500" />
+            Steven Dux 5-Filter Scanner
+          </h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Small-cap gap-up candidates: ≥20% gap · ≥1M vol · price &gt;$3 · mktcap &lt;$1B · float &lt;100M
+          </p>
+        </div>
+        {scannedAt && (
+          <span className="text-xs text-muted-foreground shrink-0">
+            Scanned {new Date(scannedAt).toLocaleTimeString()}
+          </span>
+        )}
+      </div>
+
+      {/* Dux rules card */}
+      <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
+        <div className="font-semibold text-orange-800 mb-2">Dux Short Bias Strategy</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-orange-700">
+          <div>1. Wait for gap ≥20% at open</div>
+          <div>2. Watch for retail exhaustion (1-min BOS)</div>
+          <div>3. Short into the zone — fade the gap</div>
+          <div>4. Exit when liquidity pool swept</div>
+        </div>
+        <div className="mt-2 text-orange-600 text-xs">⚠ Dux avoids biotech — binary risk. Biotech tickers shown but flagged.</div>
+      </div>
+
+      {!started && (
+        <div className="text-center py-12 text-muted-foreground">
+          <Flame className="h-10 w-10 mx-auto mb-3 text-orange-300" />
+          <p className="font-medium">Click "Run Scan" to find today's Dux setups</p>
+          <p className="text-sm mt-1">Scans {universeSize || 100}+ small-cap tickers for all 5 filters</p>
+        </div>
+      )}
+
+      {started && loading && (
+        <div className="text-center py-12 text-muted-foreground">
+          <div className="animate-spin h-8 w-8 border-2 border-orange-400 border-t-transparent rounded-full mx-auto mb-3" />
+          <p>Scanning {universeSize || 100}+ small-cap tickers…</p>
+        </div>
+      )}
+
+      {started && !loading && (
+        <>
+          {/* Stats bar */}
+          <div className="flex items-center gap-4 text-sm">
+            <span className="font-semibold text-orange-700">{passCount} tickers pass all 5 filters</span>
+            <span className="text-muted-foreground">of {universeSize} scanned</span>
+          </div>
+
+          {/* Main results */}
+          {results.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground border border-dashed rounded-xl">
+              <p className="font-medium">No tickers pass all 5 Dux filters right now</p>
+              <p className="text-sm mt-1">Check near-miss watchlist below for setups approaching criteria</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium">Ticker</th>
+                    <th className="text-right px-3 py-2 font-medium">Price</th>
+                    <th className="text-right px-3 py-2 font-medium">Gap %</th>
+                    <th className="text-right px-3 py-2 font-medium">Volume</th>
+                    <th className="text-right px-3 py-2 font-medium">Vol Ratio</th>
+                    <th className="text-right px-3 py-2 font-medium">Float M</th>
+                    <th className="text-right px-3 py-2 font-medium">Mkt Cap</th>
+                    <th className="text-center px-3 py-2 font-medium">Bias</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r) => (
+                    <tr key={r.symbol} className={`border-t border-border hover:bg-muted/30 ${r.isBiotech ? "opacity-60" : ""}`}>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{r.symbol}</span>
+                          {r.isBiotech && (
+                            <span className="text-xs bg-red-100 text-red-600 px-1 rounded">BIOTECH ⚠</span>
+                          )}
+                          <span className="text-xs text-muted-foreground">{r.sector}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">{r.name}</div>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">${r.price.toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-green-600 font-semibold">+{r.gapPct.toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-right font-mono">{(r.volume / 1_000_000).toFixed(1)}M</td>
+                      <td className="px-3 py-2 text-right font-mono">{r.volumeRatio}×</td>
+                      <td className="px-3 py-2 text-right font-mono">{r.floatM}M</td>
+                      <td className="px-3 py-2 text-right font-mono">${r.mktCapM}M</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${biasColor(r.shortBias)}`}>
+                          {r.shortBias}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Near-miss watchlist */}
+          {nearMiss.length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-medium text-sm mb-2 flex items-center gap-1.5">
+                <BadgeAlert className="h-4 w-4 text-yellow-500" />
+                Near-Miss Watchlist (gap 10–20% — approaching Dux criteria)
+              </h4>
+              <div className="rounded-xl border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium">Ticker</th>
+                      <th className="text-right px-3 py-2 font-medium">Price</th>
+                      <th className="text-right px-3 py-2 font-medium">Gap %</th>
+                      <th className="text-right px-3 py-2 font-medium">Volume</th>
+                      <th className="text-right px-3 py-2 font-medium">Float M</th>
+                      <th className="text-right px-3 py-2 font-medium">Mkt Cap</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {nearMiss.map((r) => (
+                      <tr key={r.symbol} className="border-t border-border hover:bg-muted/30">
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{r.symbol}</span>
+                            {r.isBiotech && <span className="text-xs bg-red-100 text-red-600 px-1 rounded">BIOTECH ⚠</span>}
+                            <span className="text-xs text-muted-foreground">{r.sector}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">{r.name}</div>
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">${r.price.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-yellow-600 font-semibold">+{r.gapPct.toFixed(1)}%</td>
+                        <td className="px-3 py-2 text-right font-mono">{(r.volume / 1_000_000).toFixed(1)}M</td>
+                        <td className="px-3 py-2 text-right font-mono">{r.floatM}M</td>
+                        <td className="px-3 py-2 text-right font-mono">${r.mktCapM}M</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function VelezScanner() {
-  const [tab, setTab] = useState<"daily" | "intraday" | "ors" | "prp">(() => {
+  const [tab, setTab] = useState<"daily" | "intraday" | "ors" | "prp" | "dux">(() => {
     if (typeof window !== "undefined") {
       const t = new URLSearchParams(window.location.search).get("tab");
-      if (t === "ors" || t === "intraday" || t === "daily" || t === "prp") return t;
+      if (t === "ors" || t === "intraday" || t === "daily" || t === "prp" || t === "dux") return t;
     }
     return "daily";
   });
@@ -521,7 +735,7 @@ export default function VelezScanner() {
   const [location] = useLocation();
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "ors" || t === "intraday" || t === "daily" || t === "prp") setTab(t);
+    if (t === "ors" || t === "intraday" || t === "daily" || t === "prp" || t === "dux") setTab(t as "daily" | "intraday" | "ors" | "prp" | "dux");
   }, [location]);
 
   const [showHowTo, setShowHowTo] = useState(false);
@@ -550,6 +764,14 @@ export default function VelezScanner() {
     {},
     { enabled: enabled && tab === "prp", staleTime: 5 * 60 * 1000 }
   );
+  const duxQuery = trpc.duxScanner.scan.useQuery(
+    undefined,
+    { enabled: enabled && tab === "dux", staleTime: 60 * 1000 }
+  );
+  const duxNearMissQuery = trpc.duxScanner.nearMiss.useQuery(
+    undefined,
+    { enabled: enabled && tab === "dux", staleTime: 60 * 1000 }
+  );
   const query = tab === "daily" ? dailyQuery : intradayQuery;
   const signals = (query.data as DailySignal[] | undefined) ?? [];
 
@@ -558,8 +780,9 @@ export default function VelezScanner() {
     if (tab === "daily") dailyQuery.refetch();
     else if (tab === "intraday") intradayQuery.refetch();
     else if (tab === "ors") orsQuery.refetch();
+    else if (tab === "dux") { duxQuery.refetch(); duxNearMissQuery.refetch(); }
     else prpQuery.refetch();
-    const label = tab === "ors" ? "Opening Range Scalper" : tab === "prp" ? "Previous Range Pullback" : `${tab} Velez`;
+    const label = tab === "ors" ? "Opening Range Scalper" : tab === "prp" ? "Previous Range Pullback" : tab === "dux" ? "Dux 5-Filter Scanner" : `${tab} Velez`;
     toast.info(`Running ${label} scan across 60 PCR tickers…`);
   };
 
@@ -698,7 +921,7 @@ export default function VelezScanner() {
       )}
 
             {/* Tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "daily" | "intraday" | "ors" | "prp")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "daily" | "intraday" | "ors" | "prp" | "dux")}>
         <TabsList>
           <TabsTrigger value="daily">Daily Signals</TabsTrigger>
           <TabsTrigger value="intraday">Intraday 5-min</TabsTrigger>
@@ -709,6 +932,10 @@ export default function VelezScanner() {
           <TabsTrigger value="prp" className="flex items-center gap-1.5">
             <TrendingUp className="h-3.5 w-3.5" />
             Prev Range Pullback
+          </TabsTrigger>
+          <TabsTrigger value="dux" className="flex items-center gap-1.5">
+            <Flame className="h-3.5 w-3.5 text-orange-500" />
+            Dux Scanner
           </TabsTrigger>
         </TabsList>
         <TabsContent value="daily" className="mt-4">
@@ -727,6 +954,17 @@ export default function VelezScanner() {
         </TabsContent>
         <TabsContent value="prp" className="mt-4">
           <PrpTable results={prpQuery.data ?? []} loading={prpQuery.isFetching} started={enabled && tab === "prp"} />
+        </TabsContent>
+        <TabsContent value="dux" className="mt-4">
+          <DuxScannerTab
+            results={duxQuery.data?.results ?? []}
+            nearMiss={duxNearMissQuery.data ?? []}
+            loading={duxQuery.isFetching}
+            started={enabled && tab === "dux"}
+            passCount={duxQuery.data?.passCount ?? 0}
+            universeSize={duxQuery.data?.universeSize ?? 0}
+            scannedAt={duxQuery.data?.scannedAt}
+          />
         </TabsContent>
       </Tabs>
       {/* Velez How-To Modal */}
