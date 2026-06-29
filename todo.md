@@ -401,3 +401,24 @@
 - [ ] All Tools menu: add Liquidity Map entry
 - [ ] TypeScript: 0 errors
 - [ ] Production build: clean
+
+## Phase 34 — Live Pre-Market Intelligence Checklist
+
+- [ ] Server: preMarketIntel procedure — VIX live price + label from Tradier
+- [ ] Server: preMarketIntel — SPY/QQQ pre-market % change from Tradier
+- [ ] Server: preMarketIntel — top 5 gap-up and gap-down tickers from Tradier screener
+- [ ] Server: preMarketIntel — today's realized P&L and weekly P&L from uploaded_trades DB
+- [ ] Server: preMarketIntel — active swing watchlist setups with day counter from DB
+- [ ] Server: preMarketIntel — risk sizing auto-calc from drawdown_settings
+- [ ] Server: preMarketIntel — liquidity zones within 1.5% of price for watchlist tickers
+- [ ] DB: add mindset_score (int 1-5) column to pre_market_checklist_items
+- [ ] Frontend: VIX panel — live price, color label, size-reduction warning if VIX > 25
+- [ ] Frontend: SPY/QQQ panel — pre-market % change with trend arrow
+- [ ] Frontend: Top Gappers panel — 5 gap-up + 5 gap-down chips, click to pre-fill Morning Session
+- [ ] Frontend: Account P&L Gate panel — today's P&L, weekly P&L, daily limit progress bar
+- [ ] Frontend: Swing Watchlist Review panel — active setups with day counter badges
+- [ ] Frontend: Risk Sizing panel — auto-calculated max risk per trade and total exposure
+- [ ] Frontend: Liquidity Zones panel — zones within 1.5% of price for watchlist tickers
+- [ ] Frontend: Mindset Check panel — 1-5 emoji scale, logged over time with history sparkline
+- [ ] TypeScript: 0 errors
+- [ ] Production build: clean
