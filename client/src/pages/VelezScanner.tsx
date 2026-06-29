@@ -29,6 +29,8 @@ import {
   AlertTriangle,
   BarChart2,
   BookOpen,
+  Bell,
+  BellOff,
   ChevronDown,
   ChevronRight,
   Info,
@@ -38,12 +40,15 @@ import {
   Target,
   TrendingDown,
   TrendingUp,
+  Volume2,
+  VolumeX,
   Zap,
   Flame,
   ExternalLink,
   BadgeAlert,
+  X,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -512,6 +517,45 @@ function PrpHowToModal({ open, onClose }: { open: boolean; onClose: () => void }
   );
 }
 
+// ─── Dux Alert Sound ─────────────────────────────────────────────────────────
+
+function playDuxAlertSound(volume = 0.6) {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+    gain.connect(ctx.destination);
+
+    // Three ascending tones: 660 Hz → 880 Hz → 1100 Hz
+    const freqs = [660, 880, 1100];
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+      osc.connect(gain);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.15);
+    });
+
+    setTimeout(() => ctx.close(), 800);
+  } catch {
+    // AudioContext not available — silently skip
+  }
+}
+
+// ─── Dux Alert Types ──────────────────────────────────────────────────────────
+
+interface DuxAlert {
+  id: string;
+  symbol: string;
+  gapPct: number;
+  volumeRatio: number;
+  price: number;
+  timestamp: Date;
+}
+
 // ─── Dux Scanner Tab ─────────────────────────────────────────────────────────
 
 interface DuxResult {
@@ -554,6 +598,13 @@ function DuxScannerTab({
   passCount,
   universeSize,
   scannedAt,
+  alertsEnabled,
+  onToggleAlerts,
+  audioEnabled,
+  onToggleAudio,
+  alertHistory,
+  onDismissAlert,
+  onClearAlerts,
 }: {
   results: DuxResult[];
   nearMiss: DuxNearMiss[];
@@ -562,6 +613,13 @@ function DuxScannerTab({
   passCount: number;
   universeSize: number;
   scannedAt?: string;
+  alertsEnabled: boolean;
+  onToggleAlerts: () => void;
+  audioEnabled: boolean;
+  onToggleAudio: () => void;
+  alertHistory: DuxAlert[];
+  onDismissAlert: (id: string) => void;
+  onClearAlerts: () => void;
 }) {
   const biasColor = (bias: string) =>
     bias === "STRONG" ? "bg-red-100 text-red-700 border-red-200" :
@@ -581,12 +639,83 @@ function DuxScannerTab({
             Small-cap gap-up candidates: ≥20% gap · ≥1M vol · price &gt;$3 · mktcap &lt;$1B · float &lt;100M
           </p>
         </div>
-        {scannedAt && (
-          <span className="text-xs text-muted-foreground shrink-0">
-            Scanned {new Date(scannedAt).toLocaleTimeString()}
-          </span>
-        )}
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Audio toggle */}
+          <button
+            onClick={onToggleAudio}
+            title={audioEnabled ? "Mute alert sound" : "Enable alert sound"}
+            className={`p-1.5 rounded-md transition-colors ${
+              audioEnabled
+                ? "text-orange-600 hover:bg-orange-50"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </button>
+          {/* Alerts toggle */}
+          <div className="flex items-center gap-1.5">
+            {alertsEnabled ? (
+              <Bell className="h-3.5 w-3.5 text-orange-500" />
+            ) : (
+              <BellOff className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+            <span className="text-xs text-muted-foreground">Auto-alerts</span>
+            <Switch checked={alertsEnabled} onCheckedChange={onToggleAlerts} />
+          </div>
+          {scannedAt && (
+            <span className="text-xs text-muted-foreground">
+              Scanned {new Date(scannedAt).toLocaleTimeString()}
+            </span>
+          )}
+        </div>
       </div>
+
+      {/* Alert history banner */}
+      {alertHistory.length > 0 && (
+        <div className="rounded-xl border border-orange-300 bg-orange-50 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-orange-800 font-semibold text-sm">
+              <Bell className="h-4 w-4 animate-pulse" />
+              {alertHistory.length} New Dux Setup{alertHistory.length > 1 ? "s" : ""} Detected
+            </div>
+            <button
+              onClick={onClearAlerts}
+              className="text-xs text-orange-600 hover:text-orange-800 underline"
+            >
+              Clear all
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {alertHistory.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-center gap-1.5 bg-white border border-orange-200 rounded-lg px-2.5 py-1.5 text-xs shadow-sm"
+              >
+                <span className="font-bold text-orange-700">{a.symbol}</span>
+                <span className="text-green-600 font-medium">+{a.gapPct.toFixed(1)}%</span>
+                <span className="text-muted-foreground">{a.volumeRatio.toFixed(1)}× vol</span>
+                <span className="text-muted-foreground">${a.price.toFixed(2)}</span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground">{a.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                <button
+                  onClick={() => onDismissAlert(a.id)}
+                  className="ml-1 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Polling status */}
+      {alertsEnabled && started && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+          Auto-scanning every 30 seconds for new setups
+        </div>
+      )}
 
       {/* Dux rules card */}
       <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
@@ -746,6 +875,15 @@ export default function VelezScanner() {
   const [excludeOtc, setExcludeOtc] = useState(true);
   const [enabled, setEnabled] = useState(false);
 
+  // ─── Dux Alert State ────────────────────────────────────────────────────────
+  const [duxAlertsEnabled, setDuxAlertsEnabled] = useState(true);
+  const [duxAudioEnabled, setDuxAudioEnabled] = useState(true);
+  const [duxAlertHistory, setDuxAlertHistory] = useState<DuxAlert[]>([]);
+  // Track previously-seen passing tickers to detect new ones
+  const prevDuxPassingRef = useRef<Set<string>>(new Set());
+  // Whether the first scan result has been processed (don't alert on initial load)
+  const duxInitializedRef = useRef(false);
+
   const dailyQuery = trpc.velez.scanDaily.useQuery(
     { thresholdPct, minPrice, excludeOtc },
     { enabled: enabled && tab === "daily", staleTime: 5 * 60 * 1000 }
@@ -766,12 +904,80 @@ export default function VelezScanner() {
   );
   const duxQuery = trpc.duxScanner.scan.useQuery(
     undefined,
-    { enabled: enabled && tab === "dux", staleTime: 60 * 1000 }
+    {
+      enabled: enabled && tab === "dux",
+      staleTime: 60 * 1000,
+      // Poll every 30 seconds when alerts are on and Dux tab is active
+      refetchInterval: duxAlertsEnabled && enabled && tab === "dux" ? 30_000 : false,
+    }
   );
   const duxNearMissQuery = trpc.duxScanner.nearMiss.useQuery(
     undefined,
-    { enabled: enabled && tab === "dux", staleTime: 60 * 1000 }
+    {
+      enabled: enabled && tab === "dux",
+      staleTime: 60 * 1000,
+      refetchInterval: duxAlertsEnabled && enabled && tab === "dux" ? 30_000 : false,
+    }
   );
+
+  // ─── Dux new-ticker detection ────────────────────────────────────────────────
+  const handleDismissAlert = useCallback((id: string) => {
+    setDuxAlertHistory((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
+  const handleClearAlerts = useCallback(() => {
+    setDuxAlertHistory([]);
+  }, []);
+
+  useEffect(() => {
+    if (!duxQuery.data?.results) return;
+    const currentPassing = new Set(duxQuery.data.results.map((r) => r.symbol));
+
+    if (!duxInitializedRef.current) {
+      // First load — seed the set without alerting
+      prevDuxPassingRef.current = currentPassing;
+      duxInitializedRef.current = true;
+      return;
+    }
+
+    if (!duxAlertsEnabled) {
+      prevDuxPassingRef.current = currentPassing;
+      return;
+    }
+
+    // Find tickers that are new since last poll
+    const newTickers = duxQuery.data.results.filter(
+      (r) => !prevDuxPassingRef.current.has(r.symbol)
+    );
+
+    if (newTickers.length > 0) {
+      // Play audio alert
+      if (duxAudioEnabled) playDuxAlertSound();
+
+      // Add to history (keep last 10)
+      const newAlerts: DuxAlert[] = newTickers.map((r) => ({
+        id: `${r.symbol}-${Date.now()}`,
+        symbol: r.symbol,
+        gapPct: r.gapPct,
+        volumeRatio: r.volumeRatio,
+        price: r.price,
+        timestamp: new Date(),
+      }));
+
+      setDuxAlertHistory((prev) => [...newAlerts, ...prev].slice(0, 10));
+
+      // Show toast for each new ticker
+      newTickers.forEach((r) => {
+        toast.success(`🔥 Dux Setup: ${r.symbol}`, {
+          description: `+${r.gapPct.toFixed(1)}% gap · ${r.volumeRatio.toFixed(1)}× vol · $${r.price.toFixed(2)} · ${r.isBiotech ? "⚠ BIOTECH" : r.shortBias + " short bias"}`,
+          duration: 8000,
+        });
+      });
+    }
+
+    prevDuxPassingRef.current = currentPassing;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duxQuery.data, duxAlertsEnabled, duxAudioEnabled]);
   const query = tab === "daily" ? dailyQuery : intradayQuery;
   const signals = (query.data as DailySignal[] | undefined) ?? [];
 
@@ -964,6 +1170,13 @@ export default function VelezScanner() {
             passCount={duxQuery.data?.passCount ?? 0}
             universeSize={duxQuery.data?.universeSize ?? 0}
             scannedAt={duxQuery.data?.scannedAt}
+            alertsEnabled={duxAlertsEnabled}
+            onToggleAlerts={() => setDuxAlertsEnabled((v) => !v)}
+            audioEnabled={duxAudioEnabled}
+            onToggleAudio={() => setDuxAudioEnabled((v) => !v)}
+            alertHistory={duxAlertHistory}
+            onDismissAlert={handleDismissAlert}
+            onClearAlerts={handleClearAlerts}
           />
         </TabsContent>
       </Tabs>

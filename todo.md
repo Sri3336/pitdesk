@@ -432,3 +432,15 @@
 - [ ] Frontend: Size-Down Rule banner in Morning Session Log Trade dialog — amber warning when last trade was a loss, auto-reduces suggested size by 50%
 - [ ] TypeScript: 0 errors
 - [ ] Production build: clean
+
+## Phase 36 — Dux Scanner Visual + Audio Alert System
+- [x] Frontend: Poll duxScanner.scan every 30s when Dux tab is active + alerts are enabled (refetchInterval)
+- [x] Frontend: useRef<Set<string>> to track previously-passing tickers across polls
+- [x] Frontend: useEffect detects newly-passing tickers on each poll result (skip first load)
+- [x] Frontend: playDuxAlertSound() — Web Audio API, three ascending tones (660→880→1100 Hz), no external files
+- [x] Frontend: toast.success() per new ticker with symbol, gap%, volume ratio, price, bias
+- [x] Frontend: Persistent alert history banner in DuxScannerTab header (last 10 alerts, dismissible per-ticker + clear all)
+- [x] Frontend: Auto-alerts toggle Switch + audio mute button in DuxScannerTab header
+- [x] Frontend: Green pulse dot "Auto-scanning every 30 seconds" status indicator
+- [x] TypeScript: 0 errors
+- [x] Production build: clean
