@@ -53,6 +53,8 @@ import {
   ListChecks,
   MapPin,
   HardDrive,
+  Calculator,
+  FlaskConical,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -120,6 +122,15 @@ const NAV_SECTIONS = [
       { icon: Upload, label: "Analyze My Trades", path: "/trade-upload" },
       { icon: BarChart2, label: "Performance", path: "/performance" },
       { icon: BookOpen, label: "Trade Proposals", path: "/trade-proposals" },
+    ],
+  },
+  {
+    key: "backtesting",
+    label: "Backtesting",
+    defaultOpen: true,
+    items: [
+      { icon: FlaskConical, label: "Backtester", path: "/backtester" },
+      { icon: Calculator, label: "Position Sizer", path: "/position-sizer" },
     ],
   },
   {
