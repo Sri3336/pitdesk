@@ -457,3 +457,16 @@
 - [x] Sidebar nav: add Historical Data under Data & Settings group
 - [x] TypeScript: 0 errors
 - [x] Production build: clean
+
+## Phase 38 — Strategy Backtester + Position Sizer
+
+- [x] DB: backtest_runs and backtest_trades tables created
+- [x] Server: backtester engine (server/backtester.ts) — Dux 5-filter + Velez pullback signal detection on stored OHLCV bars
+- [x] Server: backtesterRouter — runBacktest, getRunStatus, getRunTrades, listRuns, deleteRun
+- [x] Server: historicalDataRouter — startBulkDownload, getDownloadStatus, getUniverseSummary, resetJobs, exportCsv, queryBars
+- [x] Frontend: Backtester.tsx — strategy selector, parameter controls, equity curve, win-rate stats, trades table
+- [x] Frontend: PositionSizer.tsx — fixed-risk + Kelly sizing calculator
+- [x] Frontend: HistoricalData.tsx — download/progress/export
+- [x] Routes /backtester, /position-sizer, /historical-data in App.tsx
+- [x] Sidebar nav: Backtesting group with all three pages
+- [x] TypeScript: 0 errors
