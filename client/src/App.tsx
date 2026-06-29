@@ -83,6 +83,8 @@ const MorningSession = lazy(() => import("./pages/MorningSession"));
 const SwingWatchlist = lazy(() => import("./pages/SwingWatchlist"));
 const LiquidityMap = lazy(() => import("./pages/LiquidityMap"));
 const HistoricalData = lazy(() => import("./pages/HistoricalData"));
+const Backtester = lazy(() => import("./pages/Backtester"));
+const PositionSizer = lazy(() => import("./pages/PositionSizer"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -208,6 +210,8 @@ function Router() {
                 <Route path="/swing-watchlist" component={SwingWatchlist} />
                 <Route path="/liquidity-map" component={LiquidityMap} />
                 <Route path="/historical-data" component={HistoricalData} />
+                <Route path="/backtester" component={Backtester} />
+                <Route path="/position-sizer" component={PositionSizer} />
                 <Route path="/agent" component={TradeProposals} />
                 <Route path="/trade-proposals" component={TradeProposals} />
                 <Route path="/performance" component={Performance} />

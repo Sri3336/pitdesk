@@ -92,6 +92,7 @@ import { morningSessionRouter } from "./routers/morningSession";
 import { swingWatchlistRouter } from "./routers/swingWatchlist";
 import { liquidityMapRouter } from "./routers/liquidityMap";
 import { historicalDataRouter } from "./routers/historicalData";
+import { backtesterRouter } from "./routers/backtester";
 import { duxScannerRouter } from "./routers/duxScanner";
 import { pitAdvisorRouter } from "./routers/pitAdvisor";
 import { optionsFlowRouter } from "./routers/optionsFlow";
@@ -1557,6 +1558,7 @@ export const appRouter = router({
   swingWatchlist: swingWatchlistRouter,
   liquidityMap: liquidityMapRouter,
   historicalData: historicalDataRouter,
+  backtester: backtesterRouter,
   duxScanner: duxScannerRouter,
 });
 export type AppRouter = typeof appRouter;
