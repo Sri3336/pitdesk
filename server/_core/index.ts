@@ -11,6 +11,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { intradayScanHandler } from "../scheduledIntradayScan";
+import { extensionSyncHandler } from "../extensionSync";
 import { weeklyBriefingHandler } from "../scheduledWeeklyBriefing";
 import { postMarketDebriefHandler } from "../scheduledPostMarketDebrief";
 
@@ -55,6 +56,9 @@ async function startServer() {
   registerOAuthRoutes(app);
   registerGoogleAuthRoutes(app);
   // Scheduled heartbeat handlers — must be before tRPC and Vite fallthrough
+  // Chrome extension sync endpoint — REST (not tRPC) to avoid batch format issues
+  app.options("/api/extension/sync", extensionSyncHandler);
+  app.post("/api/extension/sync", extensionSyncHandler);
   app.post("/api/scheduled/intraday-scan", intradayScanHandler);
   app.post("/api/scheduled/weekly-briefing", weeklyBriefingHandler);
   app.post("/api/scheduled/post-market-debrief", postMarketDebriefHandler);
