@@ -28,7 +28,18 @@ const STRATEGIES = [
   { value: "other", label: "Other", icon: "📋", desc: "Custom structure" },
 ];
 
-const TICKERS = ["WDC", "LITE", "SNDK", "NVDA", "TSLA", "APP", "AVGO", "RKLB", "AAPL", "META", "AMZN", "OTHER"];
+const TICKERS = ["WDC", "TSLA", "NVDA", "LITE", "SMCI", "META", "AMZN", "PLTR", "OTHER"];
+
+const TICKER_UNIVERSE = [
+  { ticker: "WDC",  sector: "Storage / HDD",        catalyst: "Storage cycle, NAND pricing",          ivProfile: "80–100%", role: "core",   note: "You know it well — high IV, liquid" },
+  { ticker: "TSLA", sector: "EV / Consumer",         catalyst: "Deliveries, Elon news, energy",        ivProfile: "80–120%", role: "core",   note: "Independent catalyst from hardware" },
+  { ticker: "NVDA", sector: "AI / GPU",              catalyst: "AI capex, data center, earnings",      ivProfile: "60–90%",  role: "core",   note: "Highest options liquidity on earth" },
+  { ticker: "LITE", sector: "Photonics / Telecom",   catalyst: "Optical interconnects, telecom capex", ivProfile: "70–100%", role: "core",   note: "Telecom cycle — not storage or GPU" },
+  { ticker: "SMCI", sector: "AI Servers",            catalyst: "AI buildout, audit/accounting news",   ivProfile: "80–130%", role: "core",   note: "High IV, different from storage cycle" },
+  { ticker: "META", sector: "Social / Ad-Tech",      catalyst: "Ad revenue, regulation, AI spend",     ivProfile: "50–80%",  role: "addon",  note: "Low correlation to hardware names" },
+  { ticker: "AMZN", sector: "Cloud / Retail",        catalyst: "AWS, consumer spending, logistics",    ivProfile: "45–75%",  role: "addon",  note: "Multi-catalyst, very liquid options" },
+  { ticker: "PLTR", sector: "Defense AI",            catalyst: "Gov contracts, earnings",              ivProfile: "70–100%", role: "addon",  note: "Completely uncorrelated to tech hardware" },
+];
 
 const PLAYBOOK_RULES = [
   {
@@ -752,25 +763,44 @@ export default function SriPlaybook() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-green-400" />
-                  Sri's Go-To Ticker Universe
+                  Sri's Ticker Universe — 8 Names, 0 Overlap
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  {[
-                    { ticker: "WDC", why: "High IV, storage cycle, liquid", best: "Strangle / Iron Condor" },
-                    { ticker: "LITE", why: "High IV, telecom/photonics, familiar", best: "Naked Put / Strangle" },
-                    { ticker: "SNDK", why: "High IV, WDC spin-off, correlated", best: "Strangle" },
-                    { ticker: "NVDA", why: "Highest liquidity, AI premium", best: "Iron Condor" },
-                    { ticker: "TSLA", why: "Perpetually high IV", best: "Strangle / Iron Condor" },
-                    { ticker: "APP", why: "High IV, ad-tech", best: "Iron Condor" },
-                  ].map(t => (
-                    <div key={t.ticker} className="border border-border rounded-lg p-3">
-                      <div className="font-bold text-base">{t.ticker}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{t.why}</div>
-                      <div className="text-xs text-green-400 mt-1">{t.best}</div>
-                    </div>
-                  ))}
+              <CardContent className="space-y-4">
+                {/* Core 5 */}
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Core 5 — Always on the radar</div>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
+                    {TICKER_UNIVERSE.filter(t => t.role === "core").map(t => (
+                      <div key={t.ticker} className="border border-green-500/30 bg-green-500/5 rounded-lg p-3">
+                        <div className="font-bold text-base text-green-400">{t.ticker}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{t.sector}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{t.catalyst}</div>
+                        <div className="text-xs text-amber-400 mt-1">IV: {t.ivProfile}</div>
+                        <div className="text-xs text-slate-400 mt-1 italic">{t.note}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Add-ons */}
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Add-ons — Rotate in when IV is elevated</div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                    {TICKER_UNIVERSE.filter(t => t.role === "addon").map(t => (
+                      <div key={t.ticker} className="border border-blue-500/30 bg-blue-500/5 rounded-lg p-3">
+                        <div className="font-bold text-base text-blue-400">{t.ticker}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{t.sector}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{t.catalyst}</div>
+                        <div className="text-xs text-amber-400 mt-1">IV: {t.ivProfile}</div>
+                        <div className="text-xs text-slate-400 mt-1 italic">{t.note}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Rotation Rule */}
+                <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-3 text-sm">
+                  <div className="font-semibold text-amber-400 mb-1">🔄 Rotation Rule</div>
+                  <div className="text-muted-foreground">Run <span className="text-white font-semibold">3 active positions max</span> at a time. Each Monday, pick the 3 tickers with the highest IV Rank from this universe — not the same 3 every week. <span className="text-amber-400">No two tickers from the same sector simultaneously.</span> When one closes, rotate in the next highest IV name.</div>
                 </div>
               </CardContent>
             </Card>
