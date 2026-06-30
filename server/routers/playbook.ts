@@ -5,7 +5,7 @@ import { accountSnapshots, playbookPositions, monthlyPnl, extensionSyncTokens } 
 import { eq, and, desc } from "drizzle-orm";
 import crypto from "crypto";
 
-const OWNER_USER_ID = 210001;
+const OWNER_USER_ID = 1; // Sri's actual DB user ID (akulasridhar@gmail.com)
 
 const legSchema = z.object({
   action: z.enum(["sell", "buy"]),

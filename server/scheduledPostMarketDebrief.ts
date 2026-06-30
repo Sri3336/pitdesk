@@ -4,7 +4,7 @@
  * Daily 4:30 PM ET Post-Market Debrief — heartbeat handler.
  *
  * What it does:
- * 1. Pulls all open trades from manual_trades for the owner (user ID 210001)
+ * 1. Pulls all open trades from manual_trades for the owner (user ID 1 = akulasridhar@gmail.com)
  * 2. Pulls today's top PCR movers / signals from pcr_scheduled_results
  * 3. Calls Pit Advisor LLM to generate a position review + tomorrow's watchlist
  * 4. Sends a rich HTML email to akulasridhar@gmail.com
@@ -22,7 +22,7 @@ import { manualTrades, pcrScheduledResults } from "../drizzle/schema";
 import { eq, desc, and, gte } from "drizzle-orm";
 
 const OWNER_EMAIL = "akulasridhar@gmail.com";
-const OWNER_USER_ID = 210001;
+const OWNER_USER_ID = 1; // Sri's actual DB user ID (akulasridhar@gmail.com)
 
 // ─── ET date helper ────────────────────────────────────────────────────────────
 

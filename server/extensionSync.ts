@@ -8,7 +8,7 @@ import { getDb } from "./db";
 import { accountSnapshots, extensionSyncTokens } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 
-const OWNER_USER_ID = 210001;
+const OWNER_USER_ID = 1; // Sri's actual DB user ID (akulasridhar@gmail.com)
 
 async function verifyExtensionToken(req: Request): Promise<number | null> {
   try {
