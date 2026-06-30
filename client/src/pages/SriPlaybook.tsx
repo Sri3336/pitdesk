@@ -10,8 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { TrendingUp, TrendingDown, Target, BookOpen, Plus, CheckCircle, XCircle, AlertTriangle, DollarSign, BarChart3, Shield, Settings, Copy, RefreshCw, Key } from "lucide-react";
+import {
+  TrendingUp, TrendingDown, Target, BookOpen, Plus, CheckCircle, XCircle,
+  AlertTriangle, DollarSign, BarChart3, Shield, Settings, Copy, RefreshCw,
+  Key, ArrowDownCircle, ArrowUpCircle, Camera, Wallet, TrendingUp as TrendUp,
+  Trash2, Activity,
+} from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -78,6 +84,13 @@ const PLAYBOOK_RULES = [
   },
 ];
 
+const TRANSFER_TYPES = [
+  { value: "deposit",      label: "Deposit",      sign: +1, color: "text-green-400" },
+  { value: "withdrawal",   label: "Withdrawal",   sign: -1, color: "text-red-400"   },
+  { value: "transfer_in",  label: "Transfer In",  sign: +1, color: "text-blue-400"  },
+  { value: "transfer_out", label: "Transfer Out", sign: -1, color: "text-orange-400"},
+];
+
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
 function daysToExpiry(expiry: string): number {
@@ -110,6 +123,13 @@ function strategyBadge(strategy: string) {
   return <Badge className={map[strategy] || ""}>{labels[strategy] || strategy}</Badge>;
 }
 
+function fmt$(n: number, opts?: { sign?: boolean; decimals?: number }) {
+  const abs = Math.abs(n);
+  const str = abs.toLocaleString("en-US", { maximumFractionDigits: opts?.decimals ?? 0 });
+  if (opts?.sign) return (n >= 0 ? "+" : "-") + "$" + str;
+  return (n < 0 ? "-" : "") + "$" + str;
+}
+
 // ─── Add Position Dialog ──────────────────────────────────────────────────────
 
 function AddPositionDialog({ onAdded }: { onAdded: () => void }) {
@@ -138,7 +158,6 @@ function AddPositionDialog({ onAdded }: { onAdded: () => void }) {
   });
 
   const accountLabel = ACCOUNTS.find(a => a.id === form.accountId)?.label ?? form.accountId;
-  const strategyLabel = STRATEGIES.find(s => s.value === form.strategy)?.label ?? form.strategy;
 
   function handleSubmit() {
     if (!form.expiry || !form.creditCollected || !form.contracts) {
@@ -312,7 +331,7 @@ function ClosePositionDialog({ position, onClosed }: { position: any; onClosed: 
   );
 }
 
-// ─── EOD Snapshot Dialog ──────────────────────────────────────────────────────
+// ─── EOD Snapshot Dialog (manual entry) ──────────────────────────────────────
 
 function EodSnapshotDialog({ onSaved }: { onSaved: () => void }) {
   const [open, setOpen] = useState(false);
@@ -400,6 +419,120 @@ function EodSnapshotDialog({ onSaved }: { onSaved: () => void }) {
   );
 }
 
+// ─── Add Transfer Dialog ──────────────────────────────────────────────────────
+
+function AddTransferDialog({ onAdded }: { onAdded: () => void }) {
+  const [open, setOpen] = useState(false);
+  const today = new Date().toISOString().split("T")[0];
+  const [form, setForm] = useState({
+    accountId: "schwab_764",
+    transferDate: today,
+    amount: "",
+    transferType: "deposit" as string,
+    notes: "",
+  });
+
+  const addMutation = trpc.playbook.addTransfer.useMutation({
+    onSuccess: () => {
+      toast.success("Transfer logged");
+      setOpen(false);
+      onAdded();
+      setForm(f => ({ ...f, amount: "", notes: "" }));
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const accountLabel = ACCOUNTS.find(a => a.id === form.accountId)?.label ?? form.accountId;
+  const typeInfo = TRANSFER_TYPES.find(t => t.value === form.transferType);
+
+  function handleSubmit() {
+    const rawAmount = parseFloat(form.amount);
+    if (!rawAmount || isNaN(rawAmount)) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    // Deposits/transfer_in are positive; withdrawals/transfer_out are negative
+    const sign = (form.transferType === "deposit" || form.transferType === "transfer_in") ? 1 : -1;
+    addMutation.mutate({
+      accountId: form.accountId,
+      accountLabel,
+      transferDate: form.transferDate,
+      amount: Math.abs(rawAmount) * sign,
+      transferType: form.transferType as any,
+      notes: form.notes || undefined,
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Plus className="w-4 h-4 mr-1" /> Log Transfer
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Log Cash Transfer</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 mt-2">
+          <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+            Transfers adjust your true P&L. Deposits/transfers-in reduce P&L (capital added, not earned). Withdrawals/transfers-out increase P&L (capital removed, not lost).
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Account</Label>
+              <Select value={form.accountId} onValueChange={v => setForm(f => ({ ...f, accountId: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ACCOUNTS.map(a => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Date</Label>
+              <Input type="date" value={form.transferDate} onChange={e => setForm(f => ({ ...f, transferDate: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Type</Label>
+              <Select value={form.transferType} onValueChange={v => setForm(f => ({ ...f, transferType: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TRANSFER_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Amount ($)</Label>
+              <Input
+                value={form.amount}
+                onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                placeholder="5000"
+                type="number"
+                min="0"
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Notes (optional)</Label>
+            <Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. Monthly contribution, IRA transfer..." />
+          </div>
+          {form.amount && (
+            <div className={`text-sm font-medium ${typeInfo?.color}`}>
+              This will be recorded as {typeInfo?.label}: {typeInfo?.sign === 1 ? "+" : "-"}${Math.abs(parseFloat(form.amount) || 0).toLocaleString()} to {accountLabel}
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={addMutation.isPending} className="bg-blue-600 hover:bg-blue-700 text-white">
+            {addMutation.isPending ? "Saving..." : "Log Transfer"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SriPlaybook() {
@@ -409,9 +542,42 @@ export default function SriPlaybook() {
   const { data: openPositions = [], refetch: refetchOpen } = trpc.playbook.getOpenPositions.useQuery();
   const { data: allPositions = [] } = trpc.playbook.getAllPositions.useQuery();
   const { data: monthlyData = [] } = trpc.playbook.getMonthlyPnl.useQuery();
+  const { data: transfers = [], refetch: refetchTransfers } = trpc.playbook.getTransfers.useQuery();
+  const { data: eodHistory = [], refetch: refetchEod } = trpc.playbook.getEodHistory.useQuery();
+
+  // MTD adjusted P&L
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const mtdFrom = `${currentMonth}-01`;
+  const mtdTo = new Date().toISOString().split("T")[0];
+  const { data: adjustedPnl, refetch: refetchAdjPnl } = trpc.playbook.getAdjustedPnl.useQuery({
+    fromDate: mtdFrom,
+    toDate: mtdTo,
+  });
+
+  const captureEodMutation = trpc.playbook.captureEodSnapshot.useMutation({
+    onSuccess: (data) => {
+      toast.success(`EOD snapshot captured — Total: ${fmt$(data.totalValue)} | Adj P&L: ${data.adjustedPnl !== null ? fmt$(data.adjustedPnl, { sign: true }) : "N/A (first snapshot)"}`);
+      refetchEod();
+      refetchAdjPnl();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteTransferMutation = trpc.playbook.deleteTransfer.useMutation({
+    onSuccess: () => {
+      toast.success("Transfer deleted");
+      refetchTransfers();
+      refetchAdjPnl();
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const deleteMutation = trpc.playbook.deletePosition.useMutation({
-    onSuccess: () => { toast.success("Position removed"); utils.playbook.getOpenPositions.invalidate(); utils.playbook.getAllPositions.invalidate(); },
+    onSuccess: () => {
+      toast.success("Position removed");
+      utils.playbook.getOpenPositions.invalidate();
+      utils.playbook.getAllPositions.invalidate();
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -427,18 +593,14 @@ export default function SriPlaybook() {
     [snapshots]
   );
 
-  const totalTotalPnl = useMemo(() =>
-    snapshots.reduce((sum, s) => sum + parseFloat(s.totalPnl as string), 0),
-    [snapshots]
-  );
-
   const monthlyTarget = totalCapital * 0.03;
-  const currentMonth = new Date().toISOString().slice(0, 7);
   const currentMonthData = monthlyData.find(m => m.month === currentMonth);
   const monthlyActual = currentMonthData ? parseFloat(currentMonthData.actualPnl as string) : 0;
-  const monthlyProgress = monthlyTarget > 0 ? Math.min(100, (monthlyActual / monthlyTarget) * 100) : 0;
 
-  // Closed positions this month
+  // Use transfer-adjusted P&L for monthly progress if available
+  const adjPnlValue = adjustedPnl?.adjustedPnl ?? monthlyActual;
+  const monthlyProgress = monthlyTarget > 0 ? Math.min(100, (adjPnlValue / monthlyTarget) * 100) : 0;
+
   const closedThisMonth = allPositions.filter(p =>
     p.status === "closed" && p.closeDate?.startsWith(currentMonth)
   );
@@ -446,75 +608,103 @@ export default function SriPlaybook() {
   const lostThisMonth = closedThisMonth.filter(p => parseFloat(p.closedPnl as string || "0") <= 0).length;
   const winRate = closedThisMonth.length > 0 ? Math.round((wonThisMonth / closedThisMonth.length) * 100) : 0;
 
+  // Total net transfers
+  const totalNetTransfers = useMemo(() =>
+    transfers.reduce((sum, t) => sum + parseFloat(t.amount as string), 0),
+    [transfers]
+  );
+
   const refetchAll = () => {
     utils.playbook.getLatestSnapshots.invalidate();
     utils.playbook.getOpenPositions.invalidate();
     utils.playbook.getAllPositions.invalidate();
     utils.playbook.getMonthlyPnl.invalidate();
+    refetchTransfers();
+    refetchEod();
+    refetchAdjPnl();
   };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Sri's Playbook</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Premium income strategy — Iron Condor · Strangle · Naked Put/Call</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => captureEodMutation.mutate({})}
+            disabled={captureEodMutation.isPending || totalCapital === 0}
+            className="border-green-500/40 text-green-400 hover:bg-green-500/10"
+            title="Captures today's EOD snapshot from the latest extension sync data"
+          >
+            <Camera className="w-4 h-4 mr-1" />
+            {captureEodMutation.isPending ? "Capturing..." : "Capture EOD"}
+          </Button>
           <EodSnapshotDialog onSaved={refetchAll} />
           <AddPositionDialog onAdded={refetchAll} />
         </div>
       </div>
 
       {/* Account Summary Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Total Capital */}
-        <Card className="col-span-1 border-green-500/20 bg-green-500/5">
+        <Card className="border-green-500/20 bg-green-500/5">
           <CardContent className="pt-4 pb-3">
             <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Capital</div>
             <div className="text-2xl font-bold text-green-400 mt-1">
-              ${totalCapital > 0 ? totalCapital.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—"}
+              {totalCapital > 0 ? fmt$(totalCapital) : "—"}
             </div>
             <div className="text-xs text-muted-foreground mt-1">3 accounts combined</div>
           </CardContent>
         </Card>
 
         {/* Monthly Target */}
-        <Card className="col-span-1 border-blue-500/20 bg-blue-500/5">
+        <Card className="border-blue-500/20 bg-blue-500/5">
           <CardContent className="pt-4 pb-3">
             <div className="text-xs text-muted-foreground uppercase tracking-wide">Monthly Target (3%)</div>
             <div className="text-2xl font-bold text-blue-400 mt-1">
-              ${monthlyTarget > 0 ? monthlyTarget.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—"}
+              {monthlyTarget > 0 ? fmt$(monthlyTarget) : "—"}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {monthlyActual !== 0 ? `Actual: $${monthlyActual.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "No data yet"}
+              {adjPnlValue !== 0
+                ? <span className={adjPnlValue >= 0 ? "text-green-400" : "text-red-400"}>
+                    Adj P&L: {fmt$(adjPnlValue, { sign: true })}
+                  </span>
+                : "No P&L data yet"}
             </div>
           </CardContent>
         </Card>
 
         {/* Today's P&L */}
-        <Card className={`col-span-1 ${totalDayPnl >= 0 ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"}`}>
+        <Card className={totalDayPnl >= 0 ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"}>
           <CardContent className="pt-4 pb-3">
             <div className="text-xs text-muted-foreground uppercase tracking-wide">Today's P&L</div>
             <div className={`text-2xl font-bold mt-1 ${totalDayPnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-              {totalDayPnl >= 0 ? "+" : ""}${totalDayPnl !== 0 ? totalDayPnl.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—"}
+              {totalDayPnl !== 0 ? fmt$(totalDayPnl, { sign: true }) : "—"}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {totalCapital > 0 && totalDayPnl !== 0 ? `${((totalDayPnl / totalCapital) * 100).toFixed(2)}% of capital` : "Log EOD snapshot"}
+              {totalCapital > 0 && totalDayPnl !== 0
+                ? `${((totalDayPnl / totalCapital) * 100).toFixed(2)}% of capital`
+                : "Sync extension to update"}
             </div>
           </CardContent>
         </Card>
 
         {/* Win Rate */}
-        <Card className="col-span-1 border-amber-500/20 bg-amber-500/5">
+        <Card className="border-amber-500/20 bg-amber-500/5">
           <CardContent className="pt-4 pb-3">
             <div className="text-xs text-muted-foreground uppercase tracking-wide">Win Rate (This Month)</div>
             <div className="text-2xl font-bold text-amber-400 mt-1">
               {closedThisMonth.length > 0 ? `${winRate}%` : "—"}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {closedThisMonth.length > 0 ? `${wonThisMonth}W / ${lostThisMonth}L of ${closedThisMonth.length} trades` : "No closed trades yet"}
+              {closedThisMonth.length > 0
+                ? `${wonThisMonth}W / ${lostThisMonth}L of ${closedThisMonth.length} trades`
+                : "No closed trades yet"}
             </div>
           </CardContent>
         </Card>
@@ -524,22 +714,36 @@ export default function SriPlaybook() {
       {totalCapital > 0 && (
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-semibold">June 2026 Progress toward 3% Target</div>
-              <div className="text-sm text-muted-foreground">
-                ${monthlyActual.toLocaleString()} / ${monthlyTarget.toLocaleString("en-US", { maximumFractionDigits: 0 })} target
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <div className="text-sm font-semibold">
+                {new Date().toLocaleString("default", { month: "long", year: "numeric" })} — 3% Target Progress
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {adjustedPnl && (
+                  <span className="text-xs text-muted-foreground">
+                    Raw: {fmt$(adjustedPnl.rawPnl, { sign: true })} | Transfers: {fmt$(adjustedPnl.netTransfers, { sign: true })}
+                  </span>
+                )}
+                <span className="font-medium">
+                  {fmt$(adjPnlValue, { sign: true })} / {fmt$(monthlyTarget)} target
+                </span>
               </div>
             </div>
             <div className="w-full bg-muted rounded-full h-3">
               <div
-                className={`h-3 rounded-full transition-all duration-500 ${monthlyProgress >= 100 ? "bg-green-500" : monthlyProgress >= 50 ? "bg-blue-500" : "bg-amber-500"}`}
-                style={{ width: `${Math.min(100, monthlyProgress)}%` }}
+                className={`h-3 rounded-full transition-all duration-500 ${
+                  monthlyProgress >= 100 ? "bg-green-500" : monthlyProgress >= 50 ? "bg-blue-500" : "bg-amber-500"
+                }`}
+                style={{ width: `${Math.max(0, Math.min(100, monthlyProgress))}%` }}
               />
             </div>
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
               <span>0%</span>
-              <span className={monthlyProgress >= 100 ? "text-green-400 font-semibold" : ""}>{monthlyProgress.toFixed(1)}% complete</span>
-              <span>3% = ${monthlyTarget.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+              <span className={monthlyProgress >= 100 ? "text-green-400 font-semibold" : ""}>
+                {monthlyProgress.toFixed(1)}% complete
+                {adjustedPnl?.netTransfers ? " (transfer-adjusted)" : ""}
+              </span>
+              <span>3% = {fmt$(monthlyTarget)}</span>
             </div>
           </CardContent>
         </Card>
@@ -549,7 +753,6 @@ export default function SriPlaybook() {
       {snapshots.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
           {ACCOUNTS.map(acct => {
-            // Match by exact ID, or by fuzzy suffix (handles extension sending "schwab_schwab" vs "schwab_764")
             const snap = snapshots.find(s => {
               if (s.accountId === acct.id) return true;
               if (acct.id === "schwab_764" && String(s.accountId).startsWith("schwab_")) return true;
@@ -576,13 +779,13 @@ export default function SriPlaybook() {
                     <div className="text-sm font-semibold">{acct.label}</div>
                     <div className="text-xs text-muted-foreground ml-auto">{snap.snapshotDate}</div>
                   </div>
-                  <div className="text-xl font-bold">${val.toLocaleString("en-US", { maximumFractionDigits: 0 })}</div>
+                  <div className="text-xl font-bold">{fmt$(val)}</div>
                   <div className="flex gap-3 mt-1">
                     <span className={`text-xs ${dayPnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      Day: {dayPnl >= 0 ? "+" : ""}${dayPnl.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                      Day: {fmt$(dayPnl, { sign: true })}
                     </span>
                     <span className={`text-xs ${totalPnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      Total: {totalPnl >= 0 ? "+" : ""}${totalPnl.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                      Total: {fmt$(totalPnl, { sign: true })}
                     </span>
                   </div>
                 </CardContent>
@@ -592,12 +795,20 @@ export default function SriPlaybook() {
         </div>
       )}
 
-      {/* Tabs: Positions | Playbook Rules | History */}
+      {/* Tabs */}
       <Tabs defaultValue="positions">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="positions">
             <Shield className="w-4 h-4 mr-1" />
             Open Positions ({openPositions.length})
+          </TabsTrigger>
+          <TabsTrigger value="capital">
+            <Activity className="w-4 h-4 mr-1" />
+            EOD Capital
+          </TabsTrigger>
+          <TabsTrigger value="transfers">
+            <Wallet className="w-4 h-4 mr-1" />
+            Transfers ({transfers.length})
           </TabsTrigger>
           <TabsTrigger value="playbook">
             <BookOpen className="w-4 h-4 mr-1" />
@@ -665,22 +876,22 @@ export default function SriPlaybook() {
                         </div>
                         <div>
                           <div className="text-xs text-muted-foreground">Credit Collected</div>
-                          <div className="font-medium text-green-400">${credit.toLocaleString("en-US", { maximumFractionDigits: 0 })}</div>
+                          <div className="font-medium text-green-400">{fmt$(credit)}</div>
                         </div>
                         <div>
                           <div className="text-xs text-muted-foreground">50% Profit Target</div>
-                          <div className="font-medium text-blue-400">${profitTarget.toLocaleString("en-US", { maximumFractionDigits: 0 })}</div>
+                          <div className="font-medium text-blue-400">{fmt$(profitTarget)}</div>
                         </div>
                         <div>
                           <div className="text-xs text-muted-foreground">2× Loss Stop</div>
-                          <div className="font-medium text-red-400">-${lossStop.toLocaleString("en-US", { maximumFractionDigits: 0 })}</div>
+                          <div className="font-medium text-red-400">-{fmt$(lossStop)}</div>
                         </div>
                       </div>
                       {(pos.shortCallStrike || pos.shortPutStrike) && (
                         <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
                           {pos.shortCallStrike && <span>Short Call: <span className="text-foreground font-medium">${pos.shortCallStrike}</span></span>}
                           {pos.shortPutStrike && <span>Short Put: <span className="text-foreground font-medium">${pos.shortPutStrike}</span></span>}
-                          {pos.maxRisk && <span>Max Risk: <span className="text-red-400 font-medium">${parseFloat(pos.maxRisk as string).toLocaleString()}</span></span>}
+                          {pos.maxRisk && <span>Max Risk: <span className="text-red-400 font-medium">{fmt$(parseFloat(pos.maxRisk as string))}</span></span>}
                         </div>
                       )}
                       {pos.notes && <div className="text-xs text-muted-foreground mt-2 italic">{pos.notes}</div>}
@@ -692,10 +903,277 @@ export default function SriPlaybook() {
           )}
         </TabsContent>
 
+        {/* ── EOD Capital Tab ── */}
+        <TabsContent value="capital" className="mt-4 space-y-4">
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="border-green-500/20 bg-green-500/5">
+              <CardContent className="pt-4 pb-3">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Latest EOD Total</div>
+                <div className="text-xl font-bold text-green-400 mt-1">
+                  {eodHistory[0] ? fmt$(parseFloat(eodHistory[0].totalValue as string)) : "—"}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">{eodHistory[0]?.snapshotDate ?? "No snapshots yet"}</div>
+              </CardContent>
+            </Card>
+            <Card className={`border-${(adjustedPnl?.adjustedPnl ?? 0) >= 0 ? "green" : "red"}-500/20 bg-${(adjustedPnl?.adjustedPnl ?? 0) >= 0 ? "green" : "red"}-500/5`}>
+              <CardContent className="pt-4 pb-3">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">MTD Adj P&L</div>
+                <div className={`text-xl font-bold mt-1 ${(adjustedPnl?.adjustedPnl ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {adjustedPnl ? fmt$(adjustedPnl.adjustedPnl, { sign: true }) : "—"}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {adjustedPnl ? `Raw: ${fmt$(adjustedPnl.rawPnl, { sign: true })}` : "Capture EOD to start"}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-blue-500/20 bg-blue-500/5">
+              <CardContent className="pt-4 pb-3">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Net Transfers (MTD)</div>
+                <div className="text-xl font-bold text-blue-400 mt-1">
+                  {adjustedPnl ? fmt$(adjustedPnl.netTransfers, { sign: true }) : "—"}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Deposits minus withdrawals</div>
+              </CardContent>
+            </Card>
+            <Card className="border-amber-500/20 bg-amber-500/5">
+              <CardContent className="pt-4 pb-3">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">EOD Snapshots</div>
+                <div className="text-xl font-bold text-amber-400 mt-1">{eodHistory.length}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {eodHistory.length > 0
+                    ? `${eodHistory[eodHistory.length - 1].snapshotDate} → ${eodHistory[0].snapshotDate}`
+                    : "Click Capture EOD to start"}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Formula explanation */}
+          <Card className="border-border">
+            <CardContent className="pt-4 pb-3">
+              <div className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <TrendUp className="w-4 h-4 text-green-400" />
+                Transfer-Adjusted P&L Formula
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
+                  True P&L = (Ending Capital − Beginning Capital) − Net Transfers In
+                </span>
+                <div className="mt-2 text-xs space-y-1">
+                  <div>• <strong>Deposits/Transfers In</strong> are subtracted — you added capital, not earned it</div>
+                  <div>• <strong>Withdrawals/Transfers Out</strong> are added back — you removed capital, not lost it</div>
+                  <div>• Click <strong>"Capture EOD"</strong> after the extension syncs to lock in today's snapshot</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* EOD History Table */}
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">EOD Capital History</CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => captureEodMutation.mutate({})}
+                  disabled={captureEodMutation.isPending || totalCapital === 0}
+                  className="border-green-500/40 text-green-400 hover:bg-green-500/10"
+                >
+                  <Camera className="w-4 h-4 mr-1" />
+                  {captureEodMutation.isPending ? "Capturing..." : "Capture Today's EOD"}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {eodHistory.length === 0 ? (
+                <div className="py-10 text-center text-muted-foreground">
+                  <Activity className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <div className="font-semibold">No EOD snapshots yet</div>
+                  <div className="text-sm mt-1">
+                    After the extension syncs your accounts, click "Capture EOD" to lock in today's total capital.
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Total Capital</TableHead>
+                        <TableHead className="text-right">Schwab ...764</TableHead>
+                        <TableHead className="text-right">E*TRADE -4723</TableHead>
+                        <TableHead className="text-right">E*TRADE -2738</TableHead>
+                        <TableHead className="text-right">Net Transfers</TableHead>
+                        <TableHead className="text-right">Adj P&L</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {eodHistory.map((row, i) => {
+                        const adjPnlRow = row.adjustedPnl !== null ? parseFloat(row.adjustedPnl as string) : null;
+                        const netT = parseFloat(row.netTransfersSinceLastSnapshot as string ?? "0");
+                        const isFirst = i === eodHistory.length - 1;
+                        return (
+                          <TableRow key={row.id}>
+                            <TableCell className="font-medium">{row.snapshotDate}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {fmt$(parseFloat(row.totalValue as string))}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {row.schwab764Value ? fmt$(parseFloat(row.schwab764Value as string)) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {row.etrade4723Value ? fmt$(parseFloat(row.etrade4723Value as string)) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {row.etrade2738Value ? fmt$(parseFloat(row.etrade2738Value as string)) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {netT !== 0
+                                ? <span className={netT > 0 ? "text-blue-400" : "text-orange-400"}>{fmt$(netT, { sign: true })}</span>
+                                : <span className="text-muted-foreground">—</span>
+                              }
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {isFirst ? (
+                                <span className="text-muted-foreground text-xs">Baseline</span>
+                              ) : adjPnlRow !== null ? (
+                                <span className={adjPnlRow >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
+                                  {fmt$(adjPnlRow, { sign: true })}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Transfers Tab ── */}
+        <TabsContent value="transfers" className="mt-4 space-y-4">
+          {/* Summary */}
+          <div className="grid grid-cols-3 gap-4">
+            <Card className="border-green-500/20 bg-green-500/5">
+              <CardContent className="pt-4 pb-3">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Deposits</div>
+                <div className="text-xl font-bold text-green-400 mt-1">
+                  {fmt$(transfers.filter(t => parseFloat(t.amount as string) > 0).reduce((s, t) => s + parseFloat(t.amount as string), 0))}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-red-500/20 bg-red-500/5">
+              <CardContent className="pt-4 pb-3">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Withdrawals</div>
+                <div className="text-xl font-bold text-red-400 mt-1">
+                  {fmt$(Math.abs(transfers.filter(t => parseFloat(t.amount as string) < 0).reduce((s, t) => s + parseFloat(t.amount as string), 0)))}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-blue-500/20 bg-blue-500/5">
+              <CardContent className="pt-4 pb-3">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Net Transfers (All Time)</div>
+                <div className={`text-xl font-bold mt-1 ${totalNetTransfers >= 0 ? "text-blue-400" : "text-orange-400"}`}>
+                  {fmt$(totalNetTransfers, { sign: true })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Transfer Log */}
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Transfer Log</CardTitle>
+                <AddTransferDialog onAdded={() => { refetchTransfers(); refetchAdjPnl(); }} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {transfers.length === 0 ? (
+                <div className="py-10 text-center text-muted-foreground">
+                  <Wallet className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <div className="font-semibold">No transfers logged</div>
+                  <div className="text-sm mt-1">Log deposits and withdrawals to get accurate transfer-adjusted P&L</div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Account</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Notes</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transfers.map(t => {
+                        const amount = parseFloat(t.amount as string);
+                        const typeInfo = TRANSFER_TYPES.find(tt => tt.value === t.transferType);
+                        const acct = ACCOUNTS.find(a => a.id === t.accountId);
+                        return (
+                          <TableRow key={t.id}>
+                            <TableCell className="font-medium">{t.transferDate}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <div className={`w-1.5 h-1.5 rounded-full ${acct?.color ?? "bg-slate-500"}`} />
+                                <span className="text-sm">{t.accountLabel}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`text-sm font-medium ${typeInfo?.color ?? ""}`}>
+                                {amount > 0
+                                  ? <ArrowDownCircle className="w-3 h-3 inline mr-1 text-green-400" />
+                                  : <ArrowUpCircle className="w-3 h-3 inline mr-1 text-red-400" />
+                                }
+                                {typeInfo?.label ?? t.transferType}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className={`font-semibold ${amount >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                {fmt$(amount, { sign: true })}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                              {t.notes ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                onClick={() => {
+                                  if (confirm("Delete this transfer?")) {
+                                    deleteTransferMutation.mutate({ id: t.id });
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* ── Playbook Rules Tab ── */}
         <TabsContent value="playbook" className="mt-4">
           <div className="space-y-4">
-            {/* Decision Tree */}
             <Card className="border-border">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -733,7 +1211,6 @@ export default function SriPlaybook() {
               </CardContent>
             </Card>
 
-            {/* Strategy Cards */}
             {PLAYBOOK_RULES.map(rule => (
               <Card key={rule.strategy} className={`border ${rule.color}`}>
                 <CardHeader className="pb-2">
@@ -770,7 +1247,6 @@ export default function SriPlaybook() {
               </Card>
             ))}
 
-            {/* Ticker Universe */}
             <Card className="border-border">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -779,7 +1255,6 @@ export default function SriPlaybook() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Core 5 */}
                 <div>
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Core 5 — Always on the radar</div>
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
@@ -794,7 +1269,6 @@ export default function SriPlaybook() {
                     ))}
                   </div>
                 </div>
-                {/* Add-ons */}
                 <div>
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Add-ons — Rotate in when IV is elevated</div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
@@ -809,10 +1283,9 @@ export default function SriPlaybook() {
                     ))}
                   </div>
                 </div>
-                {/* Rotation Rule */}
                 <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-3 text-sm">
                   <div className="font-semibold text-amber-400 mb-1">🔄 Rotation Rule</div>
-                  <div className="text-muted-foreground">Run <span className="text-white font-semibold">3 active positions max</span> at a time. Each Monday, pick the 3 tickers with the highest IV Rank from this universe — not the same 3 every week. <span className="text-amber-400">No two tickers from the same sector simultaneously.</span> When one closes, rotate in the next highest IV name.</div>
+                  <div className="text-muted-foreground">Run <span className="text-white font-semibold">3 active positions max</span> at a time. Each Monday, pick the 3 tickers with the highest IV Rank from this universe — not the same 3 every week. No two names from the same sector simultaneously. No WDC + SNDK (storage overlap). No crypto.</div>
                 </div>
               </CardContent>
             </Card>
@@ -843,17 +1316,15 @@ export default function SriPlaybook() {
                           <div className={`w-2 h-2 rounded-full ${acct?.color ?? "bg-slate-500"}`} />
                           <span className="font-bold">{pos.ticker}</span>
                           {strategyBadge(pos.strategy)}
-                          <Badge className={pos.status === "expired" ? "bg-slate-500/20 text-slate-400" : "bg-slate-500/20 text-slate-400"}>
-                            {pos.status}
-                          </Badge>
+                          <Badge className="bg-slate-500/20 text-slate-400">{pos.status}</Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">{pos.entryDate} → {pos.closeDate}</div>
                         <div className="ml-auto flex items-center gap-3">
                           {pnl >= 0
-                            ? <span className="text-green-400 font-semibold flex items-center gap-1"><CheckCircle className="w-3 h-3" /> +${pnl.toLocaleString()}</span>
-                            : <span className="text-red-400 font-semibold flex items-center gap-1"><XCircle className="w-3 h-3" /> -${Math.abs(pnl).toLocaleString()}</span>
+                            ? <span className="text-green-400 font-semibold flex items-center gap-1"><CheckCircle className="w-3 h-3" /> {fmt$(pnl, { sign: true })}</span>
+                            : <span className="text-red-400 font-semibold flex items-center gap-1"><XCircle className="w-3 h-3" /> {fmt$(pnl, { sign: true })}</span>
                           }
-                          <span className="text-xs text-muted-foreground">of ${credit.toLocaleString()} credit</span>
+                          <span className="text-xs text-muted-foreground">of {fmt$(credit)} credit</span>
                         </div>
                       </div>
                       {pos.closeReason && <div className="text-xs text-muted-foreground mt-1">Reason: {pos.closeReason}</div>}
@@ -873,6 +1344,8 @@ export default function SriPlaybook() {
     </div>
   );
 }
+
+// ─── Extension Settings Tab Component ────────────────────────────────────────
 
 function ExtensionSettingsTab() {
   const [copied, setCopied] = React.useState(false);
@@ -928,16 +1401,8 @@ function ExtensionSettingsTab() {
                 <div className="space-y-2">
                   <Label className="text-xs text-amber-600 font-semibold">⚠ Copy this token now — it won't be shown again</Label>
                   <div className="flex gap-2">
-                    <Input
-                      value={fullToken}
-                      readOnly
-                      className="font-mono text-xs"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleCopy(fullToken)}
-                    >
+                    <Input value={fullToken} readOnly className="font-mono text-xs" />
+                    <Button size="sm" variant="outline" onClick={() => handleCopy(fullToken)}>
                       {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </Button>
                   </div>

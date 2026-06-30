@@ -772,3 +772,39 @@ export const extensionSyncTokens = mysqlTable("extension_sync_tokens", {
 });
 export type ExtensionSyncToken = typeof extensionSyncTokens.$inferSelect;
 export type InsertExtensionSyncToken = typeof extensionSyncTokens.$inferInsert;
+
+// Cash transfers in/out of brokerage accounts — used for transfer-adjusted P&L
+// True P&L = (Ending Value - Beginning Value) - Net Transfers In
+export const accountTransfers = mysqlTable("account_transfers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  accountId: varchar("account_id", { length: 32 }).notNull(),   // "schwab_764" | "etrade_4723" | "etrade_2738" | "all"
+  accountLabel: varchar("account_label", { length: 64 }).notNull(),
+  transferDate: varchar("transfer_date", { length: 10 }).notNull(), // YYYY-MM-DD
+  // Positive = deposit/transfer-in, Negative = withdrawal/transfer-out
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  transferType: mysqlEnum("transfer_type", ["deposit", "withdrawal", "transfer_in", "transfer_out"]).notNull(),
+  notes: text("notes"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type AccountTransfer = typeof accountTransfers.$inferSelect;
+export type InsertAccountTransfer = typeof accountTransfers.$inferInsert;
+
+// EOD capital snapshots — daily total portfolio value for performance tracking
+// Auto-captured from extension sync data, one row per day
+export const eodCapitalSnapshots = mysqlTable("eod_capital_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  snapshotDate: varchar("snapshot_date", { length: 10 }).notNull(), // YYYY-MM-DD
+  totalValue: decimal("total_value", { precision: 14, scale: 2 }).notNull(),    // sum of all accounts
+  schwab764Value: decimal("schwab_764_value", { precision: 14, scale: 2 }),
+  etrade4723Value: decimal("etrade_4723_value", { precision: 14, scale: 2 }),
+  etrade2738Value: decimal("etrade_2738_value", { precision: 14, scale: 2 }),
+  // Transfer-adjusted P&L vs the previous EOD snapshot
+  netTransfersSinceLastSnapshot: decimal("net_transfers_since_last_snapshot", { precision: 14, scale: 2 }).default("0"),
+  adjustedPnl: decimal("adjusted_pnl", { precision: 14, scale: 2 }),  // totalValue - prevTotalValue - netTransfers
+  notes: text("notes"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type EodCapitalSnapshot = typeof eodCapitalSnapshots.$inferSelect;
+export type InsertEodCapitalSnapshot = typeof eodCapitalSnapshots.$inferInsert;

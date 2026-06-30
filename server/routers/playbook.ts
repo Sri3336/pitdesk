@@ -1,8 +1,15 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { accountSnapshots, playbookPositions, monthlyPnl, extensionSyncTokens } from "../../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import {
+  accountSnapshots,
+  playbookPositions,
+  monthlyPnl,
+  extensionSyncTokens,
+  accountTransfers,
+  eodCapitalSnapshots,
+} from "../../drizzle/schema";
+import { eq, and, desc, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
 
 const OWNER_USER_ID = 1; // Sri's actual DB user ID (akulasridhar@gmail.com)
@@ -31,8 +38,17 @@ const positionInput = z.object({
   notes: z.string().optional(),
 });
 
+// ─── Canonical account ID helper ───────────────────────────────────────────
+function canonicalId(id: string): string {
+  if (id.startsWith("schwab_")) return "schwab_764";
+  if (id.includes("4723")) return "etrade_4723";
+  if (id.includes("2738")) return "etrade_2738";
+  return id;
+}
+
 export const playbookRouter = router({
-  // Save EOD snapshot for all accounts
+  // ─── Snapshots ─────────────────────────────────────────────────────────────
+
   saveSnapshot: protectedProcedure
     .input(z.object({
       snapshotDate: z.string(),
@@ -78,24 +94,16 @@ export const playbookRouter = router({
 
   getLatestSnapshots: protectedProcedure.query(async () => {
     const db = await getDb();
-      if (!db) throw new Error("Database not available");
+    if (!db) throw new Error("Database not available");
     const rows = await db
       .select()
       .from(accountSnapshots)
       .where(eq(accountSnapshots.userId, OWNER_USER_ID))
       .orderBy(desc(accountSnapshots.snapshotDate), desc(accountSnapshots.createdAt));
-    // Canonicalize account IDs — all schwab_* variants map to schwab_764
-    function canonicalId(id: string): string {
-      if (id.startsWith("schwab_")) return "schwab_764";
-      if (id.includes("4723")) return "etrade_4723";
-      if (id.includes("2738")) return "etrade_2738";
-      return id;
-    }
     const seen = new Map<string, typeof rows[0]>();
     for (const r of rows) {
       const key = canonicalId(r.accountId);
       if (!seen.has(key)) {
-        // Normalize the accountId on the returned row so UI matching works
         seen.set(key, { ...r, accountId: key });
       }
     }
@@ -104,13 +112,15 @@ export const playbookRouter = router({
 
   getSnapshotHistory: protectedProcedure.query(async () => {
     const db = await getDb();
-      if (!db) throw new Error("Database not available");
+    if (!db) throw new Error("Database not available");
     return db
       .select()
       .from(accountSnapshots)
       .where(eq(accountSnapshots.userId, OWNER_USER_ID))
       .orderBy(desc(accountSnapshots.snapshotDate));
   }),
+
+  // ─── Positions ─────────────────────────────────────────────────────────────
 
   addPosition: protectedProcedure
     .input(positionInput)
@@ -142,7 +152,7 @@ export const playbookRouter = router({
 
   getOpenPositions: protectedProcedure.query(async () => {
     const db = await getDb();
-      if (!db) throw new Error("Database not available");
+    if (!db) throw new Error("Database not available");
     return db
       .select()
       .from(playbookPositions)
@@ -152,7 +162,7 @@ export const playbookRouter = router({
 
   getAllPositions: protectedProcedure.query(async () => {
     const db = await getDb();
-      if (!db) throw new Error("Database not available");
+    if (!db) throw new Error("Database not available");
     return db
       .select()
       .from(playbookPositions)
@@ -191,6 +201,8 @@ export const playbookRouter = router({
         .where(and(eq(playbookPositions.id, input.id), eq(playbookPositions.userId, OWNER_USER_ID)));
       return { ok: true };
     }),
+
+  // ─── Monthly P&L ───────────────────────────────────────────────────────────
 
   upsertMonthlyPnl: protectedProcedure
     .input(z.object({
@@ -236,13 +248,14 @@ export const playbookRouter = router({
 
   getMonthlyPnl: protectedProcedure.query(async () => {
     const db = await getDb();
-      if (!db) throw new Error("Database not available");
+    if (!db) throw new Error("Database not available");
     return db.select().from(monthlyPnl)
       .where(eq(monthlyPnl.userId, OWNER_USER_ID))
       .orderBy(desc(monthlyPnl.month));
   }),
 
-  // Called by the Chrome extension — receives scraped brokerage data
+  // ─── Chrome Extension ──────────────────────────────────────────────────────
+
   syncBrokerSnapshot: protectedProcedure
     .input(z.object({
       broker: z.enum(["etrade", "schwab"]),
@@ -272,7 +285,6 @@ export const playbookRouter = router({
       const now = Date.now();
       const today = new Date().toISOString().split("T")[0];
 
-      // Save account snapshot if we have summary data
       if (input.accountSummary && input.accountSummary.totalValue) {
         const s = input.accountSummary;
         await db.delete(accountSnapshots).where(
@@ -305,46 +317,317 @@ export const playbookRouter = router({
         snapshotSaved: !!(input.accountSummary?.totalValue),
         syncedAt: now,
       };
-      }),
+    }),
 
-  // Generate a personal sync token for the Chrome extension
   generateExtensionToken: protectedProcedure
     .mutation(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("DB unavailable");
       if (ctx.user.id !== OWNER_USER_ID) throw new Error("Forbidden");
-
-      // Delete any existing tokens for this user
       await db.delete(extensionSyncTokens).where(eq(extensionSyncTokens.userId, OWNER_USER_ID));
-
-      const token = crypto.randomBytes(32).toString("hex"); // 64-char hex
+      const token = crypto.randomBytes(32).toString("hex");
       await db.insert(extensionSyncTokens).values({
         userId: OWNER_USER_ID,
         token,
         label: "Chrome Extension",
         createdAt: Date.now(),
       });
-
       return { token };
     }),
 
-  // Get the current extension token (masked for display)
   getExtensionToken: protectedProcedure
     .query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return { hasToken: false, maskedToken: null, lastUsedAt: null };
       if (ctx.user.id !== OWNER_USER_ID) return { hasToken: false, maskedToken: null, lastUsedAt: null };
-
       const rows = await db
         .select()
         .from(extensionSyncTokens)
         .where(eq(extensionSyncTokens.userId, OWNER_USER_ID))
         .limit(1);
-
       if (!rows.length) return { hasToken: false, maskedToken: null, lastUsedAt: null };
-
       const t = rows[0];
       const masked = t.token.slice(0, 8) + "..." + t.token.slice(-4);
       return { hasToken: true, maskedToken: masked, lastUsedAt: t.lastUsedAt };
+    }),
+
+  // ─── EOD Capital Tracking ──────────────────────────────────────────────────
+
+  /**
+   * Capture an EOD snapshot from the latest account_snapshots data.
+   * Calculates transfer-adjusted P&L vs the previous EOD snapshot.
+   * Called manually from the UI (or can be automated).
+   */
+  captureEodSnapshot: protectedProcedure
+    .input(z.object({
+      snapshotDate: z.string().optional(), // defaults to today
+      notes: z.string().optional(),
+    }))
+    .mutation(async () => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const now = Date.now();
+      const today = new Date().toISOString().split("T")[0];
+
+      // Get latest per-account snapshots
+      const snapRows = await db
+        .select()
+        .from(accountSnapshots)
+        .where(eq(accountSnapshots.userId, OWNER_USER_ID))
+        .orderBy(desc(accountSnapshots.snapshotDate), desc(accountSnapshots.createdAt));
+
+      // Deduplicate to latest per canonical account
+      const seen = new Map<string, typeof snapRows[0]>();
+      for (const r of snapRows) {
+        const key = canonicalId(r.accountId);
+        if (!seen.has(key)) seen.set(key, r);
+      }
+
+      const schwab = seen.get("schwab_764");
+      const et4723 = seen.get("etrade_4723");
+      const et2738 = seen.get("etrade_2738");
+
+      const schwabVal = schwab ? parseFloat(String(schwab.totalValue)) : 0;
+      const et4723Val = et4723 ? parseFloat(String(et4723.totalValue)) : 0;
+      const et2738Val = et2738 ? parseFloat(String(et2738.totalValue)) : 0;
+      const totalValue = schwabVal + et4723Val + et2738Val;
+
+      // Get previous EOD snapshot to compute P&L
+      const prevRows = await db
+        .select()
+        .from(eodCapitalSnapshots)
+        .where(
+          and(
+            eq(eodCapitalSnapshots.userId, OWNER_USER_ID),
+            lte(eodCapitalSnapshots.snapshotDate, today),
+          )
+        )
+        .orderBy(desc(eodCapitalSnapshots.snapshotDate))
+        .limit(2);
+
+      // Find the most recent snapshot that isn't today (to avoid double-counting)
+      const prevSnap = prevRows.find(r => r.snapshotDate < today) ?? prevRows[0] ?? null;
+      const prevTotal = prevSnap ? parseFloat(String(prevSnap.totalValue)) : 0;
+
+      // Sum transfers between prevSnap.snapshotDate and today
+      let netTransfers = 0;
+      if (prevSnap) {
+        const transferRows = await db
+          .select()
+          .from(accountTransfers)
+          .where(
+            and(
+              eq(accountTransfers.userId, OWNER_USER_ID),
+              gte(accountTransfers.transferDate, prevSnap.snapshotDate),
+              lte(accountTransfers.transferDate, today),
+            )
+          );
+        for (const t of transferRows) {
+          netTransfers += parseFloat(String(t.amount));
+        }
+      }
+
+      const adjustedPnl = prevTotal > 0 ? totalValue - prevTotal - netTransfers : null;
+
+      // Upsert today's EOD snapshot
+      const existing = await db
+        .select()
+        .from(eodCapitalSnapshots)
+        .where(
+          and(
+            eq(eodCapitalSnapshots.userId, OWNER_USER_ID),
+            eq(eodCapitalSnapshots.snapshotDate, today),
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db.update(eodCapitalSnapshots)
+          .set({
+            totalValue: String(totalValue),
+            schwab764Value: schwabVal > 0 ? String(schwabVal) : null,
+            etrade4723Value: et4723Val > 0 ? String(et4723Val) : null,
+            etrade2738Value: et2738Val > 0 ? String(et2738Val) : null,
+            netTransfersSinceLastSnapshot: String(netTransfers),
+            adjustedPnl: adjustedPnl !== null ? String(adjustedPnl) : null,
+            createdAt: now,
+          })
+          .where(
+            and(
+              eq(eodCapitalSnapshots.userId, OWNER_USER_ID),
+              eq(eodCapitalSnapshots.snapshotDate, today),
+            )
+          );
+      } else {
+        await db.insert(eodCapitalSnapshots).values({
+          userId: OWNER_USER_ID,
+          snapshotDate: today,
+          totalValue: String(totalValue),
+          schwab764Value: schwabVal > 0 ? String(schwabVal) : null,
+          etrade4723Value: et4723Val > 0 ? String(et4723Val) : null,
+          etrade2738Value: et2738Val > 0 ? String(et2738Val) : null,
+          netTransfersSinceLastSnapshot: String(netTransfers),
+          adjustedPnl: adjustedPnl !== null ? String(adjustedPnl) : null,
+          createdAt: now,
+        });
+      }
+
+      return {
+        ok: true,
+        snapshotDate: today,
+        totalValue,
+        schwabVal,
+        et4723Val,
+        et2738Val,
+        netTransfers,
+        adjustedPnl,
+      };
+    }),
+
+  /** Return all EOD capital snapshots for the chart */
+  getEodHistory: protectedProcedure
+    .input(z.object({
+      fromDate: z.string().optional(),
+      toDate: z.string().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const conditions = [eq(eodCapitalSnapshots.userId, OWNER_USER_ID)];
+      if (input?.fromDate) conditions.push(gte(eodCapitalSnapshots.snapshotDate, input.fromDate));
+      if (input?.toDate) conditions.push(lte(eodCapitalSnapshots.snapshotDate, input.toDate));
+
+      return db
+        .select()
+        .from(eodCapitalSnapshots)
+        .where(and(...conditions))
+        .orderBy(desc(eodCapitalSnapshots.snapshotDate));
+    }),
+
+  /** Return transfer-adjusted P&L for a date range (month-to-date by default) */
+  getAdjustedPnl: protectedProcedure
+    .input(z.object({
+      fromDate: z.string(),
+      toDate: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      // Get the EOD snapshot at/before fromDate as the baseline
+      const baselineRows = await db
+        .select()
+        .from(eodCapitalSnapshots)
+        .where(
+          and(
+            eq(eodCapitalSnapshots.userId, OWNER_USER_ID),
+            lte(eodCapitalSnapshots.snapshotDate, input.fromDate),
+          )
+        )
+        .orderBy(desc(eodCapitalSnapshots.snapshotDate))
+        .limit(1);
+
+      // Get the most recent EOD snapshot at/before toDate
+      const currentRows = await db
+        .select()
+        .from(eodCapitalSnapshots)
+        .where(
+          and(
+            eq(eodCapitalSnapshots.userId, OWNER_USER_ID),
+            lte(eodCapitalSnapshots.snapshotDate, input.toDate),
+          )
+        )
+        .orderBy(desc(eodCapitalSnapshots.snapshotDate))
+        .limit(1);
+
+      // Sum all transfers in the date range
+      const transferRows = await db
+        .select()
+        .from(accountTransfers)
+        .where(
+          and(
+            eq(accountTransfers.userId, OWNER_USER_ID),
+            gte(accountTransfers.transferDate, input.fromDate),
+            lte(accountTransfers.transferDate, input.toDate),
+          )
+        );
+
+      const netTransfers = transferRows.reduce((sum, t) => sum + parseFloat(String(t.amount)), 0);
+      const baselineValue = baselineRows[0] ? parseFloat(String(baselineRows[0].totalValue)) : 0;
+      const currentValue = currentRows[0] ? parseFloat(String(currentRows[0].totalValue)) : 0;
+      const rawPnl = currentValue - baselineValue;
+      const adjustedPnl = rawPnl - netTransfers;
+
+      return {
+        fromDate: input.fromDate,
+        toDate: input.toDate,
+        baselineValue,
+        currentValue,
+        rawPnl,
+        netTransfers,
+        adjustedPnl,
+        baselineDate: baselineRows[0]?.snapshotDate ?? null,
+        currentDate: currentRows[0]?.snapshotDate ?? null,
+      };
+    }),
+
+  // ─── Transfers CRUD ────────────────────────────────────────────────────────
+
+  addTransfer: protectedProcedure
+    .input(z.object({
+      accountId: z.string(),
+      accountLabel: z.string(),
+      transferDate: z.string(),
+      amount: z.number(), // positive = deposit, negative = withdrawal
+      transferType: z.enum(["deposit", "withdrawal", "transfer_in", "transfer_out"]),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const [result] = await db.insert(accountTransfers).values({
+        userId: OWNER_USER_ID,
+        accountId: input.accountId,
+        accountLabel: input.accountLabel,
+        transferDate: input.transferDate,
+        amount: String(input.amount),
+        transferType: input.transferType,
+        notes: input.notes ?? null,
+        createdAt: Date.now(),
+      });
+      return { id: (result as any).insertId };
+    }),
+
+  getTransfers: protectedProcedure
+    .input(z.object({
+      fromDate: z.string().optional(),
+      toDate: z.string().optional(),
+      accountId: z.string().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const conditions = [eq(accountTransfers.userId, OWNER_USER_ID)];
+      if (input?.fromDate) conditions.push(gte(accountTransfers.transferDate, input.fromDate));
+      if (input?.toDate) conditions.push(lte(accountTransfers.transferDate, input.toDate));
+      if (input?.accountId) conditions.push(eq(accountTransfers.accountId, input.accountId));
+
+      return db
+        .select()
+        .from(accountTransfers)
+        .where(and(...conditions))
+        .orderBy(desc(accountTransfers.transferDate));
+    }),
+
+  deleteTransfer: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      await db.delete(accountTransfers)
+        .where(and(eq(accountTransfers.id, input.id), eq(accountTransfers.userId, OWNER_USER_ID)));
+      return { ok: true };
     }),
 });
