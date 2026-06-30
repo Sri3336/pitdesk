@@ -233,4 +233,69 @@ export const playbookRouter = router({
       .where(eq(monthlyPnl.userId, OWNER_USER_ID))
       .orderBy(desc(monthlyPnl.month));
   }),
+
+  // Called by the Chrome extension — receives scraped brokerage data
+  syncBrokerSnapshot: protectedProcedure
+    .input(z.object({
+      broker: z.enum(["etrade", "schwab"]),
+      accountId: z.string(),
+      accountLabel: z.string(),
+      scrapedAt: z.string(),
+      pageUrl: z.string().optional(),
+      accountSummary: z.object({
+        totalValue: z.number().optional(),
+        cash: z.number().optional(),
+        dayPnl: z.number().optional(),
+        totalPnl: z.number().optional(),
+      }).nullable().optional(),
+      positions: z.array(z.object({
+        symbol: z.string(),
+        qty: z.number(),
+        price: z.number(),
+        costPerShare: z.number(),
+        dayChange: z.number(),
+        totalGain: z.number(),
+        marketValue: z.number(),
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const now = Date.now();
+      const today = new Date().toISOString().split("T")[0];
+
+      // Save account snapshot if we have summary data
+      if (input.accountSummary && input.accountSummary.totalValue) {
+        const s = input.accountSummary;
+        await db.delete(accountSnapshots).where(
+          and(
+            eq(accountSnapshots.userId, OWNER_USER_ID),
+            eq(accountSnapshots.snapshotDate, today),
+            eq(accountSnapshots.accountId, input.accountId),
+          )
+        );
+        await db.insert(accountSnapshots).values({
+          userId: OWNER_USER_ID,
+          snapshotDate: today,
+          accountId: input.accountId,
+          accountLabel: input.accountLabel,
+          totalValue: String(s.totalValue ?? 0),
+          cashValue: String(s.cash ?? 0),
+          marketValue: String((s.totalValue ?? 0) - (s.cash ?? 0)),
+          dayPnl: String(s.dayPnl ?? 0),
+          totalPnl: String(s.totalPnl ?? 0),
+          notes: `Auto-synced via Chrome extension from ${input.broker} at ${input.scrapedAt}`,
+          createdAt: now,
+        });
+      }
+
+      return {
+        ok: true,
+        broker: input.broker,
+        accountId: input.accountId,
+        positionsReceived: input.positions.length,
+        snapshotSaved: !!(input.accountSummary?.totalValue),
+        syncedAt: now,
+      };
+    }),
 });
