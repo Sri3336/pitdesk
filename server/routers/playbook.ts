@@ -84,15 +84,22 @@ export const playbookRouter = router({
       .from(accountSnapshots)
       .where(eq(accountSnapshots.userId, OWNER_USER_ID))
       .orderBy(desc(accountSnapshots.snapshotDate), desc(accountSnapshots.createdAt));
-    const seen = new Set<string>();
-    const latest: typeof rows = [];
+    // Canonicalize account IDs — all schwab_* variants map to schwab_764
+    function canonicalId(id: string): string {
+      if (id.startsWith("schwab_")) return "schwab_764";
+      if (id.includes("4723")) return "etrade_4723";
+      if (id.includes("2738")) return "etrade_2738";
+      return id;
+    }
+    const seen = new Map<string, typeof rows[0]>();
     for (const r of rows) {
-      if (!seen.has(r.accountId)) {
-        seen.add(r.accountId);
-        latest.push(r);
+      const key = canonicalId(r.accountId);
+      if (!seen.has(key)) {
+        // Normalize the accountId on the returned row so UI matching works
+        seen.set(key, { ...r, accountId: key });
       }
     }
-    return latest;
+    return Array.from(seen.values());
   }),
 
   getSnapshotHistory: protectedProcedure.query(async () => {
