@@ -597,8 +597,11 @@ export default function SriPlaybook() {
   const currentMonthData = monthlyData.find(m => m.month === currentMonth);
   const monthlyActual = currentMonthData ? parseFloat(currentMonthData.actualPnl as string) : 0;
 
-  // Use transfer-adjusted P&L for monthly progress if available
-  const adjPnlValue = adjustedPnl?.adjustedPnl ?? monthlyActual;
+  // Only use EOD-based adjusted P&L when a valid baseline snapshot exists for the period.
+  // If baselineValue is 0 and baselineDate is null, it means no snapshot was captured before
+  // the start of the month, so we fall back to closed-trade P&L (monthlyActual).
+  const hasValidBaseline = adjustedPnl?.baselineDate != null && (adjustedPnl?.baselineValue ?? 0) > 0;
+  const adjPnlValue = hasValidBaseline ? (adjustedPnl?.adjustedPnl ?? monthlyActual) : monthlyActual;
   const monthlyProgress = monthlyTarget > 0 ? Math.min(100, (adjPnlValue / monthlyTarget) * 100) : 0;
 
   const closedThisMonth = allPositions.filter(p =>
@@ -670,10 +673,12 @@ export default function SriPlaybook() {
               {monthlyTarget > 0 ? fmt$(monthlyTarget) : "—"}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {adjPnlValue !== 0
+              {hasValidBaseline && adjPnlValue !== 0
                 ? <span className={adjPnlValue >= 0 ? "text-green-400" : "text-red-400"}>
                     Adj P&L: {fmt$(adjPnlValue, { sign: true })}
                   </span>
+                : !hasValidBaseline
+                ? <span className="text-amber-400 text-xs">Capture EOD to enable tracking</span>
                 : "No P&L data yet"}
             </div>
           </CardContent>
@@ -719,7 +724,7 @@ export default function SriPlaybook() {
                 {new Date().toLocaleString("default", { month: "long", year: "numeric" })} — 3% Target Progress
               </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                {adjustedPnl && (
+                {hasValidBaseline && adjustedPnl && (
                   <span className="text-xs text-muted-foreground">
                     Raw: {fmt$(adjustedPnl.rawPnl, { sign: true })} | Transfers: {fmt$(adjustedPnl.netTransfers, { sign: true })}
                   </span>
