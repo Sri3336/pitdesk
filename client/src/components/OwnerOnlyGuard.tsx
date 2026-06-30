@@ -5,7 +5,7 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Shield } from "lucide-react";
 
 // The owner's database user ID — only this user can access owner-only pages.
-const OWNER_USER_ID = 210001;
+const OWNER_USER_ID = 1; // Sridhar Akula (akulasridhar@gmail.com)
 
 export default function OwnerOnlyGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -21,7 +21,7 @@ export default function OwnerOnlyGuard({ children }: { children: React.ReactNode
   if (loading) return <DashboardLayoutSkeleton />;
   if (!user) return null;
 
-  if (user.id !== OWNER_USER_ID) {
+  if (Number(user.id) !== OWNER_USER_ID) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
         <div className="rounded-full bg-muted p-4">
