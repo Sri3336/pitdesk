@@ -695,3 +695,68 @@ export const priceDownloadJobs = mysqlTable("price_download_jobs", {
 });
 export type PriceDownloadJob = typeof priceDownloadJobs.$inferSelect;
 export type InsertPriceDownloadJob = typeof priceDownloadJobs.$inferInsert;
+
+// ─── Sri's Portfolio Tracker ───────────────────────────────────────────────────
+
+// Daily account snapshots — one row per account per day
+export const accountSnapshots = mysqlTable("account_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  snapshotDate: varchar("snapshot_date", { length: 10 }).notNull(), // YYYY-MM-DD
+  accountId: varchar("account_id", { length: 32 }).notNull(),       // "schwab_764" | "etrade_4723" | "etrade_2738"
+  accountLabel: varchar("account_label", { length: 64 }).notNull(), // "Schwab ...764"
+  totalValue: decimal("total_value", { precision: 14, scale: 2 }).notNull(),
+  cashValue: decimal("cash_value", { precision: 14, scale: 2 }).notNull(),
+  marketValue: decimal("market_value", { precision: 14, scale: 2 }).notNull(),
+  dayPnl: decimal("day_pnl", { precision: 14, scale: 2 }).notNull(),
+  totalPnl: decimal("total_pnl", { precision: 14, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type AccountSnapshot = typeof accountSnapshots.$inferSelect;
+export type InsertAccountSnapshot = typeof accountSnapshots.$inferInsert;
+
+// Active options positions — manually entered/updated
+export const playbookPositions = mysqlTable("playbook_positions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  accountId: varchar("account_id", { length: 32 }).notNull(),
+  accountLabel: varchar("account_label", { length: 64 }).notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  strategy: mysqlEnum("strategy", ["iron_condor", "strangle", "naked_put", "naked_call", "other"]).notNull(),
+  // Legs stored as JSON: [{action, strike, type, expiry, qty, credit}]
+  legs: json("legs").notNull(),
+  expiry: varchar("expiry", { length: 10 }).notNull(),              // YYYY-MM-DD
+  creditCollected: decimal("credit_collected", { precision: 10, scale: 2 }).notNull(),
+  maxRisk: decimal("max_risk", { precision: 10, scale: 2 }),        // null for naked
+  contracts: int("contracts").notNull(),
+  shortCallStrike: decimal("short_call_strike", { precision: 10, scale: 2 }),
+  shortPutStrike: decimal("short_put_strike", { precision: 10, scale: 2 }),
+  status: mysqlEnum("status", ["open", "closed", "expired"]).default("open").notNull(),
+  closedPnl: decimal("closed_pnl", { precision: 10, scale: 2 }),   // realized when closed
+  closeReason: varchar("close_reason", { length: 128 }),            // "50% profit" | "2x loss" | "expired" | "rolled"
+  entryDate: varchar("entry_date", { length: 10 }).notNull(),
+  closeDate: varchar("close_date", { length: 10 }),
+  notes: text("notes"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type PlaybookPosition = typeof playbookPositions.$inferSelect;
+export type InsertPlaybookPosition = typeof playbookPositions.$inferInsert;
+
+// Monthly P&L summary — computed/cached per month
+export const monthlyPnl = mysqlTable("monthly_pnl", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  month: varchar("month", { length: 7 }).notNull(),                 // YYYY-MM
+  totalCapital: decimal("total_capital", { precision: 14, scale: 2 }).notNull(),
+  targetPct: decimal("target_pct", { precision: 5, scale: 2 }).default("3.00").notNull(),
+  targetAmount: decimal("target_amount", { precision: 14, scale: 2 }).notNull(),
+  actualPnl: decimal("actual_pnl", { precision: 14, scale: 2 }).default("0").notNull(),
+  tradesWon: int("trades_won").default(0).notNull(),
+  tradesLost: int("trades_lost").default(0).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type MonthlyPnl = typeof monthlyPnl.$inferSelect;
+export type InsertMonthlyPnl = typeof monthlyPnl.$inferInsert;

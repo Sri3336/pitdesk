@@ -470,3 +470,11 @@
 - [x] Routes /backtester, /position-sizer, /historical-data in App.tsx
 - [x] Sidebar nav: Backtesting group with all three pages
 - [x] TypeScript: 0 errors
+
+## Sri's Playbook + Portfolio Tracker
+- [x] DB schema: account_snapshots, playbook_positions, monthly_pnl tables
+- [x] tRPC router: playbook.ts (saveSnapshot, getLatestSnapshots, addPosition, closePosition, deletePosition, upsertMonthlyPnl, getMonthlyPnl)
+- [x] Frontend: SriPlaybook.tsx — 3-account summary cards, monthly target progress bar, open positions book, playbook rules, trade history
+- [x] Sidebar nav: "Sri's Playbook" group with "Playbook & Tracker" link at /sri-playbook
+- [x] Route: /sri-playbook wired in App.tsx
+- [x] Baseline data seeded: Jun 29 EOD snapshots for all 3 accounts, 7 open positions, June monthly P&L

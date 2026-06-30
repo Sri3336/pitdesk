@@ -85,6 +85,7 @@ const LiquidityMap = lazy(() => import("./pages/LiquidityMap"));
 const HistoricalData = lazy(() => import("./pages/HistoricalData"));
 const Backtester = lazy(() => import("./pages/Backtester"));
 const PositionSizer = lazy(() => import("./pages/PositionSizer"));
+const SriPlaybook = lazy(() => import("./pages/SriPlaybook"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -212,6 +213,7 @@ function Router() {
                 <Route path="/historical-data" component={HistoricalData} />
                 <Route path="/backtester" component={Backtester} />
                 <Route path="/position-sizer" component={PositionSizer} />
+                <Route path="/sri-playbook" component={SriPlaybook} />
                 <Route path="/agent" component={TradeProposals} />
                 <Route path="/trade-proposals" component={TradeProposals} />
                 <Route path="/performance" component={Performance} />

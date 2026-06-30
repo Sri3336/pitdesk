@@ -55,6 +55,7 @@ import {
   HardDrive,
   Calculator,
   FlaskConical,
+  BookMarked,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -122,6 +123,14 @@ const NAV_SECTIONS = [
       { icon: Upload, label: "Analyze My Trades", path: "/trade-upload" },
       { icon: BarChart2, label: "Performance", path: "/performance" },
       { icon: BookOpen, label: "Trade Proposals", path: "/trade-proposals" },
+    ],
+  },
+  {
+    key: "playbook",
+    label: "Sri's Playbook",
+    defaultOpen: true,
+    items: [
+      { icon: BookMarked, label: "Playbook & Tracker", path: "/sri-playbook" },
     ],
   },
   {
