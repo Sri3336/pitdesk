@@ -323,11 +323,11 @@ export const playbookRouter = router({
     .mutation(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("DB unavailable");
-      if (ctx.user.id !== OWNER_USER_ID) throw new Error("Forbidden");
-      await db.delete(extensionSyncTokens).where(eq(extensionSyncTokens.userId, OWNER_USER_ID));
+      // Delete any existing token for this user and issue a new one
+      await db.delete(extensionSyncTokens).where(eq(extensionSyncTokens.userId, ctx.user.id));
       const token = crypto.randomBytes(32).toString("hex");
       await db.insert(extensionSyncTokens).values({
-        userId: OWNER_USER_ID,
+        userId: ctx.user.id,
         token,
         label: "Chrome Extension",
         createdAt: Date.now(),
@@ -339,11 +339,10 @@ export const playbookRouter = router({
     .query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return { hasToken: false, maskedToken: null, lastUsedAt: null };
-      if (ctx.user.id !== OWNER_USER_ID) return { hasToken: false, maskedToken: null, lastUsedAt: null };
       const rows = await db
         .select()
         .from(extensionSyncTokens)
-        .where(eq(extensionSyncTokens.userId, OWNER_USER_ID))
+        .where(eq(extensionSyncTokens.userId, ctx.user.id))
         .limit(1);
       if (!rows.length) return { hasToken: false, maskedToken: null, lastUsedAt: null };
       const t = rows[0];

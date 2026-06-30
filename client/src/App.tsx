@@ -5,6 +5,7 @@ import { lazy, Suspense } from "react";
 import { Route, Switch, useLocation } from "wouter";
 
 import AuthGuard from "./components/AuthGuard";
+import OwnerOnlyGuard from "./components/OwnerOnlyGuard";
 import DashboardLayout from "./components/DashboardLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -86,6 +87,7 @@ const HistoricalData = lazy(() => import("./pages/HistoricalData"));
 const Backtester = lazy(() => import("./pages/Backtester"));
 const PositionSizer = lazy(() => import("./pages/PositionSizer"));
 const SriPlaybook = lazy(() => import("./pages/SriPlaybook"));
+const ExtensionSettings = lazy(() => import("./pages/ExtensionSettings"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -213,7 +215,14 @@ function Router() {
                 <Route path="/historical-data" component={HistoricalData} />
                 <Route path="/backtester" component={Backtester} />
                 <Route path="/position-sizer" component={PositionSizer} />
-                <Route path="/sri-playbook" component={SriPlaybook} />
+                <Route path="/sri-playbook">
+                  {() => (
+                    <OwnerOnlyGuard>
+                      <Suspense fallback={<PageLoader />}><SriPlaybook /></Suspense>
+                    </OwnerOnlyGuard>
+                  )}
+                </Route>
+                <Route path="/extension-settings" component={ExtensionSettings} />
                 <Route path="/agent" component={TradeProposals} />
                 <Route path="/trade-proposals" component={TradeProposals} />
                 <Route path="/performance" component={Performance} />

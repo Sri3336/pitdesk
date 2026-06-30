@@ -56,6 +56,7 @@ import {
   Calculator,
   FlaskConical,
   BookMarked,
+  Chrome,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -151,6 +152,7 @@ const NAV_SECTIONS = [
       { icon: Database, label: "COT Dashboard", path: "/cot-dashboard" },
       { icon: HardDrive, label: "Historical Data", path: "/historical-data" },
       { icon: Building2, label: "Broker Settings", path: "/broker-settings" },
+      { icon: Chrome, label: "Extension Settings", path: "/extension-settings" },
     ],
   },
   {

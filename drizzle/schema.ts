@@ -828,3 +828,19 @@ export const schwabTokens = mysqlTable("schwab_tokens", {
 });
 export type SchwabToken = typeof schwabTokens.$inferSelect;
 export type InsertSchwabToken = typeof schwabTokens.$inferInsert;
+
+// Per-user brokerage account tracking config for the Chrome extension
+// Users register the account numbers they want the extension to track.
+export const userTrackedAccounts = mysqlTable("user_tracked_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  accountId: varchar("account_id", { length: 64 }).notNull(),   // e.g. "etrade_4723", "schwab_764"
+  accountLabel: varchar("account_label", { length: 100 }).notNull(), // display name
+  broker: varchar("broker", { length: 32 }).notNull(),           // "etrade" | "schwab" | "other"
+  accountSuffix: varchar("account_suffix", { length: 16 }),      // last 4 digits for matching
+  isActive: tinyint("is_active").default(1).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type UserTrackedAccount = typeof userTrackedAccounts.$inferSelect;
+export type InsertUserTrackedAccount = typeof userTrackedAccounts.$inferInsert;

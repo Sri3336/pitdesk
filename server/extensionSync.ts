@@ -5,10 +5,9 @@
 
 import type { Request, Response } from "express";
 import { getDb } from "./db";
-import { accountSnapshots, extensionSyncTokens } from "../drizzle/schema";
+import { accountSnapshots, extensionSyncTokens, userTrackedAccounts } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 
-const OWNER_USER_ID = 1; // Sri's actual DB user ID (akulasridhar@gmail.com)
 
 async function verifyExtensionToken(req: Request): Promise<number | null> {
   try {
@@ -64,13 +63,8 @@ export async function extensionSyncHandler(req: Request, res: Response) {
     if (!userId) {
       return res.status(401).json({
         success: false,
-        error: "Invalid or missing sync token. Generate one in PitDesk → Sri's Playbook → Settings.",
+        error: "Invalid or missing sync token. Generate one in PitDesk → My Account → Extension Settings.",
       });
-    }
-
-    // Only owner can sync
-    if (userId !== OWNER_USER_ID) {
-      return res.status(403).json({ success: false, error: "Forbidden." });
     }
 
     const payload = req.body;
@@ -89,20 +83,30 @@ export async function extensionSyncHandler(req: Request, res: Response) {
     const now = Date.now();
     const today = new Date().toISOString().split("T")[0];
 
-    // Canonicalize account IDs — normalize all variants to standard form
-    const canonicalizeAccountId = (id: string): string => {
-      if (!id) return id;
-      // All schwab variants → schwab_764
-      if (id.startsWith('schwab_')) return 'schwab_764';
-      // etrade_unknown or etrade_5611 → etrade_4723 (Joint JTWROS -5611 is actually the -4723 account login)
-      if (id === 'etrade_unknown' || id === 'etrade_5611') return 'etrade_4723';
-      return id;
-    };
-    payload.accountId = canonicalizeAccountId(payload.accountId);
-    // Fix label to match canonical ID
-    if (payload.accountId === 'schwab_764') payload.accountLabel = 'Schwab ...764';
-    else if (payload.accountId === 'etrade_4723') payload.accountLabel = 'E*TRADE -4723';
-    else if (payload.accountId === 'etrade_2738') payload.accountLabel = 'E*TRADE -2738';
+    // ── Resolve the accountId against this user's tracked accounts ────────────
+    const trackedAccounts = await db
+      .select()
+      .from(userTrackedAccounts)
+      .where(and(eq(userTrackedAccounts.userId, userId), eq(userTrackedAccounts.isActive, 1)));
+
+    // Try exact match first, then suffix match
+    let matched = trackedAccounts.find(a => a.accountId === payload.accountId);
+    if (!matched) {
+      const incomingSuffix = payload.accountId.split("_").slice(1).join("_");
+      matched = trackedAccounts.find(
+        a => a.accountSuffix && incomingSuffix && incomingSuffix.includes(a.accountSuffix)
+      );
+    }
+
+    if (!matched) {
+      return res.status(403).json({
+        success: false,
+        error: `Account '${payload.accountId}' is not in your tracked accounts list. Add it in PitDesk → My Account → Extension Settings.`,
+      });
+    }
+
+    const canonicalAccountId = matched.accountId;
+    const canonicalLabel = matched.accountLabel;
 
     // Save account snapshot if we have summary data
     if (payload.accountSummary?.totalValue) {
@@ -111,17 +115,17 @@ export async function extensionSyncHandler(req: Request, res: Response) {
       // Delete existing snapshot for today + this account (upsert pattern)
       await db.delete(accountSnapshots).where(
         and(
-          eq(accountSnapshots.userId, OWNER_USER_ID),
+          eq(accountSnapshots.userId, userId),
           eq(accountSnapshots.snapshotDate, today),
-          eq(accountSnapshots.accountId, payload.accountId)
+          eq(accountSnapshots.accountId, canonicalAccountId)
         )
       );
 
       await db.insert(accountSnapshots).values({
-        userId: OWNER_USER_ID,
+        userId,
         snapshotDate: today,
-        accountId: payload.accountId,
-        accountLabel: payload.accountLabel || payload.broker,
+        accountId: canonicalAccountId,
+        accountLabel: canonicalLabel,
         totalValue: String(s.totalValue || 0),
         cashValue: String(s.cash || 0),
         marketValue: String(s.marketValue || 0),
@@ -135,7 +139,7 @@ export async function extensionSyncHandler(req: Request, res: Response) {
 
     return res.json({
       success: true,
-      message: `Synced ${positionCount} positions for ${payload.accountLabel || payload.accountId}`,
+      message: `Synced ${positionCount} positions for ${canonicalLabel}`,
       snapshotDate: today,
       positionCount,
     });
