@@ -10,4 +10,6 @@ export const ENV = {
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   tradierApiKey: process.env.TRADIER_API_KEY ?? "",
+  schwabAppKey: process.env.SCHWAB_APP_KEY ?? "",
+  schwabAppSecret: process.env.SCHWAB_APP_SECRET ?? "",
 };

@@ -808,3 +808,23 @@ export const eodCapitalSnapshots = mysqlTable("eod_capital_snapshots", {
 });
 export type EodCapitalSnapshot = typeof eodCapitalSnapshots.$inferSelect;
 export type InsertEodCapitalSnapshot = typeof eodCapitalSnapshots.$inferInsert;
+
+// Schwab OAuth tokens — stores access + refresh tokens for the Schwab Trader API
+// One row per user (Sri only). Refresh token expires every 7 days — requires re-auth.
+export const schwabTokens = mysqlTable("schwab_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  accessTokenExpiresAt: bigint("access_token_expires_at", { mode: "number" }).notNull(), // unix ms
+  refreshTokenExpiresAt: bigint("refresh_token_expires_at", { mode: "number" }).notNull(), // unix ms
+  // Hashed account numbers returned by Schwab (needed for API calls)
+  accountNumbers: json("account_numbers"), // Array of { accountNumber, hashValue }
+  // Last successful sync metadata
+  lastSyncAt: bigint("last_sync_at", { mode: "number" }),
+  lastSyncStatus: varchar("last_sync_status", { length: 32 }), // "ok" | "error" | "token_expired"
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type SchwabToken = typeof schwabTokens.$inferSelect;
+export type InsertSchwabToken = typeof schwabTokens.$inferInsert;

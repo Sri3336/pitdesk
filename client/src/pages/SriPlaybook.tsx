@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import React from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import {
   TrendingUp, TrendingDown, Target, BookOpen, Plus, CheckCircle, XCircle,
   AlertTriangle, DollarSign, BarChart3, Shield, Settings, Copy, RefreshCw,
   Key, ArrowDownCircle, ArrowUpCircle, Camera, Wallet, TrendingUp as TrendUp,
-  Trash2, Activity,
+  Trash2, Activity, Zap, Link2Off, ExternalLink, RefreshCcw,
 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -818,6 +818,10 @@ export default function SriPlaybook() {
             <BarChart3 className="w-4 h-4 mr-1" />
             Trade History
           </TabsTrigger>
+          <TabsTrigger value="schwab">
+            <Zap className="w-4 h-4 mr-1" />
+            Schwab Live
+          </TabsTrigger>
           <TabsTrigger value="settings">
             <Settings className="w-4 h-4 mr-1" />
             Extension
@@ -1336,6 +1340,11 @@ export default function SriPlaybook() {
           )}
         </TabsContent>
 
+        {/* ── Schwab Live Tab ── */}
+        <TabsContent value="schwab" className="mt-4">
+          <SchwabLiveTab />
+        </TabsContent>
+
         {/* ── Extension Settings Tab ── */}
         <TabsContent value="settings" className="mt-4">
           <ExtensionSettingsTab />
@@ -1458,6 +1467,280 @@ function ExtensionSettingsTab() {
           </p>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ─── Schwab Live Tab Component ────────────────────────────────────────────────
+
+function SchwabLiveTab() {
+  const statusQuery = trpc.schwab.getStatus.useQuery(undefined, {
+    refetchInterval: 60_000, // refresh every minute
+  });
+  const accountsQuery = trpc.schwab.getAccounts.useQuery(undefined, {
+    enabled: statusQuery.data?.connected === true,
+    refetchInterval: 5 * 60_000, // refresh every 5 min
+  });
+  const disconnectMutation = trpc.schwab.disconnect.useMutation({
+    onSuccess: () => {
+      toast.success("Schwab disconnected");
+      statusQuery.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Handle OAuth callback params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("schwab_connected") === "1") {
+      toast.success("Schwab connected successfully!");
+      statusQuery.refetch();
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    const err = params.get("schwab_error");
+    if (err) {
+      toast.error(`Schwab connection failed: ${err}`);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  const status = statusQuery.data;
+  const accounts = accountsQuery.data;
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+      {/* ── Connection Status Card ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-yellow-500" />
+              Schwab API Connection
+            </div>
+            {status?.connected && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-500 border-red-500/30 hover:bg-red-500/10 text-xs"
+                onClick={() => disconnectMutation.mutate()}
+                disabled={disconnectMutation.isPending}
+              >
+                <Link2Off className="w-3 h-3 mr-1" />
+                Disconnect
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {statusQuery.isLoading ? (
+            <div className="text-sm text-muted-foreground animate-pulse">Checking connection...</div>
+          ) : status?.connected ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-400">Connected to Schwab</p>
+                  <p className="text-xs text-muted-foreground">
+                    Refresh token expires in <strong>{status.daysUntilExpiry} day{status.daysUntilExpiry !== 1 ? "s" : ""}</strong>
+                    {status.daysUntilExpiry !== undefined && status.daysUntilExpiry <= 2 && (
+                      <span className="ml-2 text-amber-500 font-semibold">⚠ Re-authorize soon!</span>
+                    )}
+                  </p>
+                  {status.lastSyncAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Last sync: {new Date(status.lastSyncAt).toLocaleString()}
+                      {status.lastSyncStatus && (
+                        <span className={`ml-2 ${status.lastSyncStatus === "ok" ? "text-green-500" : "text-red-500"}`}>
+                          ({status.lastSyncStatus})
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => accountsQuery.refetch()}
+                  disabled={accountsQuery.isFetching}
+                >
+                  <RefreshCcw className={`w-3 h-3 mr-1 ${accountsQuery.isFetching ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+              </div>
+              {/* Account numbers */}
+              {status.accountNumbers && status.accountNumbers.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {(status.accountNumbers as Array<{ accountNumber: string; hashValue: string }>).map((a) => (
+                    <Badge key={a.accountNumber} variant="outline" className="text-xs font-mono">
+                      ...{a.accountNumber.slice(-4)}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                    {status?.reason === "refresh_token_expired"
+                      ? "Schwab token expired — re-authorization required"
+                      : "Schwab not connected"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Connect to pull live balances and positions directly from Schwab API
+                  </p>
+                </div>
+              </div>
+              <a href="/api/schwab/connect">
+                <Button className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  {status?.reason === "refresh_token_expired" ? "Re-authorize Schwab" : "Connect Schwab Account"}
+                </Button>
+              </a>
+              <p className="text-xs text-muted-foreground">
+                You'll be redirected to Schwab's login page. After authorizing, you'll return here automatically.
+                The connection lasts 7 days before requiring re-authorization.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Live Account Data ── */}
+      {status?.connected && (
+        <>
+          {accountsQuery.isLoading ? (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground animate-pulse">
+                Loading live account data from Schwab...
+              </CardContent>
+            </Card>
+          ) : accountsQuery.error ? (
+            <Card>
+              <CardContent className="py-6">
+                <div className="flex items-center gap-2 text-red-500">
+                  <XCircle className="w-4 h-4" />
+                  <span className="text-sm">{accountsQuery.error.message}</span>
+                </div>
+                {accountsQuery.error.message.includes("expired") && (
+                  <a href="/api/schwab/connect" className="mt-3 block">
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+                      Re-authorize Schwab
+                    </Button>
+                  </a>
+                )}
+              </CardContent>
+            </Card>
+          ) : accounts ? (
+            <>
+              {/* Summary row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="border-border">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-xs text-muted-foreground">Total Portfolio Value</p>
+                    <p className="text-2xl font-bold text-green-500">{fmt$(accounts.summary.totalValue)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-border">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-xs text-muted-foreground">Accounts Linked</p>
+                    <p className="text-2xl font-bold">{accounts.summary.accountCount}</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-border">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-xs text-muted-foreground">Last Synced</p>
+                    <p className="text-sm font-medium">{new Date(accounts.summary.syncedAt).toLocaleTimeString()}</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-border">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-xs text-muted-foreground">Total Positions</p>
+                    <p className="text-2xl font-bold">
+                      {accounts.accounts.reduce((s, a) => s + a.positions.length, 0)}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Per-account cards */}
+              {accounts.accounts.map((acct) => (
+                <Card key={acct.accountNumber} className="border-border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        Schwab ...{acct.accountNumber.slice(-4)}
+                        <Badge variant="outline" className="text-xs">{acct.accountType}</Badge>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-bold">{fmt$(acct.totalValue)}</span>
+                        <span className="text-xs text-muted-foreground ml-2">total value</span>
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {/* Balance summary */}
+                    <div className="grid grid-cols-3 gap-3 mb-4 text-sm">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Cash Balance</p>
+                        <p className="font-semibold">{fmt$(acct.cashBalance)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Buying Power</p>
+                        <p className="font-semibold">{fmt$(acct.buyingPower)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Positions</p>
+                        <p className="font-semibold">{acct.positions.length}</p>
+                      </div>
+                    </div>
+
+                    {/* Positions table */}
+                    {acct.positions.length > 0 ? (
+                      <div className="rounded-md border border-border overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/40">
+                              <TableHead className="text-xs py-2">Symbol</TableHead>
+                              <TableHead className="text-xs py-2">Type</TableHead>
+                              <TableHead className="text-xs py-2 text-right">Qty</TableHead>
+                              <TableHead className="text-xs py-2 text-right">Avg Price</TableHead>
+                              <TableHead className="text-xs py-2 text-right">Market Value</TableHead>
+                              <TableHead className="text-xs py-2 text-right">Unrealized P&L</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {acct.positions.map((pos, idx) => (
+                              <TableRow key={idx} className="hover:bg-muted/20">
+                                <TableCell className="py-2 font-mono font-semibold text-sm">{pos.symbol}</TableCell>
+                                <TableCell className="py-2">
+                                  <Badge variant="outline" className="text-xs">{pos.assetType}</Badge>
+                                </TableCell>
+                                <TableCell className="py-2 text-right text-sm">{pos.quantity}</TableCell>
+                                <TableCell className="py-2 text-right text-sm">{fmt$(pos.averagePrice, { decimals: 2 })}</TableCell>
+                                <TableCell className="py-2 text-right text-sm font-medium">{fmt$(pos.marketValue)}</TableCell>
+                                <TableCell className={`py-2 text-right text-sm font-semibold ${pos.unrealizedPnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                  {fmt$(pos.unrealizedPnl, { sign: true })}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">No open positions</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

@@ -95,6 +95,7 @@ import { historicalDataRouter } from "./routers/historicalData";
 import { backtesterRouter } from "./routers/backtester";
 import { duxScannerRouter } from "./routers/duxScanner";
 import { playbookRouter } from "./routers/playbook";
+import { schwabRouter } from "./routers/schwab";
 import { pitAdvisorRouter } from "./routers/pitAdvisor";
 import { optionsFlowRouter } from "./routers/optionsFlow";
 import { catalystBreakoutRouter } from "./routers/catalystBreakout";
@@ -1562,5 +1563,6 @@ export const appRouter = router({
   backtester: backtesterRouter,
   duxScanner: duxScannerRouter,
   playbook: playbookRouter,
+  schwab: schwabRouter,
 });
 export type AppRouter = typeof appRouter;

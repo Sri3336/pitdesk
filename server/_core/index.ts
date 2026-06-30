@@ -14,6 +14,7 @@ import { intradayScanHandler } from "../scheduledIntradayScan";
 import { extensionSyncHandler } from "../extensionSync";
 import { weeklyBriefingHandler } from "../scheduledWeeklyBriefing";
 import { postMarketDebriefHandler } from "../scheduledPostMarketDebrief";
+import { schwabRouter } from "../schwabRoutes";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -62,6 +63,8 @@ async function startServer() {
   app.post("/api/scheduled/intraday-scan", intradayScanHandler);
   app.post("/api/scheduled/weekly-briefing", weeklyBriefingHandler);
   app.post("/api/scheduled/post-market-debrief", postMarketDebriefHandler);
+  // Schwab OAuth routes
+  app.use("/api/schwab", schwabRouter);
   // tRPC API
   app.use(
     "/api/trpc",
