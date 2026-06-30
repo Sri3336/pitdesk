@@ -89,6 +89,21 @@ export async function extensionSyncHandler(req: Request, res: Response) {
     const now = Date.now();
     const today = new Date().toISOString().split("T")[0];
 
+    // Canonicalize account IDs — normalize all variants to standard form
+    const canonicalizeAccountId = (id: string): string => {
+      if (!id) return id;
+      // All schwab variants → schwab_764
+      if (id.startsWith('schwab_')) return 'schwab_764';
+      // etrade_unknown or etrade_5611 → etrade_4723 (Joint JTWROS -5611 is actually the -4723 account login)
+      if (id === 'etrade_unknown' || id === 'etrade_5611') return 'etrade_4723';
+      return id;
+    };
+    payload.accountId = canonicalizeAccountId(payload.accountId);
+    // Fix label to match canonical ID
+    if (payload.accountId === 'schwab_764') payload.accountLabel = 'Schwab ...764';
+    else if (payload.accountId === 'etrade_4723') payload.accountLabel = 'E*TRADE -4723';
+    else if (payload.accountId === 'etrade_2738') payload.accountLabel = 'E*TRADE -2738';
+
     // Save account snapshot if we have summary data
     if (payload.accountSummary?.totalValue) {
       const s = payload.accountSummary;
