@@ -63,7 +63,7 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { ROUTES } from "@/lib/routes";
 
 const SIDEBAR_WIDTH_KEY = "pitdesk-sidebar-width";
-const SIDEBAR_SECTIONS_KEY = "pitdesk-sidebar-sections-v2";
+const SIDEBAR_SECTIONS_KEY = "pitdesk-sidebar-sections-v3";
 const DEFAULT_WIDTH = 260;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 380;
