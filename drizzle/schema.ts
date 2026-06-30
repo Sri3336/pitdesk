@@ -760,3 +760,15 @@ export const monthlyPnl = mysqlTable("monthly_pnl", {
 });
 export type MonthlyPnl = typeof monthlyPnl.$inferSelect;
 export type InsertMonthlyPnl = typeof monthlyPnl.$inferInsert;
+
+// Chrome extension sync tokens — personal API tokens for the Chrome extension
+export const extensionSyncTokens = mysqlTable("extension_sync_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  label: varchar("label", { length: 100 }).default("Chrome Extension").notNull(),
+  lastUsedAt: bigint("last_used_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type ExtensionSyncToken = typeof extensionSyncTokens.$inferSelect;
+export type InsertExtensionSyncToken = typeof extensionSyncTokens.$inferInsert;

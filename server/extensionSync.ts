@@ -1,33 +1,45 @@
 // PitDesk Chrome Extension — Dedicated REST sync endpoint
-// Bypasses tRPC to avoid batch format issues from browser extensions
+// Uses token-based auth (X-PitDesk-Token header) — cookies don't work cross-origin from extensions
 // POST /api/extension/sync
 // OPTIONS /api/extension/sync  (preflight)
 
 import type { Request, Response } from "express";
-import { jwtVerify } from "jose";
 import { getDb } from "./db";
-import { accountSnapshots } from "../drizzle/schema";
+import { accountSnapshots, extensionSyncTokens } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
-import { COOKIE_NAME } from "@shared/const";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? "fallback-dev-secret"
-);
 const OWNER_USER_ID = 210001;
 
-async function verifySession(req: Request): Promise<number | null> {
+async function verifyExtensionToken(req: Request): Promise<number | null> {
   try {
-    const token = req.cookies?.[COOKIE_NAME];
-    if (!token) return null;
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload.sub ? parseInt(payload.sub, 10) : null;
+    const token = req.headers["x-pitdesk-token"] as string | undefined;
+    if (!token || token.length < 32) return null;
+
+    const db = await getDb();
+    if (!db) return null;
+
+    const rows = await db
+      .select()
+      .from(extensionSyncTokens)
+      .where(eq(extensionSyncTokens.token, token))
+      .limit(1);
+
+    if (!rows.length) return null;
+
+    // Update last used timestamp
+    await db
+      .update(extensionSyncTokens)
+      .set({ lastUsedAt: Date.now() })
+      .where(eq(extensionSyncTokens.token, token));
+
+    return rows[0].userId;
   } catch {
     return null;
   }
 }
 
 export async function extensionSyncHandler(req: Request, res: Response) {
-  // CORS — allow requests from Chrome extension (chrome-extension://) and pitdesk domains
+  // CORS — allow requests from Chrome extension origins and pitdesk domains
   const origin = req.headers.origin || "";
   if (
     origin.startsWith("chrome-extension://") ||
@@ -36,22 +48,23 @@ export async function extensionSyncHandler(req: Request, res: Response) {
     origin === ""
   ) {
     res.setHeader("Access-Control-Allow-Origin", origin || "*");
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
   }
-  res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-PitDesk-Extension");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-PitDesk-Extension, X-PitDesk-Token");
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
 
   try {
-    // Verify session cookie
-    const userId = await verifySession(req);
+    // Verify via token header (cookie-based auth doesn't work cross-origin from extensions)
+    const userId = await verifyExtensionToken(req);
     if (!userId) {
       return res.status(401).json({
         success: false,
-        error: "Not authenticated. Please log into PitDesk at trading.akulaz.ai first.",
+        error: "Invalid or missing sync token. Generate one in PitDesk → Sri's Playbook → Settings.",
       });
     }
 
@@ -80,7 +93,7 @@ export async function extensionSyncHandler(req: Request, res: Response) {
     if (payload.accountSummary?.totalValue) {
       const s = payload.accountSummary;
 
-      // Delete existing snapshot for today + this account
+      // Delete existing snapshot for today + this account (upsert pattern)
       await db.delete(accountSnapshots).where(
         and(
           eq(accountSnapshots.userId, OWNER_USER_ID),
@@ -96,7 +109,7 @@ export async function extensionSyncHandler(req: Request, res: Response) {
         accountLabel: payload.accountLabel || payload.broker,
         totalValue: String(s.totalValue || 0),
         cashValue: String(s.cash || 0),
-        marketValue: String(0),
+        marketValue: String(s.marketValue || 0),
         dayPnl: String(s.dayPnl || 0),
         totalPnl: String(s.totalPnl || 0),
         createdAt: now,

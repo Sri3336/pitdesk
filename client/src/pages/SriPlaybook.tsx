@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import React from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { TrendingUp, TrendingDown, Target, BookOpen, Plus, CheckCircle, XCircle, AlertTriangle, DollarSign, BarChart3, Shield } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, BookOpen, Plus, CheckCircle, XCircle, AlertTriangle, DollarSign, BarChart3, Shield, Settings, Copy, RefreshCw, Key } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -599,6 +600,10 @@ export default function SriPlaybook() {
             <BarChart3 className="w-4 h-4 mr-1" />
             Trade History
           </TabsTrigger>
+          <TabsTrigger value="settings">
+            <Settings className="w-4 h-4 mr-1" />
+            Extension
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Open Positions Tab ── */}
@@ -852,7 +857,135 @@ export default function SriPlaybook() {
             </div>
           )}
         </TabsContent>
+
+        {/* ── Extension Settings Tab ── */}
+        <TabsContent value="settings" className="mt-4">
+          <ExtensionSettingsTab />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function ExtensionSettingsTab() {
+  const [copied, setCopied] = React.useState(false);
+  const [fullToken, setFullToken] = React.useState<string | null>(null);
+  const tokenQuery = trpc.playbook.getExtensionToken.useQuery();
+  const generateMutation = trpc.playbook.generateExtensionToken.useMutation({
+    onSuccess: (data) => {
+      setFullToken(data.token);
+      tokenQuery.refetch();
+      toast.success("New sync token generated — copy it now, it won't be shown again.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleCopy = (token: string) => {
+    navigator.clipboard.writeText(token);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast.success("Token copied to clipboard");
+  };
+
+  return (
+    <div className="max-w-xl space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Key className="w-4 h-4 text-green-500" />
+            Chrome Extension Sync Token
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            The Chrome extension uses a personal sync token to authenticate with PitDesk.
+            Generate a token here, then paste it into the extension's Settings field.
+          </p>
+
+          {tokenQuery.data?.hasToken ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-400">Token active</p>
+                  <p className="text-xs text-muted-foreground font-mono">{tokenQuery.data.maskedToken}</p>
+                  {tokenQuery.data.lastUsedAt && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Last used: {new Date(tokenQuery.data.lastUsedAt).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {fullToken && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-amber-600 font-semibold">⚠ Copy this token now — it won't be shown again</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={fullToken}
+                      readOnly
+                      className="font-mono text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCopy(fullToken)}
+                    >
+                      {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
+                className="w-full"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                {generateMutation.isPending ? "Regenerating..." : "Regenerate Token"}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                <p className="text-sm text-amber-700 dark:text-amber-400">No token yet — generate one to enable extension sync.</p>
+              </div>
+              <Button
+                onClick={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
+                className="w-full bg-green-500 hover:bg-green-600 text-white"
+              >
+                <Key className="w-4 h-4 mr-2" />
+                {generateMutation.isPending ? "Generating..." : "Generate Sync Token"}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">How to use the token</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <ol className="list-decimal list-inside space-y-2">
+            <li>Click <strong>Generate Sync Token</strong> above</li>
+            <li>Copy the full token that appears</li>
+            <li>Open the PitDesk extension popup in Chrome (click the extension icon)</li>
+            <li>Scroll to <strong>Settings → Sync Token</strong> and paste it</li>
+            <li>Click <strong>Save Settings</strong></li>
+            <li>Open E*TRADE or Schwab Positions page — sync should show green ✓</li>
+          </ol>
+          <p className="text-xs pt-2 border-t">
+            The token is stored only in your browser's local storage and never transmitted except to PitDesk.
+            Regenerating creates a new token and invalidates the old one.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

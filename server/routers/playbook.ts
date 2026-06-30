@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { accountSnapshots, playbookPositions, monthlyPnl } from "../../drizzle/schema";
+import { accountSnapshots, playbookPositions, monthlyPnl, extensionSyncTokens } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
+import crypto from "crypto";
 
 const OWNER_USER_ID = 210001;
 
@@ -297,5 +298,46 @@ export const playbookRouter = router({
         snapshotSaved: !!(input.accountSummary?.totalValue),
         syncedAt: now,
       };
+      }),
+
+  // Generate a personal sync token for the Chrome extension
+  generateExtensionToken: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      if (ctx.user.id !== OWNER_USER_ID) throw new Error("Forbidden");
+
+      // Delete any existing tokens for this user
+      await db.delete(extensionSyncTokens).where(eq(extensionSyncTokens.userId, OWNER_USER_ID));
+
+      const token = crypto.randomBytes(32).toString("hex"); // 64-char hex
+      await db.insert(extensionSyncTokens).values({
+        userId: OWNER_USER_ID,
+        token,
+        label: "Chrome Extension",
+        createdAt: Date.now(),
+      });
+
+      return { token };
+    }),
+
+  // Get the current extension token (masked for display)
+  getExtensionToken: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return { hasToken: false, maskedToken: null, lastUsedAt: null };
+      if (ctx.user.id !== OWNER_USER_ID) return { hasToken: false, maskedToken: null, lastUsedAt: null };
+
+      const rows = await db
+        .select()
+        .from(extensionSyncTokens)
+        .where(eq(extensionSyncTokens.userId, OWNER_USER_ID))
+        .limit(1);
+
+      if (!rows.length) return { hasToken: false, maskedToken: null, lastUsedAt: null };
+
+      const t = rows[0];
+      const masked = t.token.slice(0, 8) + "..." + t.token.slice(-4);
+      return { hasToken: true, maskedToken: masked, lastUsedAt: t.lastUsedAt };
     }),
 });
