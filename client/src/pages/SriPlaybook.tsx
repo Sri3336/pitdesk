@@ -549,7 +549,14 @@ export default function SriPlaybook() {
       {snapshots.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
           {ACCOUNTS.map(acct => {
-            const snap = snapshots.find(s => s.accountId === acct.id);
+            // Match by exact ID, or by fuzzy suffix (handles extension sending "schwab_schwab" vs "schwab_764")
+            const snap = snapshots.find(s => {
+              if (s.accountId === acct.id) return true;
+              if (acct.id === "schwab_764" && String(s.accountId).startsWith("schwab_")) return true;
+              if (acct.id === "etrade_4723" && String(s.accountId).includes("4723")) return true;
+              if (acct.id === "etrade_2738" && String(s.accountId).includes("2738")) return true;
+              return false;
+            });
             if (!snap) return (
               <Card key={acct.id} className="border-border opacity-50">
                 <CardContent className="pt-4 pb-3">
