@@ -1298,6 +1298,155 @@ export default function SriPlaybook() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* ── GEX Strategy Card ── */}
+            <Card className="border-violet-500/40 bg-violet-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-violet-400" />
+                  SPX Gamma Exposure (GEX) — Pre-Trade Context Check
+                  <a
+                    href="https://www.barchart.com/stocks/quotes/$SPX/gamma-exposure"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-auto flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 font-normal"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Live GEX Chart
+                  </a>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Based on TOS Indicators — <em>"SPX Gamma Trading: Risk $30 to Make $800?"</em> — GEX tells you <strong>how market makers must hedge</strong>, which shapes whether SPX trends, chops, or snaps back.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+
+                {/* Positive vs Negative GEX */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div className="border border-green-500/30 bg-green-500/5 rounded-lg p-3">
+                    <div className="font-semibold text-green-400 mb-2">✅ Positive GEX (Green) — Dealers Long Gamma</div>
+                    <ul className="text-muted-foreground space-y-1 text-xs">
+                      <li>• MMs <strong>sell rallies, buy dips</strong> → dampens volatility</li>
+                      <li>• Market acts like a <strong>shock absorber</strong> — range-bound, sticky</li>
+                      <li>• Price gravitates toward the largest GEX cluster (magnet effect)</li>
+                      <li>• <span className="text-green-400 font-semibold">Best for: Iron Condors, Strangles, Naked Puts</span></li>
+                      <li>• Premium income strategies thrive — IV stays elevated but realized vol is low</li>
+                    </ul>
+                  </div>
+                  <div className="border border-red-500/30 bg-red-500/5 rounded-lg p-3">
+                    <div className="font-semibold text-red-400 mb-2">⚠️ Negative GEX (Red) — Dealers Short Gamma</div>
+                    <ul className="text-muted-foreground space-y-1 text-xs">
+                      <li>• MMs <strong>buy rallies, sell dips</strong> → amplifies moves</li>
+                      <li>• Market acts like <strong>loose steering</strong> — trending, volatile</li>
+                      <li>• Sharp directional moves more likely, breakouts follow through</li>
+                      <li>• <span className="text-red-400 font-semibold">Danger zone for premium sellers</span> — avoid naked strangles</li>
+                      <li>• Use defined risk (Iron Condors) only, or sit out entirely</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Key Levels */}
+                <div className="border border-border rounded-lg p-3 text-sm">
+                  <div className="font-semibold text-amber-400 mb-2">📍 Key GEX Levels to Watch (from barchart)</div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <div className="text-muted-foreground font-semibold mb-1">Call Resistance</div>
+                      <div className="text-muted-foreground">Heavy call OI above current price. Dealer hedging creates a ceiling — price slows or reverses here. <span className="text-amber-400">Sell calls above this level.</span></div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground font-semibold mb-1">Put Support</div>
+                      <div className="text-muted-foreground">Heavy put OI below current price. Dealer buying provides a floor. <span className="text-green-400">Sell puts above this level.</span></div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground font-semibold mb-1">HVL — High Volatility Level</div>
+                      <div className="text-muted-foreground">Critical inflection point. <span className="text-red-400">Price below HVL = negative gamma regime</span> — expect momentum moves, not mean reversion.</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* The Trade Setup */}
+                <div className="border border-violet-500/30 bg-violet-500/5 rounded-lg p-3 text-sm">
+                  <div className="font-semibold text-violet-400 mb-2">🎯 The "Risk $30 to Make $800" Setup — SPX 0DTE / 1DTE</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div className="space-y-2">
+                      <div><span className="text-muted-foreground font-semibold">When to enter:</span>
+                        <ul className="text-muted-foreground mt-1 space-y-0.5 ml-2">
+                          <li>• Positive GEX dominant (green on barchart)</li>
+                          <li>• SPX near a large GEX cluster (magnet zone)</li>
+                          <li>• VIX elevated (IV Rank &gt; 40) for premium</li>
+                          <li>• No major catalyst (FOMC, CPI) same day</li>
+                        </ul>
+                      </div>
+                      <div><span className="text-muted-foreground font-semibold">Structure:</span>
+                        <ul className="text-muted-foreground mt-1 space-y-0.5 ml-2">
+                          <li>• Buy 1 OTM SPX call/put (cheap, ~$30 debit)</li>
+                          <li>• Sell 1 closer-to-money call/put (collect ~$800 credit)</li>
+                          <li>• Net credit = ~$770 per spread</li>
+                          <li>• Expiry: 0DTE or 1DTE only</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div><span className="text-muted-foreground font-semibold">Exit rules:</span>
+                        <ul className="text-muted-foreground mt-1 space-y-0.5 ml-2">
+                          <li>• Take profit at 50% of max credit (~$385)</li>
+                          <li>• Stop loss: if SPX breaches GEX support/resistance level</li>
+                          <li>• Never hold through FOMC or CPI</li>
+                          <li>• If GEX flips negative intraday → close immediately</li>
+                        </ul>
+                      </div>
+                      <div><span className="text-muted-foreground font-semibold">Why it works:</span>
+                        <ul className="text-muted-foreground mt-1 space-y-0.5 ml-2">
+                          <li>• Positive GEX = MMs pin price near clusters</li>
+                          <li>• Short option collects IV premium as time decays</li>
+                          <li>• Long option is cheap insurance against GEX flip</li>
+                          <li>• Asymmetric: risk $30 if wrong, keep $770 if right</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pre-Trade GEX Checklist */}
+                <div className="border border-border rounded-lg p-3 text-sm">
+                  <div className="font-semibold text-white mb-2">✅ Pre-Trade GEX Checklist (run every morning)</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2"><span className="text-green-400">□</span> Check barchart SPX GEX — positive or negative?</div>
+                      <div className="flex items-center gap-2"><span className="text-green-400">□</span> Identify today's GEX cluster (magnet price)</div>
+                      <div className="flex items-center gap-2"><span className="text-green-400">□</span> Note Call Resistance level (short call strike above it)</div>
+                      <div className="flex items-center gap-2"><span className="text-green-400">□</span> Note Put Support level (short put strike above it)</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2"><span className="text-amber-400">□</span> Is SPX above or below HVL? (below = skip premium selling)</div>
+                      <div className="flex items-center gap-2"><span className="text-amber-400">□</span> Any macro catalyst today (FOMC, CPI, NFP)? → skip</div>
+                      <div className="flex items-center gap-2"><span className="text-amber-400">□</span> VIX &gt; 20? If yes, widen strikes for more cushion</div>
+                      <div className="flex items-center gap-2"><span className="text-red-400">□</span> Negative GEX dominant? → No naked strangles today</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Integration with Sri's Strategies */}
+                <div className="border border-blue-500/30 bg-blue-500/5 rounded-lg p-3 text-sm">
+                  <div className="font-semibold text-blue-400 mb-2">🔗 How GEX Integrates with Sri's Existing Strategies</div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-muted-foreground">
+                    <div>
+                      <div className="font-semibold text-white mb-1">Iron Condor / Strangle</div>
+                      <div>Only enter when GEX is <span className="text-green-400">positive</span>. Use GEX cluster as center of your range. Call resistance = upper wing. Put support = lower wing.</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-white mb-1">Naked Put</div>
+                      <div>Sell put strikes <span className="text-green-400">above put support level</span>. If SPX is above HVL and GEX is positive, naked puts have structural backing from dealer hedging.</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-white mb-1">Weekly Decision Tree</div>
+                      <div>Add GEX check as <span className="text-amber-400">Step 0</span> before IV Rank check. Negative GEX = skip the week regardless of IV Rank. Positive GEX = proceed to Step 1.</div>
+                    </div>
+                  </div>
+                </div>
+
+              </CardContent>
+            </Card>
+
           </div>
         </TabsContent>
 
