@@ -1022,6 +1022,7 @@ export default function SriPlaybook() {
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">Total Capital</TableHead>
+                        <TableHead className="text-right">Day P&L</TableHead>
                         <TableHead className="text-right">Schwab ...764</TableHead>
                         <TableHead className="text-right">E*TRADE -4723</TableHead>
                         <TableHead className="text-right">E*TRADE -2738</TableHead>
@@ -1034,11 +1035,27 @@ export default function SriPlaybook() {
                         const adjPnlRow = row.adjustedPnl !== null ? parseFloat(row.adjustedPnl as string) : null;
                         const netT = parseFloat(row.netTransfersSinceLastSnapshot as string ?? "0");
                         const isFirst = i === eodHistory.length - 1;
+                        // Day P&L = current total − previous row's total (eodHistory is newest-first)
+                        const prevRow = eodHistory[i + 1];
+                        const dayPnl = prevRow
+                          ? parseFloat(row.totalValue as string) - parseFloat(prevRow.totalValue as string)
+                          : null;
                         return (
                           <TableRow key={row.id}>
                             <TableCell className="font-medium">{row.snapshotDate}</TableCell>
                             <TableCell className="text-right font-semibold">
                               {fmt$(parseFloat(row.totalValue as string))}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {isFirst ? (
+                                <span className="text-muted-foreground text-xs">Baseline</span>
+                              ) : dayPnl !== null ? (
+                                <span className={dayPnl >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
+                                  {fmt$(dayPnl, { sign: true })}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {row.schwab764Value ? fmt$(parseFloat(row.schwab764Value as string)) : "—"}
