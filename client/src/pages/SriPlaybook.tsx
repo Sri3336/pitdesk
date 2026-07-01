@@ -560,9 +560,16 @@ export default function SriPlaybook() {
 
   const captureEodMutation = trpc.playbook.captureEodSnapshot.useMutation({
     onSuccess: (data) => {
-      toast.success(`EOD snapshot captured — Total: ${fmt$(data.totalValue)} | Adj P&L: ${data.adjustedPnl !== null ? fmt$(data.adjustedPnl, { sign: true }) : "N/A (first snapshot)"}`);
+      const d = data as any;
+      const schwabNote = d.schwabSource === "api"
+        ? ` | Schwab: ${fmt$(d.schwabVal)} ✔ live API`
+        : d.schwabSource === "extension_fallback"
+          ? ` | Schwab: ${fmt$(d.schwabVal)} (extension)`
+          : "";
+      toast.success(`EOD captured — Total: ${fmt$(data.totalValue)}${schwabNote} | Adj P&L: ${data.adjustedPnl !== null ? fmt$(data.adjustedPnl, { sign: true }) : "N/A (first snapshot)"}`);
       refetchEod();
       refetchAdjPnl();
+      utils.playbook.getLatestSnapshots.invalidate();
     },
     onError: (e) => toast.error(e.message),
   });

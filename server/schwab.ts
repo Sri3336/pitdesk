@@ -291,14 +291,22 @@ export interface SchwabPosition {
 export function normalizeAccount(raw: any): SchwabAccountSummary {
   const acct = raw.securitiesAccount ?? raw;
   const balances = acct.currentBalances ?? acct.initialBalances ?? {};
+
+  // Map positions — Schwab returns currentDayProfitLoss at position level
   const positions: SchwabPosition[] = (acct.positions ?? []).map((p: any) => {
     const instrument = p.instrument ?? {};
     const mktVal = p.marketValue ?? 0;
     const avgPrice = p.averagePrice ?? 0;
     const qty = p.longQuantity ?? p.shortQuantity ?? p.quantity ?? 0;
-    const currentPrice = p.currentDayProfitLossPercentage != null
-      ? avgPrice * (1 + p.currentDayProfitLossPercentage / 100)
-      : (qty > 0 ? mktVal / qty : 0);
+    // Current price from market value / quantity
+    const currentPrice = Math.abs(qty) > 0 ? mktVal / Math.abs(qty) : avgPrice;
+    // Position-level day P&L (Schwab field: currentDayProfitLoss)
+    const posDayPnl = p.currentDayProfitLoss ?? 0;
+    // Unrealized P&L: longOpenProfitLoss for long positions, shortOpenProfitLoss for short
+    const unrealizedPnl = p.longOpenProfitLoss ?? p.shortOpenProfitLoss ?? 0;
+    const unrealizedPnlPct = avgPrice > 0 && Math.abs(qty) > 0
+      ? (unrealizedPnl / (Math.abs(qty) * avgPrice)) * 100
+      : (p.currentDayProfitLossPercentage ?? 0);
     return {
       symbol: instrument.symbol ?? instrument.cusip ?? "UNKNOWN",
       description: instrument.description ?? "",
@@ -307,11 +315,19 @@ export function normalizeAccount(raw: any): SchwabAccountSummary {
       marketValue: mktVal,
       averagePrice: avgPrice,
       currentPrice,
-      unrealizedPnl: p.longOpenProfitLoss ?? p.currentDayProfitLoss ?? 0,
-      unrealizedPnlPct: p.currentDayProfitLossPercentage ?? 0,
-      dayPnl: p.currentDayProfitLoss ?? 0,
+      unrealizedPnl,
+      unrealizedPnlPct,
+      dayPnl: posDayPnl,
     };
   });
+
+  // Account-level day P&L = sum of all position-level currentDayProfitLoss
+  // Schwab doesn't expose a single account-level day P&L in currentBalances,
+  // so we aggregate from positions (most accurate approach)
+  const accountDayPnl = positions.reduce((sum, p) => sum + p.dayPnl, 0);
+
+  // Total unrealized P&L across all positions
+  const totalUnrealizedPnl = positions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
 
   return {
     accountNumber: acct.accountNumber ?? "",
@@ -320,8 +336,8 @@ export function normalizeAccount(raw: any): SchwabAccountSummary {
     totalValue: balances.liquidationValue ?? balances.accountValue ?? 0,
     cashBalance: balances.cashBalance ?? balances.availableFunds ?? 0,
     buyingPower: balances.buyingPower ?? balances.availableFundsNonMarginableTrade ?? 0,
-    dayPnl: balances.dayTradingBuyingPower ?? 0,
-    totalPnl: 0, // not directly available from Schwab balance endpoint
+    dayPnl: accountDayPnl,
+    totalPnl: totalUnrealizedPnl,
     positions,
   };
 }

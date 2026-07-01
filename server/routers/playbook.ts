@@ -12,6 +12,13 @@ import {
 import { eq, and, desc, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
 import { getTradierQuote, getTradierAtmChain } from "../tradierClient";
+import {
+  getValidAccessToken,
+  fetchAllAccounts,
+  normalizeAccount,
+  updateSchwabSyncStatus,
+  getSchwabTokens,
+} from "../schwab";
 
 const OWNER_USER_ID = 1; // Sri's actual DB user ID (akulasridhar@gmail.com)
 
@@ -381,7 +388,55 @@ export const playbookRouter = router({
       const now = Date.now();
       const today = new Date().toISOString().split("T")[0];
 
-      // Get latest per-account snapshots
+      // ── Step 1: Try to fetch Schwab value live from API ──────────────────────
+      let schwabVal = 0;
+      let schwabDayPnl = 0;
+      let schwabSource = "none";
+      try {
+        const schwabTokenRow = await getSchwabTokens(OWNER_USER_ID);
+        if (schwabTokenRow && Date.now() < schwabTokenRow.refreshTokenExpiresAt) {
+          const accessToken = await getValidAccessToken(OWNER_USER_ID);
+          const rawAccounts = await fetchAllAccounts(accessToken, "positions");
+          const normalized = rawAccounts.map(normalizeAccount);
+          // Sum all Schwab accounts (usually just one)
+          for (const acct of normalized) {
+            schwabVal += acct.totalValue;
+            schwabDayPnl += acct.dayPnl;
+          }
+          // Also upsert a fresh account_snapshot for Schwab so the cards update
+          if (normalized.length > 0) {
+            const acct = normalized[0];
+            await db.delete(accountSnapshots).where(
+              and(
+                eq(accountSnapshots.userId, OWNER_USER_ID),
+                eq(accountSnapshots.snapshotDate, today),
+                eq(accountSnapshots.accountId, "schwab_764"),
+              )
+            );
+            await db.insert(accountSnapshots).values({
+              userId: OWNER_USER_ID,
+              snapshotDate: today,
+              accountId: "schwab_764",
+              accountLabel: "Schwab ...764",
+              totalValue: String(schwabVal),
+              cashValue: String(acct.cashBalance),
+              marketValue: String(acct.totalValue - acct.cashBalance),
+              dayPnl: String(schwabDayPnl),
+              totalPnl: String(acct.totalPnl),
+              notes: `Auto-fetched via Schwab API at ${new Date().toISOString()}`,
+              createdAt: now,
+            });
+            await updateSchwabSyncStatus(OWNER_USER_ID, "ok");
+          }
+          schwabSource = "api";
+        }
+      } catch (err) {
+        // Schwab API unavailable — fall back to last extension snapshot
+        console.warn("[captureEodSnapshot] Schwab API fetch failed, using extension snapshot:", err);
+        schwabSource = "extension_fallback";
+      }
+
+      // ── Step 2: Get latest per-account snapshots (for E*TRADE + Schwab fallback) ─
       const snapRows = await db
         .select()
         .from(accountSnapshots)
@@ -395,11 +450,15 @@ export const playbookRouter = router({
         if (!seen.has(key)) seen.set(key, r);
       }
 
-      const schwab = seen.get("schwab_764");
+      // Use API value for Schwab if available, otherwise fall back to extension snapshot
+      if (schwabSource === "extension_fallback") {
+        const schwabSnap = seen.get("schwab_764");
+        schwabVal = schwabSnap ? parseFloat(String(schwabSnap.totalValue)) : 0;
+      }
+
       const et4723 = seen.get("etrade_4723");
       const et2738 = seen.get("etrade_2738");
 
-      const schwabVal = schwab ? parseFloat(String(schwab.totalValue)) : 0;
       const et4723Val = et4723 ? parseFloat(String(et4723.totalValue)) : 0;
       const et2738Val = et2738 ? parseFloat(String(et2738.totalValue)) : 0;
       const totalValue = schwabVal + et4723Val + et2738Val;
@@ -489,6 +548,8 @@ export const playbookRouter = router({
         snapshotDate: today,
         totalValue,
         schwabVal,
+        schwabDayPnl,
+        schwabSource,
         et4723Val,
         et2738Val,
         netTransfers,
