@@ -11,8 +11,21 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
+import { getTradierQuote, getTradierAtmChain } from "../tradierClient";
 
 const OWNER_USER_ID = 1; // Sri's actual DB user ID (akulasridhar@gmail.com)
+
+// Sri's 8-ticker universe with known IV range (annualised decimal)
+const UNIVERSE_TICKERS = [
+  { ticker: "WDC",  ivLow: 0.80, ivHigh: 1.00 },
+  { ticker: "TSLA", ivLow: 0.80, ivHigh: 1.20 },
+  { ticker: "NVDA", ivLow: 0.60, ivHigh: 0.90 },
+  { ticker: "LITE", ivLow: 0.70, ivHigh: 1.00 },
+  { ticker: "SMCI", ivLow: 0.80, ivHigh: 1.30 },
+  { ticker: "META", ivLow: 0.50, ivHigh: 0.80 },
+  { ticker: "AMZN", ivLow: 0.45, ivHigh: 0.75 },
+  { ticker: "PLTR", ivLow: 0.70, ivHigh: 1.00 },
+];
 
 const legSchema = z.object({
   action: z.enum(["sell", "buy"]),
@@ -629,4 +642,66 @@ export const playbookRouter = router({
         .where(and(eq(accountTransfers.id, input.id), eq(accountTransfers.userId, OWNER_USER_ID)));
       return { ok: true };
     }),
+
+  // ─── Ticker Setup Signals ──────────────────────────────────────────────────
+  /**
+   * Fetch live IV data for Sri's 8 tickers and compute a setup signal:
+   *   green  = IV Rank >= 40  (ready to sell premium)
+   *   yellow = IV Rank 20-39  (watch, IV rising)
+   *   red    = IV Rank < 20   (skip, IV too low)
+   *   gray   = data unavailable
+   */
+  getTickerSetupSignals: protectedProcedure.query(async () => {
+    const results = await Promise.allSettled(
+      UNIVERSE_TICKERS.map(async ({ ticker, ivLow, ivHigh }) => {
+        try {
+          const quote = await getTradierQuote(ticker);
+          const price = quote?.last ?? 0;
+          if (!price) return { ticker, status: "gray" as const, ivRank: null, iv: null, change: null };
+
+          const chain = await getTradierAtmChain(ticker, price);
+          // Use the average mid_iv of ATM calls and puts as current IV
+          const contracts = [
+            ...(chain?.calls ?? []),
+            ...(chain?.puts ?? []),
+          ].filter(c => c.greeks?.mid_iv && c.greeks.mid_iv > 0);
+
+          let iv: number | null = null;
+          if (contracts.length > 0) {
+            const sum = contracts.reduce((acc, c) => acc + (c.greeks?.mid_iv ?? 0), 0);
+            iv = sum / contracts.length;
+          }
+
+          let ivRank: number | null = null;
+          let status: "green" | "yellow" | "red" | "gray" = "gray";
+
+          if (iv !== null && ivHigh > ivLow) {
+            // Clamp IV to known range for rank calculation
+            ivRank = Math.round(((iv - ivLow) / (ivHigh - ivLow)) * 100);
+            ivRank = Math.max(0, Math.min(100, ivRank));
+            if (ivRank >= 40) status = "green";
+            else if (ivRank >= 20) status = "yellow";
+            else status = "red";
+          }
+
+          return {
+            ticker,
+            status,
+            ivRank,
+            iv: iv !== null ? Math.round(iv * 100) : null, // as percentage
+            change: quote?.change_percentage ?? null,
+            price: quote?.last ?? null,
+          };
+        } catch {
+          return { ticker, status: "gray" as const, ivRank: null, iv: null, change: null, price: null };
+        }
+      })
+    );
+
+    return results.map((r, i) =>
+      r.status === "fulfilled"
+        ? r.value
+        : { ticker: UNIVERSE_TICKERS[i].ticker, status: "gray" as const, ivRank: null, iv: null, change: null, price: null }
+    );
+  }),
 });

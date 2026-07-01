@@ -544,6 +544,10 @@ export default function SriPlaybook() {
   const { data: monthlyData = [] } = trpc.playbook.getMonthlyPnl.useQuery();
   const { data: transfers = [], refetch: refetchTransfers } = trpc.playbook.getTransfers.useQuery();
   const { data: eodHistory = [], refetch: refetchEod } = trpc.playbook.getEodHistory.useQuery();
+  const { data: tickerSignals = [], isLoading: signalsLoading } = trpc.playbook.getTickerSetupSignals.useQuery(
+    undefined,
+    { staleTime: 5 * 60 * 1000 } // cache 5 min — Tradier has rate limits
+  );
 
   // MTD adjusted P&L
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -1261,35 +1265,114 @@ export default function SriPlaybook() {
                 <CardTitle className="text-base flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-green-400" />
                   Sri's Ticker Universe — 8 Names, 0 Overlap
+                  {signalsLoading && <span className="ml-auto text-xs text-muted-foreground animate-pulse">Loading signals...</span>}
+                  {!signalsLoading && tickerSignals.length > 0 && (
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      🟢 {tickerSignals.filter(s => s.status === "green").length} ready
+                      {" · "}
+                      🟡 {tickerSignals.filter(s => s.status === "yellow").length} watch
+                      {" · "}
+                      🔴 {tickerSignals.filter(s => s.status === "red").length} skip
+                    </span>
+                  )}
                 </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Live IV Rank signals — <span className="text-green-400 font-semibold">Green ≥ 40 IVR</span> (sell premium now) · <span className="text-amber-400 font-semibold">Yellow 20–39</span> (watch) · <span className="text-red-400 font-semibold">Red &lt; 20</span> (skip)
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Core 5 — Always on the radar</div>
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
-                    {TICKER_UNIVERSE.filter(t => t.role === "core").map(t => (
-                      <div key={t.ticker} className="border border-green-500/30 bg-green-500/5 rounded-lg p-3">
-                        <div className="font-bold text-base text-green-400">{t.ticker}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{t.sector}</div>
-                        <div className="text-xs text-muted-foreground mt-1">{t.catalyst}</div>
-                        <div className="text-xs text-amber-400 mt-1">IV: {t.ivProfile}</div>
-                        <div className="text-xs text-slate-400 mt-1 italic">{t.note}</div>
-                      </div>
-                    ))}
+                    {TICKER_UNIVERSE.filter(t => t.role === "core").map(t => {
+                      const sig = tickerSignals.find(s => s.ticker === t.ticker);
+                      const borderColor = sig?.status === "green" ? "border-green-500/60 bg-green-500/10"
+                        : sig?.status === "yellow" ? "border-amber-500/60 bg-amber-500/10"
+                        : sig?.status === "red" ? "border-red-500/40 bg-red-500/5"
+                        : "border-green-500/30 bg-green-500/5";
+                      return (
+                        <div key={t.ticker} className={`border rounded-lg p-3 ${borderColor}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="font-bold text-base text-green-400">{t.ticker}</div>
+                            {sig && sig.status !== "gray" ? (
+                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                                sig.status === "green" ? "bg-green-500/20 text-green-400" :
+                                sig.status === "yellow" ? "bg-amber-500/20 text-amber-400" :
+                                "bg-red-500/20 text-red-400"
+                              }`}>
+                                {sig.status === "green" ? "✓ READY" : sig.status === "yellow" ? "◐ WATCH" : "✗ SKIP"}
+                              </span>
+                            ) : signalsLoading ? (
+                              <span className="text-xs text-muted-foreground">...</span>
+                            ) : null}
+                          </div>
+                          {sig && sig.ivRank !== null && (
+                            <div className="text-xs mb-1">
+                              <span className={sig.status === "green" ? "text-green-400" : sig.status === "yellow" ? "text-amber-400" : "text-red-400"}>
+                                IVR {sig.ivRank}
+                              </span>
+                              {sig.iv !== null && <span className="text-muted-foreground"> · IV {sig.iv}%</span>}
+                              {sig.change !== null && (
+                                <span className={sig.change >= 0 ? "text-green-400" : "text-red-400"}>
+                                  {" "}{sig.change >= 0 ? "+" : ""}{sig.change.toFixed(1)}%
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground mt-0.5">{t.sector}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{t.catalyst}</div>
+                          <div className="text-xs text-amber-400 mt-1">Typical IV: {t.ivProfile}</div>
+                          <div className="text-xs text-slate-400 mt-1 italic">{t.note}</div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Add-ons — Rotate in when IV is elevated</div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                    {TICKER_UNIVERSE.filter(t => t.role === "addon").map(t => (
-                      <div key={t.ticker} className="border border-blue-500/30 bg-blue-500/5 rounded-lg p-3">
-                        <div className="font-bold text-base text-blue-400">{t.ticker}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{t.sector}</div>
-                        <div className="text-xs text-muted-foreground mt-1">{t.catalyst}</div>
-                        <div className="text-xs text-amber-400 mt-1">IV: {t.ivProfile}</div>
-                        <div className="text-xs text-slate-400 mt-1 italic">{t.note}</div>
-                      </div>
-                    ))}
+                    {TICKER_UNIVERSE.filter(t => t.role === "addon").map(t => {
+                      const sig = tickerSignals.find(s => s.ticker === t.ticker);
+                      const borderColor = sig?.status === "green" ? "border-green-500/60 bg-green-500/10"
+                        : sig?.status === "yellow" ? "border-amber-500/60 bg-amber-500/10"
+                        : sig?.status === "red" ? "border-red-500/40 bg-red-500/5"
+                        : "border-blue-500/30 bg-blue-500/5";
+                      return (
+                        <div key={t.ticker} className={`border rounded-lg p-3 ${borderColor}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="font-bold text-base text-blue-400">{t.ticker}</div>
+                            {sig && sig.status !== "gray" ? (
+                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                                sig.status === "green" ? "bg-green-500/20 text-green-400" :
+                                sig.status === "yellow" ? "bg-amber-500/20 text-amber-400" :
+                                "bg-red-500/20 text-red-400"
+                              }`}>
+                                {sig.status === "green" ? "✓ READY" : sig.status === "yellow" ? "◐ WATCH" : "✗ SKIP"}
+                              </span>
+                            ) : signalsLoading ? (
+                              <span className="text-xs text-muted-foreground">...</span>
+                            ) : null}
+                          </div>
+                          {sig && sig.ivRank !== null && (
+                            <div className="text-xs mb-1">
+                              <span className={sig.status === "green" ? "text-green-400" : sig.status === "yellow" ? "text-amber-400" : "text-red-400"}>
+                                IVR {sig.ivRank}
+                              </span>
+                              {sig.iv !== null && <span className="text-muted-foreground"> · IV {sig.iv}%</span>}
+                              {sig.change !== null && (
+                                <span className={sig.change >= 0 ? "text-green-400" : "text-red-400"}>
+                                  {" "}{sig.change >= 0 ? "+" : ""}{sig.change.toFixed(1)}%
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground mt-0.5">{t.sector}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{t.catalyst}</div>
+                          <div className="text-xs text-amber-400 mt-1">Typical IV: {t.ivProfile}</div>
+                          <div className="text-xs text-slate-400 mt-1 italic">{t.note}</div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-3 text-sm">
