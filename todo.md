@@ -478,3 +478,23 @@
 - [x] Sidebar nav: "Sri's Playbook" group with "Playbook & Tracker" link at /sri-playbook
 - [x] Route: /sri-playbook wired in App.tsx
 - [x] Baseline data seeded: Jun 29 EOD snapshots for all 3 accounts, 7 open positions, June monthly P&L
+
+## Phase 39 — Weekly Top 10 Ticker Picks
+- [ ] Server: weeklyPicksRouter — getWeeklyTopTickers procedure (Tradier IV + volume + LLM fundamental note)
+- [ ] Server: Register weeklyPicksRouter in routers.ts
+- [ ] Frontend: "Weekly Picks" tab in SriPlaybook.tsx with top 10 cards (IV Rank badge, volume, AI note, Add to Watchlist)
+
+## Phase 40 — Auto Trade Analysis
+- [ ] Server: analyzePosition procedure in playbook.ts (takes position data, calls invokeLLM, returns structured analysis)
+- [ ] Frontend: Analysis popup after "Add Position" form submit in SriPlaybook.tsx
+- [ ] Frontend: "🔍 Analyze" button on each Trade Log row in SriPlaybook.tsx
+- [ ] Frontend: Analysis modal with summary, max profit/loss/breakeven, playbook fit check (✅/❌), key risks
+
+## Phase 39 — Weekly Top 10 Picks + Auto Trade Analysis (Jul 5 2026)
+- [x] weeklyPicks.ts router — score 50 S&P 500 candidates by IV Rank + options liquidity, AI fundamental notes, 4h cache
+- [x] weeklyPicks.refreshCache mutation — force-clear the cache
+- [x] playbook.analyzePosition mutation — AI-powered trade breakdown (summary, max P/L, breakeven, playbook fit, risks, buddy take)
+- [x] Register weeklyPicksRouter in routers.ts
+- [x] Weekly Picks tab in SriPlaybook — 10-card grid, IV status badges, score, AI notes, refresh button
+- [x] Analyze button on each Open Position card
+- [x] TradeAnalysisModal — auto-runs on open, shows full AI analysis with playbook fit check

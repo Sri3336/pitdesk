@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { invokeLLM } from "../_core/llm";
 import {
   accountSnapshots,
   playbookPositions,
@@ -765,4 +766,145 @@ export const playbookRouter = router({
         : { ticker: UNIVERSE_TICKERS[i].ticker, status: "gray" as const, ivRank: null, iv: null, change: null, price: null }
     );
   }),
+
+  // ─── Auto Trade Analysis ──────────────────────────────────────────────────
+  /**
+   * Analyze a position using AI — plain-English breakdown:
+   * what the trade is, max profit/loss/breakeven, what needs to happen to win,
+   * key risks, and a playbook fit check.
+   */
+  analyzePosition: protectedProcedure
+    .input(z.object({
+      ticker: z.string(),
+      strategy: z.enum(["iron_condor", "strangle", "naked_put", "naked_call", "other"]),
+      expiry: z.string(),
+      creditCollected: z.number(),
+      contracts: z.number(),
+      shortCallStrike: z.number().optional(),
+      shortPutStrike: z.number().optional(),
+      maxRisk: z.number().optional(),
+      entryDate: z.string(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const {
+        ticker, strategy, expiry, creditCollected, contracts,
+        shortCallStrike, shortPutStrike, maxRisk, entryDate, notes,
+      } = input;
+
+      const totalCredit = creditCollected * contracts * 100;
+      const profitTarget = totalCredit * 0.5;
+      const lossStop = totalCredit * 2;
+      const today = new Date();
+      const expiryDate = new Date(expiry + "T20:00:00Z");
+      const dte = Math.max(0, Math.round((expiryDate.getTime() - today.getTime()) / 86400000));
+
+      const strategyMap: Record<string, string> = {
+        iron_condor: "Iron Condor (4-leg defined-risk spread)",
+        strangle: "Short Strangle (naked call + naked put)",
+        naked_put: "Naked Put (cash-secured put)",
+        naked_call: "Naked Call (uncovered call)",
+        other: "Custom options structure",
+      };
+      const strategyLabel = strategyMap[strategy] ?? strategy;
+
+      const strikesDesc = [
+        shortCallStrike ? `Short Call at $${shortCallStrike}` : null,
+        shortPutStrike ? `Short Put at $${shortPutStrike}` : null,
+      ].filter(Boolean).join(", ");
+
+      const prompt = `You are Pit Advisor, an expert options trading analyst for PitDesk.
+
+Analyze this trade and return a JSON object with the exact fields below.
+
+## Trade Details
+- Ticker: ${ticker}
+- Strategy: ${strategyLabel}
+- Expiry: ${expiry} (${dte} days to expiry)
+- Entry Date: ${entryDate}
+- Credit Collected: $${creditCollected.toFixed(2)} per share
+- Contracts: ${contracts}
+- Total Credit: $${totalCredit.toFixed(2)}
+${strikesDesc ? `- Strikes: ${strikesDesc}` : ""}
+${maxRisk ? `- Max Risk (spread width): $${maxRisk.toFixed(2)}` : ""}
+${notes ? `- Trader Notes: ${notes}` : ""}
+
+## Sri's Playbook Rules (check against these)
+- Entry window: 10:00–11:00 AM EST only
+- Iron Condor: IV Rank > 40, min 10 DTE, max $10k risk, 50% profit target, 2× loss stop
+- Strangle: IV Rank > 60, no binary events in next 10 days, min 10 DTE, max 2–3 contracts
+- Naked Put/Call: Directional conviction required, IV Rank > 40
+- All strategies: Take profit at 50% of credit. Close if loss = 2× credit.
+
+## Required JSON Response
+Return ONLY this JSON object (no markdown, no explanation outside the JSON):
+{
+  "summary": "One sentence plain-English description of what this trade is",
+  "maxProfit": number,
+  "maxLoss": number,
+  "breakeven": "e.g. $145–$165 or below $145",
+  "whatNeedsToHappen": "Plain English: what price action needs to occur for max profit",
+  "playbookFit": {
+    "pass": boolean,
+    "score": number,
+    "reason": "Specific reason why it passes or fails the playbook rules",
+    "warnings": ["list of specific concerns or rule violations"]
+  },
+  "risks": ["risk 1", "risk 2", "risk 3"],
+  "tradingBuddyTake": "2-3 sentences of honest assessment from your trading mentor perspective"
+}`;
+
+      try {
+        const result = await invokeLLM({
+          messages: [{ role: "user", content: prompt }],
+          responseFormat: { type: "json_object" },
+          maxTokens: 800,
+        });
+        const content = typeof result.choices[0]?.message?.content === "string"
+          ? result.choices[0].message.content : "{}";
+        const parsed = JSON.parse(content);
+        return {
+          ok: true,
+          analysis: {
+            summary: parsed.summary ?? "",
+            maxProfit: parsed.maxProfit ?? totalCredit,
+            maxLoss: parsed.maxLoss ?? (maxRisk ? maxRisk * contracts : lossStop),
+            breakeven: parsed.breakeven ?? "N/A",
+            whatNeedsToHappen: parsed.whatNeedsToHappen ?? "",
+            playbookFit: {
+              pass: parsed.playbookFit?.pass ?? true,
+              score: parsed.playbookFit?.score ?? 70,
+              reason: parsed.playbookFit?.reason ?? "",
+              warnings: (parsed.playbookFit?.warnings ?? []) as string[],
+            },
+            risks: (parsed.risks ?? []) as string[],
+            tradingBuddyTake: parsed.tradingBuddyTake ?? "",
+          },
+        };
+      } catch (err) {
+        console.error("[analyzePosition] LLM error:", (err as Error).message);
+        return {
+          ok: true,
+          analysis: {
+            summary: `${contracts} contract ${strategyLabel} on ${ticker} expiring ${expiry}`,
+            maxProfit: totalCredit,
+            maxLoss: maxRisk ? maxRisk * contracts : lossStop,
+            breakeven: strikesDesc || "See strikes",
+            whatNeedsToHappen: `${ticker} stays between the short strikes through ${expiry}`,
+            playbookFit: {
+              pass: dte >= 10,
+              score: dte >= 10 ? 70 : 30,
+              reason: dte >= 10 ? "DTE requirement met" : "DTE < 10 days — below playbook minimum",
+              warnings: dte < 10 ? ["Less than 10 days to expiry"] : [] as string[],
+            },
+            risks: [
+              "Gap risk on earnings or macro event",
+              "IV expansion can increase unrealized loss",
+              "Assignment risk if stock moves through short strike",
+            ] as string[],
+            tradingBuddyTake: "Analysis unavailable — check your connection and try again.",
+          },
+        };
+      }
+    }),
 });

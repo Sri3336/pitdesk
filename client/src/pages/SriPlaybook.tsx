@@ -17,6 +17,7 @@ import {
   AlertTriangle, DollarSign, BarChart3, Shield, Settings, Copy, RefreshCw,
   Key, ArrowDownCircle, ArrowUpCircle, Camera, Wallet, TrendingUp as TrendUp,
   Trash2, Activity, Zap, Link2Off, ExternalLink, RefreshCcw,
+  Sparkles, Search, Star, Loader2,
 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -534,9 +535,9 @@ function AddTransferDialog({ onAdded }: { onAdded: () => void }) {
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-
 export default function SriPlaybook() {
   const utils = trpc.useUtils();
+  const [analyzePos, setAnalyzePos] = useState<any | null>(null);
 
   const { data: snapshots = [] } = trpc.playbook.getLatestSnapshots.useQuery();
   const { data: openPositions = [], refetch: refetchOpen } = trpc.playbook.getOpenPositions.useQuery();
@@ -842,6 +843,10 @@ export default function SriPlaybook() {
             <Settings className="w-4 h-4 mr-1" />
             Extension
           </TabsTrigger>
+          <TabsTrigger value="weekly-picks">
+            <Sparkles className="w-4 h-4 mr-1" />
+            Weekly Picks
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Open Positions Tab ── */}
@@ -874,6 +879,14 @@ export default function SriPlaybook() {
                         </div>
                         <div className="text-xs text-muted-foreground">{acct?.label}</div>
                         <div className="ml-auto flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs h-7 border-green-500/40 text-green-400 hover:bg-green-500/10"
+                            onClick={() => setAnalyzePos(pos)}
+                          >
+                            <Search className="w-3 h-3 mr-1" /> Analyze
+                          </Button>
                           <ClosePositionDialog position={pos} onClosed={refetchAll} />
                           <Button
                             size="sm"
@@ -1462,7 +1475,29 @@ export default function SriPlaybook() {
         <TabsContent value="settings" className="mt-4">
           <ExtensionSettingsTab />
         </TabsContent>
+        {/* ── Weekly Picks Tab ── */}
+        <TabsContent value="weekly-picks" className="mt-4">
+          <WeeklyPicksTab />
+        </TabsContent>
       </Tabs>
+
+      {/* ── Trade Analysis Modal ── */}
+      <TradeAnalysisModal
+        open={analyzePos !== null}
+        onClose={() => setAnalyzePos(null)}
+        position={analyzePos ? {
+          ticker: analyzePos.ticker,
+          strategy: analyzePos.strategy,
+          expiry: analyzePos.expiry,
+          creditCollected: parseFloat(analyzePos.creditCollected as string),
+          contracts: analyzePos.contracts,
+          shortCallStrike: analyzePos.shortCallStrike ? parseFloat(analyzePos.shortCallStrike as string) : undefined,
+          shortPutStrike: analyzePos.shortPutStrike ? parseFloat(analyzePos.shortPutStrike as string) : undefined,
+          maxRisk: analyzePos.maxRisk ? parseFloat(analyzePos.maxRisk as string) : undefined,
+          entryDate: analyzePos.entryDate,
+          notes: analyzePos.notes ?? undefined,
+        } : null}
+      />
     </div>
   );
 }
@@ -1855,5 +1890,361 @@ function SchwabLiveTab() {
         </>
       )}
     </div>
+  );
+}
+
+// ─── Weekly Picks Tab Component ───────────────────────────────────────────────
+function WeeklyPicksTab() {
+  const { data: picks = [], isLoading, error, refetch } = trpc.weeklyPicks.getWeeklyTopTickers.useQuery(
+    undefined,
+    { staleTime: 4 * 60 * 60 * 1000 } // 4 hours — matches server cache
+  );
+  const refreshMutation = trpc.weeklyPicks.refreshCache.useMutation({
+    onSuccess: () => {
+      toast.success("Cache cleared — fetching fresh data...");
+      refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  function ivStatusColor(status: string) {
+    if (status === "green") return "bg-green-500/20 text-green-400 border-green-500/30";
+    if (status === "yellow") return "bg-amber-500/20 text-amber-400 border-amber-500/30";
+    if (status === "red") return "bg-red-500/20 text-red-400 border-red-500/30";
+    return "bg-slate-500/20 text-slate-400 border-slate-500/30";
+  }
+
+  function ivStatusLabel(status: string, ivRank: number | null) {
+    if (status === "green") return `IVR ${ivRank ?? "—"} 🟢 READY`;
+    if (status === "yellow") return `IVR ${ivRank ?? "—"} 🟡 WATCH`;
+    if (status === "red") return `IVR ${ivRank ?? "—"} 🔴 SKIP`;
+    return "IVR — ⚪ N/A";
+  }
+
+  function fmtVol(n: number) {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+    return String(n);
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-yellow-400" />
+            This Week's Opportunities
+          </h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Top 10 premium-selling candidates from the S&P 500 universe — scored by IV Rank + options liquidity.
+            Cached for 4 hours. These are <strong>not</strong> your core 8 tickers — they're expansion opportunities.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => refreshMutation.mutate()}
+          disabled={refreshMutation.isPending || isLoading}
+          className="shrink-0"
+        >
+          <RefreshCw className={`w-4 h-4 mr-1 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
+          <Loader2 className="w-6 h-6 animate-spin mr-2" />
+          Fetching IV data for 50 tickers... (this takes ~30 seconds)
+        </div>
+      )}
+
+      {error && (
+        <Card className="border-red-500/30 bg-red-500/5">
+          <CardContent className="py-6 text-center text-red-400">
+            <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+            <div className="font-medium">Failed to load weekly picks</div>
+            <div className="text-sm mt-1">{(error as any).message}</div>
+            <Button size="sm" variant="outline" onClick={() => refetch()} className="mt-3">Retry</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && !error && picks.length === 0 && (
+        <Card className="border-border">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <div className="font-semibold">No picks available</div>
+            <div className="text-sm mt-1">Click Refresh to fetch this week's top opportunities</div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && picks.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {picks.map((pick, idx) => (
+            <Card key={pick.ticker} className={`border-border hover:border-green-500/30 transition-colors ${idx === 0 ? "border-yellow-500/40 bg-yellow-500/5" : ""}`}>
+              <CardContent className="py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {idx === 0 && <Star className="w-4 h-4 text-yellow-400 shrink-0" />}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-lg">{pick.ticker}</span>
+                        <Badge variant="outline" className="text-xs text-muted-foreground">{pick.sector}</Badge>
+                      </div>
+                      {pick.price && (
+                        <div className="text-sm text-muted-foreground">
+                          ${pick.price.toFixed(2)}
+                          {pick.change !== null && (
+                            <span className={`ml-2 ${pick.change >= 0 ? "text-green-400" : "text-red-400"}`}>
+                              {pick.change >= 0 ? "+" : ""}{pick.change.toFixed(2)}%
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <Badge className={`text-xs ${ivStatusColor(pick.ivStatus)}`}>
+                      {ivStatusLabel(pick.ivStatus, pick.ivRank)}
+                    </Badge>
+                    <div className="text-xs text-muted-foreground">
+                      Score: <span className="font-semibold text-foreground">{pick.score}</span>/100
+                    </div>
+                  </div>
+                </div>
+
+                {/* Liquidity row */}
+                <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                  <span>Vol: <span className="text-foreground font-medium">{fmtVol(pick.optionsVolume)}</span></span>
+                  <span>OI: <span className="text-foreground font-medium">{fmtVol(pick.openInterest)}</span></span>
+                  {pick.iv !== null && (
+                    <span>IV: <span className="text-foreground font-medium">{(pick.iv * 100).toFixed(0)}%</span></span>
+                  )}
+                </div>
+
+                {/* AI fundamental note */}
+                {pick.fundamentalNote && (
+                  <div className="mt-2 text-xs text-muted-foreground italic border-t border-border pt-2">
+                    <Sparkles className="w-3 h-3 inline mr-1 text-yellow-400" />
+                    {pick.fundamentalNote}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Disclaimer */}
+      <div className="text-xs text-muted-foreground border border-border rounded-md p-3 bg-muted/20">
+        <strong>Note:</strong> These picks are scored purely on IV Rank and options liquidity. They are NOT buy/sell recommendations.
+        Always check earnings dates, news catalysts, and your own conviction before entering any trade.
+        Entry window: <strong>10:00–11:00 AM EST only</strong>.
+      </div>
+    </div>
+  );
+}
+
+// ─── Trade Analysis Modal ─────────────────────────────────────────────────────
+interface AnalysisResult {
+  summary: string;
+  maxProfit: number;
+  maxLoss: number;
+  breakeven: string;
+  whatNeedsToHappen: string;
+  playbookFit: {
+    pass: boolean;
+    score: number;
+    reason: string;
+    warnings: string[];
+  };
+  risks: string[];
+  tradingBuddyTake: string;
+}
+
+export function TradeAnalysisModal({
+  open,
+  onClose,
+  position,
+}: {
+  open: boolean;
+  onClose: () => void;
+  position: {
+    ticker: string;
+    strategy: string;
+    expiry: string;
+    creditCollected: number;
+    contracts: number;
+    shortCallStrike?: number;
+    shortPutStrike?: number;
+    maxRisk?: number;
+    entryDate: string;
+    notes?: string;
+  } | null;
+}) {
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [hasRun, setHasRun] = useState(false);
+
+  const analyzeMutation = trpc.playbook.analyzePosition.useMutation({
+    onSuccess: (data) => {
+      setAnalysis(data.analysis as AnalysisResult);
+    },
+    onError: (e) => toast.error(`Analysis failed: ${e.message}`),
+  });
+
+  // Auto-run analysis when modal opens with a position
+  useEffect(() => {
+    if (open && position && !hasRun) {
+      setHasRun(true);
+      analyzeMutation.mutate({
+        ticker: position.ticker,
+        strategy: position.strategy as any,
+        expiry: position.expiry,
+        creditCollected: position.creditCollected,
+        contracts: position.contracts,
+        shortCallStrike: position.shortCallStrike,
+        shortPutStrike: position.shortPutStrike,
+        maxRisk: position.maxRisk,
+        entryDate: position.entryDate,
+        notes: position.notes,
+      });
+    }
+    if (!open) {
+      setAnalysis(null);
+      setHasRun(false);
+    }
+  }, [open, position]);
+
+  if (!position) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Search className="w-5 h-5 text-green-400" />
+            Trade Analysis — {position.ticker}
+          </DialogTitle>
+        </DialogHeader>
+
+        {analyzeMutation.isPending && (
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" />
+            Pit Advisor is analyzing your trade...
+          </div>
+        )}
+
+        {analysis && (
+          <div className="space-y-4 mt-2">
+            {/* Summary */}
+            <div className="p-3 rounded-md bg-muted/30 border border-border">
+              <p className="text-sm font-medium">{analysis.summary}</p>
+            </div>
+
+            {/* Key Numbers */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center p-3 rounded-md bg-green-500/10 border border-green-500/20">
+                <div className="text-xs text-muted-foreground mb-1">Max Profit</div>
+                <div className="font-bold text-green-400">{fmt$(analysis.maxProfit)}</div>
+              </div>
+              <div className="text-center p-3 rounded-md bg-red-500/10 border border-red-500/20">
+                <div className="text-xs text-muted-foreground mb-1">Max Loss</div>
+                <div className="font-bold text-red-400">-{fmt$(analysis.maxLoss)}</div>
+              </div>
+              <div className="text-center p-3 rounded-md bg-blue-500/10 border border-blue-500/20">
+                <div className="text-xs text-muted-foreground mb-1">Breakeven</div>
+                <div className="font-bold text-blue-400 text-sm">{analysis.breakeven}</div>
+              </div>
+            </div>
+
+            {/* What needs to happen */}
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">To Win This Trade</div>
+              <p className="text-sm">{analysis.whatNeedsToHappen}</p>
+            </div>
+
+            {/* Playbook Fit */}
+            <div className={`p-3 rounded-md border ${analysis.playbookFit.pass ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30"}`}>
+              <div className="flex items-center gap-2 mb-1">
+                {analysis.playbookFit.pass
+                  ? <CheckCircle className="w-4 h-4 text-green-400" />
+                  : <XCircle className="w-4 h-4 text-red-400" />
+                }
+                <span className="font-semibold text-sm">
+                  Playbook Fit: {analysis.playbookFit.pass ? "✅ PASS" : "❌ FAIL"} ({analysis.playbookFit.score}/100)
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">{analysis.playbookFit.reason}</p>
+              {analysis.playbookFit.warnings.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {analysis.playbookFit.warnings.map((w, i) => (
+                    <li key={i} className="text-xs text-amber-400 flex items-start gap-1">
+                      <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                      {w}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Key Risks */}
+            {analysis.risks.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Key Risks</div>
+                <ul className="space-y-1">
+                  {analysis.risks.map((r, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2">
+                      <span className="text-red-400 mt-0.5">•</span>
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Trading Buddy Take */}
+            {analysis.tradingBuddyTake && (
+              <div className="p-3 rounded-md bg-blue-500/10 border border-blue-500/20">
+                <div className="text-xs font-semibold text-blue-400 mb-1 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> Pit Advisor's Take
+                </div>
+                <p className="text-sm">{analysis.tradingBuddyTake}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-between items-center mt-4 pt-4 border-t border-border">
+          {analysis && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setAnalysis(null);
+                setHasRun(false);
+                analyzeMutation.mutate({
+                  ticker: position.ticker,
+                  strategy: position.strategy as any,
+                  expiry: position.expiry,
+                  creditCollected: position.creditCollected,
+                  contracts: position.contracts,
+                  shortCallStrike: position.shortCallStrike,
+                  shortPutStrike: position.shortPutStrike,
+                  maxRisk: position.maxRisk,
+                  entryDate: position.entryDate,
+                  notes: position.notes,
+                });
+              }}
+            >
+              <RefreshCw className="w-4 h-4 mr-1" /> Re-analyze
+            </Button>
+          )}
+          <Button onClick={onClose} className="ml-auto">Close</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
