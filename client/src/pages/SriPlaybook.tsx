@@ -2063,6 +2063,13 @@ interface AnalysisResult {
   };
   risks: string[];
   tradingBuddyTake: string;
+  adjustmentStrategy?: {
+    needed: boolean;
+    headline: string;
+    steps: string[];
+    hedgeOption: string;
+    doNothing: string;
+  };
 }
 
 export function TradeAnalysisModal({
@@ -2202,6 +2209,62 @@ export function TradeAnalysisModal({
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {/* Adjustment Strategy */}
+            {analysis.adjustmentStrategy && (
+              <div className={`p-3 rounded-md border ${
+                analysis.adjustmentStrategy.needed
+                  ? "bg-amber-500/10 border-amber-500/30"
+                  : "bg-muted/20 border-border"
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className={`w-4 h-4 shrink-0 ${
+                    analysis.adjustmentStrategy.needed ? "text-amber-400" : "text-muted-foreground"
+                  }`} />
+                  <span className={`font-semibold text-sm ${
+                    analysis.adjustmentStrategy.needed ? "text-amber-300" : "text-muted-foreground"
+                  }`}>
+                    Adjustment Strategy{analysis.adjustmentStrategy.needed ? " — Action Recommended" : " — Holding is Fine"}
+                  </span>
+                </div>
+
+                {/* Headline action */}
+                {analysis.adjustmentStrategy.headline && (
+                  <p className="text-sm font-medium mb-2">{analysis.adjustmentStrategy.headline}</p>
+                )}
+
+                {/* Step-by-step roll/hedge plan */}
+                {analysis.adjustmentStrategy.steps.length > 0 && (
+                  <div className="mb-2">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Step-by-Step Plan</div>
+                    <ol className="space-y-1">
+                      {analysis.adjustmentStrategy.steps.map((step, i) => (
+                        <li key={i} className="text-sm flex items-start gap-2">
+                          <span className="text-amber-400 font-bold shrink-0">{i + 1}.</span>
+                          {step}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {/* Hedge alternative */}
+                {analysis.adjustmentStrategy.hedgeOption && (
+                  <div className="mb-2">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Alternative Hedge</div>
+                    <p className="text-sm text-muted-foreground">{analysis.adjustmentStrategy.hedgeOption}</p>
+                  </div>
+                )}
+
+                {/* Do-nothing condition */}
+                {analysis.adjustmentStrategy.doNothing && (
+                  <div className="pt-2 border-t border-border/50">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">When to Do Nothing</div>
+                    <p className="text-sm text-muted-foreground italic">{analysis.adjustmentStrategy.doNothing}</p>
+                  </div>
+                )}
               </div>
             )}
 

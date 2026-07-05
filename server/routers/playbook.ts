@@ -851,14 +851,25 @@ Return ONLY this JSON object (no markdown, no explanation outside the JSON):
     "warnings": ["list of specific concerns or rule violations"]
   },
   "risks": ["risk 1", "risk 2", "risk 3"],
-  "tradingBuddyTake": "2-3 sentences of honest assessment from your trading mentor perspective"
+  "tradingBuddyTake": "2-3 sentences of honest assessment from your trading mentor perspective",
+  "adjustmentStrategy": {
+    "needed": boolean,
+    "headline": "One sentence: what is the primary adjustment action (e.g. 'Roll the short call up and out to reduce delta risk')",
+    "steps": [
+      "Step 1: specific action with strikes/expiry guidance",
+      "Step 2: specific action",
+      "Step 3: specific action"
+    ],
+    "hedgeOption": "One sentence describing an alternative hedge (e.g. buy a protective put, add a long call wing, reduce contracts)",
+    "doNothing": "One sentence on when it is acceptable to hold without adjusting"
+  }
 }`;
 
       try {
         const result = await invokeLLM({
           messages: [{ role: "user", content: prompt }],
           responseFormat: { type: "json_object" },
-          maxTokens: 800,
+          maxTokens: 1200,
         });
         const content = typeof result.choices[0]?.message?.content === "string"
           ? result.choices[0].message.content : "{}";
@@ -879,6 +890,13 @@ Return ONLY this JSON object (no markdown, no explanation outside the JSON):
             },
             risks: (parsed.risks ?? []) as string[],
             tradingBuddyTake: parsed.tradingBuddyTake ?? "",
+            adjustmentStrategy: {
+              needed: parsed.adjustmentStrategy?.needed ?? !parsed.playbookFit?.pass,
+              headline: parsed.adjustmentStrategy?.headline ?? "",
+              steps: (parsed.adjustmentStrategy?.steps ?? []) as string[],
+              hedgeOption: parsed.adjustmentStrategy?.hedgeOption ?? "",
+              doNothing: parsed.adjustmentStrategy?.doNothing ?? "",
+            },
           },
         };
       } catch (err) {
@@ -903,6 +921,19 @@ Return ONLY this JSON object (no markdown, no explanation outside the JSON):
               "Assignment risk if stock moves through short strike",
             ] as string[],
             tradingBuddyTake: "Analysis unavailable — check your connection and try again.",
+            adjustmentStrategy: {
+              needed: dte < 10,
+              headline: dte < 10 ? "Consider rolling out to a later expiry to buy more time" : "No adjustment needed at this time",
+              steps: dte < 10
+                ? [
+                    "Buy back the current short options to close the position",
+                    "Sell the same strikes in the next available expiry (1–2 weeks out)",
+                    "Collect a net credit or debit-neutral roll if possible",
+                  ] as string[]
+                : ["Monitor position daily", "Re-evaluate if stock moves within 5% of short strike"] as string[],
+              hedgeOption: "Buy a further OTM option as a wing to cap max loss",
+              doNothing: "Hold if the position is within the profit zone and DTE > 5",
+            },
           },
         };
       }
