@@ -49,6 +49,7 @@ const CatalystBreakoutWatch = lazy(() => import("./pages/CatalystBreakoutWatch")
 const VCPStrategy = lazy(() => import("./pages/VCPStrategy"));
 const VcpAlerts = lazy(() => import("./pages/VcpAlerts"));
 const IvrAlerts = lazy(() => import("./pages/IvrAlerts"));
+const ICTSupplyZone = lazy(() => import("./pages/ICTSupplyZone"));
 
 // Analysis pages
 const Analyzer = lazy(() => import("./pages/Analyzer"));
@@ -195,6 +196,7 @@ function Router() {
                 <Route path="/vcp-strategy" component={VCPStrategy} />
                 <Route path="/vcp-alerts" component={VcpAlerts} />
                 <Route path="/ivr-alerts" component={IvrAlerts} />
+                <Route path="/ict-supply-zone" component={ICTSupplyZone} />
 
                 {/* Analysis */}
                 <Route path="/analyzer" component={Analyzer} />

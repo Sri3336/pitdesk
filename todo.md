@@ -498,3 +498,20 @@
 - [x] Weekly Picks tab in SriPlaybook — 10-card grid, IV status badges, score, AI notes, refresh button
 - [x] Analyze button on each Open Position card
 - [x] TradeAnalysisModal — auto-runs on open, shows full AI analysis with playbook fit check
+
+## Phase 40 — ICT Pro-Trend Supply Zone Scanner
+- [x] Build ictSupplyZone.ts server router with full scanner engine
+- [x] Supply zone identification (swing high + strong reversal detection)
+- [x] Asian range detection (consolidation below POI)
+- [x] London inducement detection (price inside zone)
+- [x] Stop placement: zone high + 0.5× ATR buffer
+- [x] Take-profit targets: T1 = Asian range low, T2 = previous swing low
+- [x] R:R calculation (T1 and T2)
+- [x] Position sizing (1% risk, configurable account size)
+- [x] Zone freshness + strength scoring
+- [x] Trend detection (EMA20 vs EMA50)
+- [x] Zone invalidation rules
+- [x] Register ictSupplyZoneRouter in routers.ts
+- [x] Build ICTSupplyZone.tsx UI page with full trade math panel
+- [x] Add ICT Supply Zone to sidebar nav (Strategies section)
+- [x] Add route /ict-supply-zone in App.tsx
