@@ -501,6 +501,34 @@ export const playbookRouter = router({
 
       const adjustedPnl = prevTotal > 0 ? totalValue - prevTotal - netTransfers : null;
 
+      // ── Step 4: Determine monthStartCapital ─────────────────────────────────
+      // Rule: the FIRST snapshot of each calendar month locks in the baseline capital.
+      // Subsequent snapshots in the same month carry the same locked value forward.
+      // This ensures the 3% monthly target and drawdown never move with daily P&L.
+      const currentYearMonth = today.slice(0, 7); // YYYY-MM
+      const monthStartStr = `${currentYearMonth}-01`;
+
+      // Look for any existing snapshot in this calendar month
+      const existingMonthRows = await db
+        .select()
+        .from(eodCapitalSnapshots)
+        .where(
+          and(
+            eq(eodCapitalSnapshots.userId, OWNER_USER_ID),
+            gte(eodCapitalSnapshots.snapshotDate, monthStartStr),
+            lte(eodCapitalSnapshots.snapshotDate, today),
+          )
+        )
+        .orderBy(eodCapitalSnapshots.snapshotDate)
+        .limit(10);
+
+      // If there's already a snapshot this month with a locked monthStartCapital, use that.
+      // Otherwise this IS the first snapshot of the month — lock in today's totalValue.
+      const existingLocked = existingMonthRows.find(r => r.monthStartCapital != null);
+      const monthStartCapital = existingLocked
+        ? parseFloat(String(existingLocked.monthStartCapital))
+        : totalValue; // first snapshot of month → lock today's value
+
       // Upsert today's EOD snapshot
       const existing = await db
         .select()
@@ -514,6 +542,8 @@ export const playbookRouter = router({
         .limit(1);
 
       if (existing.length > 0) {
+        // When updating, preserve the original monthStartCapital if it was already set
+        const existingMonthStart = existing[0].monthStartCapital;
         await db.update(eodCapitalSnapshots)
           .set({
             totalValue: String(totalValue),
@@ -522,6 +552,8 @@ export const playbookRouter = router({
             etrade2738Value: et2738Val > 0 ? String(et2738Val) : null,
             netTransfersSinceLastSnapshot: String(netTransfers),
             adjustedPnl: adjustedPnl !== null ? String(adjustedPnl) : null,
+            // Only set monthStartCapital if not already locked
+            monthStartCapital: existingMonthStart != null ? existingMonthStart : String(monthStartCapital),
             createdAt: now,
           })
           .where(
@@ -540,6 +572,7 @@ export const playbookRouter = router({
           etrade2738Value: et2738Val > 0 ? String(et2738Val) : null,
           netTransfersSinceLastSnapshot: String(netTransfers),
           adjustedPnl: adjustedPnl !== null ? String(adjustedPnl) : null,
+          monthStartCapital: String(monthStartCapital),
           createdAt: now,
         });
       }
@@ -555,6 +588,8 @@ export const playbookRouter = router({
         et2738Val,
         netTransfers,
         adjustedPnl,
+        monthStartCapital,
+        isFirstSnapshotOfMonth: !existingLocked,
       };
     }),
 
@@ -633,6 +668,29 @@ export const playbookRouter = router({
       const rawPnl = currentValue - baselineValue;
       const adjustedPnl = rawPnl - netTransfers;
 
+      // Find the locked monthStartCapital for the current month.
+      // Look for any snapshot in the current month that has monthStartCapital set.
+      const currentYearMonth = input.fromDate.slice(0, 7);
+      const monthStartStr = `${currentYearMonth}-01`;
+      const monthEndStr = `${currentYearMonth}-31`;
+      const monthSnapshotRows = await db
+        .select()
+        .from(eodCapitalSnapshots)
+        .where(
+          and(
+            eq(eodCapitalSnapshots.userId, OWNER_USER_ID),
+            gte(eodCapitalSnapshots.snapshotDate, monthStartStr),
+            lte(eodCapitalSnapshots.snapshotDate, monthEndStr),
+          )
+        )
+        .orderBy(eodCapitalSnapshots.snapshotDate)
+        .limit(10);
+
+      const lockedRow = monthSnapshotRows.find(r => r.monthStartCapital != null);
+      const monthStartCapital = lockedRow
+        ? parseFloat(String(lockedRow.monthStartCapital))
+        : null; // null means no snapshot has been captured this month yet
+
       return {
         fromDate: input.fromDate,
         toDate: input.toDate,
@@ -643,6 +701,8 @@ export const playbookRouter = router({
         adjustedPnl,
         baselineDate: baselineRows[0]?.snapshotDate ?? null,
         currentDate: currentRows[0]?.snapshotDate ?? null,
+        monthStartCapital,
+        monthStartCapitalDate: lockedRow?.snapshotDate ?? null,
       };
     }),
 

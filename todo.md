@@ -515,3 +515,16 @@
 - [x] Build ICTSupplyZone.tsx UI page with full trade math panel
 - [x] Add ICT Supply Zone to sidebar nav (Strategies section)
 - [x] Add route /ict-supply-zone in App.tsx
+
+## Phase 41 — Locked Month-Start Baseline Capital
+- [x] Add month_start_capital column to eod_capital_snapshots schema
+- [x] Apply ALTER TABLE migration via webdev_execute_sql
+- [x] Update captureEodSnapshot to lock monthStartCapital on first snapshot of month
+- [x] Preserve existing monthStartCapital on subsequent snapshots (never overwrite)
+- [x] Update getAdjustedPnl to return monthStartCapital and monthStartCapitalDate
+- [x] Update SriPlaybook: monthlyTarget now uses locked monthStartCapital (not live totalCapital)
+- [x] Monthly Target card shows "Base: $X · locked" when baseline is set
+- [x] Progress bar shows "Base locked @ $X on YYYY-MM-DD" pill badge
+- [x] Progress bar shows drawdown/gain vs month-start (red warning if down, green if up)
+- [x] Progress bar footer shows "(fixed)" vs "(live)" to indicate target type
+- [x] Backfill July 2026 existing snapshots with locked baseline from earliest July snapshot

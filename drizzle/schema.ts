@@ -803,6 +803,9 @@ export const eodCapitalSnapshots = mysqlTable("eod_capital_snapshots", {
   // Transfer-adjusted P&L vs the previous EOD snapshot
   netTransfersSinceLastSnapshot: decimal("net_transfers_since_last_snapshot", { precision: 14, scale: 2 }).default("0"),
   adjustedPnl: decimal("adjusted_pnl", { precision: 14, scale: 2 }),  // totalValue - prevTotalValue - netTransfers
+  // Locked baseline capital for the month — set on the FIRST snapshot of each calendar month,
+  // then carried forward unchanged. Used to compute a fixed monthly target and true drawdown.
+  monthStartCapital: decimal("month_start_capital", { precision: 14, scale: 2 }),
   notes: text("notes"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });

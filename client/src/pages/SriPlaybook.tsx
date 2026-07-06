@@ -605,7 +605,15 @@ export default function SriPlaybook() {
     [snapshots]
   );
 
-  const monthlyTarget = totalCapital * 0.03;
+  // ── Locked month-start capital ──────────────────────────────────────────────
+  // monthStartCapital is locked on the FIRST EOD snapshot of each calendar month.
+  // The 3% monthly target is always computed from this frozen value — it never
+  // moves with daily P&L. Falls back to current totalCapital if no snapshot yet.
+  const monthStartCapital = adjustedPnl?.monthStartCapital ?? null;
+  const targetBase = monthStartCapital ?? totalCapital; // locked if available, else live
+  const hasLockedBaseline = monthStartCapital != null && monthStartCapital > 0;
+
+  const monthlyTarget = targetBase * 0.03;
   const currentMonthData = monthlyData.find(m => m.month === currentMonth);
   const monthlyActual = currentMonthData ? parseFloat(currentMonthData.actualPnl as string) : 0;
 
@@ -685,13 +693,15 @@ export default function SriPlaybook() {
               {monthlyTarget > 0 ? fmt$(monthlyTarget) : "—"}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {hasValidBaseline && adjPnlValue !== 0
+              {hasLockedBaseline
+                ? <span className="text-blue-300/70">
+                    Base: {fmt$(monthStartCapital!)} · locked
+                  </span>
+                : hasValidBaseline && adjPnlValue !== 0
                 ? <span className={adjPnlValue >= 0 ? "text-green-400" : "text-red-400"}>
                     Adj P&L: {fmt$(adjPnlValue, { sign: true })}
                   </span>
-                : !hasValidBaseline
-                ? <span className="text-amber-400 text-xs">Capture EOD to enable tracking</span>
-                : "No P&L data yet"}
+                : <span className="text-amber-400 text-xs">Capture EOD to lock baseline</span>}
             </div>
           </CardContent>
         </Card>
@@ -732,8 +742,15 @@ export default function SriPlaybook() {
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-              <div className="text-sm font-semibold">
-                {new Date().toLocaleString("default", { month: "long", year: "numeric" })} — 3% Target Progress
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">
+                  {new Date().toLocaleString("default", { month: "long", year: "numeric" })} — 3% Target Progress
+                </span>
+                {hasLockedBaseline && (
+                  <span className="text-xs bg-blue-500/15 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30">
+                    Base locked @ {fmt$(monthStartCapital!)} on {adjustedPnl?.monthStartCapitalDate ?? "first EOD"}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 {hasValidBaseline && adjustedPnl && (
@@ -746,6 +763,22 @@ export default function SriPlaybook() {
                 </span>
               </div>
             </div>
+            {/* Drawdown vs locked baseline */}
+            {hasLockedBaseline && monthStartCapital && totalCapital > 0 && (() => {
+              const drawdown = totalCapital - monthStartCapital;
+              const drawdownPct = (drawdown / monthStartCapital) * 100;
+              return drawdown < 0 ? (
+                <div className="mb-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-1.5 flex items-center justify-between">
+                  <span>⚠️ Drawdown vs month-start: {fmt$(drawdown, { sign: true })} ({drawdownPct.toFixed(2)}%)</span>
+                  <span className="text-muted-foreground">Current: {fmt$(totalCapital)} vs Locked: {fmt$(monthStartCapital)}</span>
+                </div>
+              ) : drawdown > 0 ? (
+                <div className="mb-2 text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded px-3 py-1.5 flex items-center justify-between">
+                  <span>↑ Up vs month-start: {fmt$(drawdown, { sign: true })} ({drawdownPct.toFixed(2)}%)</span>
+                  <span className="text-muted-foreground">Current: {fmt$(totalCapital)} vs Locked: {fmt$(monthStartCapital)}</span>
+                </div>
+              ) : null;
+            })()}
             <div className="w-full bg-muted rounded-full h-3">
               <div
                 className={`h-3 rounded-full transition-all duration-500 ${
@@ -760,7 +793,7 @@ export default function SriPlaybook() {
                 {monthlyProgress.toFixed(1)}% complete
                 {adjustedPnl?.netTransfers ? " (transfer-adjusted)" : ""}
               </span>
-              <span>3% = {fmt$(monthlyTarget)}</span>
+              <span>3% = {fmt$(monthlyTarget)} {hasLockedBaseline ? "(fixed)" : "(live)"}</span>
             </div>
           </CardContent>
         </Card>
