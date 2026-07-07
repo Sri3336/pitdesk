@@ -99,6 +99,7 @@ const NAV_SECTIONS = [
       { icon: Zap, label: "Catalyst Watch", path: "/catalyst-watch" },
       { icon: TrendingDown, label: "ICT Supply Zone", path: "/ict-supply-zone" },
       { icon: TrendingUp, label: "EMA Pullback", path: "/ema-pullback" },
+      { icon: BookOpen, label: "Chart Patterns", path: "/chart-patterns" },
       { icon: Target, label: "Opening Range Scalper", path: "/velez-scanner?tab=ors" },
     ],
   },

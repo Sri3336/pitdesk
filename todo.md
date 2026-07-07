@@ -537,3 +537,19 @@
 - [x] Build EMAPullbackScanner.tsx UI page (signal cards, trade math, options bias)
 - [x] Add persistent TopNavBar to Home.tsx with quick links to 7 most-used tools
 - [x] Add QuickAccessGrid to Home.tsx (all 36 features, filterable by group)
+
+## Phase 43 — 6 Tops Pattern Library + Scanner Integration
+- [ ] Build shared topPatterns.ts detection engine (H&S, Double Top, Triple Top, Rounding, Rising Wedge, Broadening Top)
+- [ ] Build ChartPatterns.tsx reference page with SVG diagrams + plain-English education + Learn mode
+- [ ] Wire pattern detection into EMA Pullback Scanner signal cards
+- [ ] Wire pattern detection into ICT Supply Zone signal cards
+- [ ] Add /chart-patterns route to App.tsx
+- [ ] Add Chart Patterns to sidebar nav (Analysis section)
+
+## Phase 43 — 6 Tops Pattern Library + Pattern Detection in Scanners
+- [x] Build shared top-pattern detection engine (server/topPatterns.ts)
+- [x] Build ChartPatterns reference page with SVG diagrams and Learn mode (client/src/pages/ChartPatterns.tsx)
+- [x] Add detectPattern procedure to emaPullback router
+- [x] Wire PatternBadge into EMA Pullback Scanner signal cards
+- [x] Wire PatternBadge into ICT Supply Zone signal cards
+- [x] Add Chart Patterns to sidebar nav and App.tsx route

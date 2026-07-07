@@ -15,6 +15,7 @@
 import { publicProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { callDataApi } from "../_core/dataApi";
+import { detectTopPattern } from "../topPatterns";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -382,5 +383,41 @@ export const emaPullbackRouter = router({
     .query(async ({ input }) => {
       const signal = await analyzeEmaPullback(input.ticker.toUpperCase(), input.timeframe);
       return signal;
+    }),
+
+  detectPattern: publicProcedure
+    .input(z.object({ ticker: z.string() }))
+    .query(async ({ input }) => {
+      const ticker = input.ticker.toUpperCase();
+      // Fetch ~90 daily bars for pattern detection
+      let bars: { high: number; low: number; close: number; open: number }[] = [];
+      try {
+        const raw = await callDataApi("YahooFinance/get_stock_chart", {
+          query: {
+            symbol: ticker,
+            region: "US",
+            interval: "1d",
+            range: "6mo",
+            includeAdjustedClose: "true",
+          },
+        });
+        const prices = (raw as any)?.chart?.result?.[0];
+        if (prices) {
+          const timestamps: number[] = prices.timestamp ?? [];
+          const q = prices.indicators?.quote?.[0] ?? {};
+          const opens: number[] = q.open ?? [];
+          const highs: number[] = q.high ?? [];
+          const lows: number[] = q.low ?? [];
+          const closes: number[] = q.close ?? [];
+          for (let i = 0; i < timestamps.length; i++) {
+            if (opens[i] != null && highs[i] != null && lows[i] != null && closes[i] != null) {
+              bars.push({ open: opens[i], high: highs[i], low: lows[i], close: closes[i] });
+            }
+          }
+        }
+      } catch (_e) {
+        // Return NONE on data fetch failure
+      }
+      return detectTopPattern(bars);
     }),
 });

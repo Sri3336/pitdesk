@@ -122,6 +122,23 @@ function strengthBadge(strength: SupplyZone["strength"]) {
 
 // ─── Single Result Card ────────────────────────────────────────────────────────
 
+// Pattern Badge — lazy-loaded per ticker
+function PatternBadge({ ticker }: { ticker: string }) {
+  const { data } = trpc.emaPullback.detectPattern.useQuery(
+    { ticker },
+    { staleTime: 10 * 60 * 1000 }
+  );
+  if (!data || data.pattern === "NONE") return null;
+  return (
+    <Badge
+      className="bg-amber-500/15 text-amber-300 border-amber-500/30 text-xs cursor-help"
+      title={data.plainEnglish + " | " + data.traderNote}
+    >
+      {data.emoji} {data.label} {data.confidence}%
+    </Badge>
+  );
+}
+
 function ResultCard({ result }: { result: SetupResult }) {
   const [expanded, setExpanded] = useState(result.status === "READY");
 
@@ -140,6 +157,7 @@ function ResultCard({ result }: { result: SetupResult }) {
             {trendIcon(result.trend)}
             <span className="font-bold text-base">{result.ticker}</span>
             {statusBadge(result.status)}
+            <PatternBadge ticker={result.ticker} />
             {result.londonInducementDetected && (
               <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 text-xs animate-pulse">
                 ⚡ INDUCEMENT

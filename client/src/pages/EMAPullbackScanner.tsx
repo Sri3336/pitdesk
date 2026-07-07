@@ -29,6 +29,7 @@ import {
   Target,
   BarChart2,
   Zap,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -107,6 +108,24 @@ function optionsBiasColor(b: string) {
 
 // ─── Signal Card ──────────────────────────────────────────────────────────────
 
+function PatternBadge({ ticker }: { ticker: string }) {
+  const { data } = trpc.emaPullback.detectPattern.useQuery(
+    { ticker },
+    { staleTime: 10 * 60 * 1000 }
+  );
+  if (!data || data.pattern === "NONE") return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200 cursor-help"
+      title={data.plainEnglish + " | " + data.traderNote}
+    >
+      <span>{data.emoji}</span>
+      {data.label}
+      <span className="opacity-60">{data.confidence}%</span>
+    </span>
+  );
+}
+
 function SignalCard({ signal }: { signal: EmaPullbackSignal }) {
   const [expanded, setExpanded] = useState(signal.signalStrength === "STRONG");
 
@@ -168,6 +187,7 @@ function SignalCard({ signal }: { signal: EmaPullbackSignal }) {
 
         {/* Quick status row */}
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          <PatternBadge ticker={signal.ticker} />
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${signal.trendConfirmed ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-600 border-red-200"}`}>
             {signal.trendConfirmed ? "✓ Trend OK" : "✗ No Trend"}
           </span>
