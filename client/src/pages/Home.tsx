@@ -1,18 +1,101 @@
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { PitDeskLogo } from "@/components/PitDeskLogo";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { ROUTES, HOME_ACTIONS } from "@/lib/routes";
 import {
+  Activity,
   BarChart2,
+  Bell,
+  BookMarked,
   BookOpen,
+  Building2,
+  Calculator,
   CalendarDays,
+  CandlestickChart,
+  ChevronRight,
+  ClipboardList,
+  Database,
+  FlaskConical,
+  GitMerge,
+  HardDrive,
+  HelpCircle,
+  LineChart,
+  ListChecks,
+  LogOut,
+  MapPin,
+  Menu,
   MessageSquare,
+  Radio,
+  Scan,
+  Settings,
+  Shield,
+  Sparkles,
+  Sunrise,
+  Target,
+  TrendingDown,
   TrendingUp,
   Upload,
+  X,
   Zap,
 } from "lucide-react";
+
+// ─── All features for Quick Access grid ──────────────────────────────────────
+
+const ALL_FEATURES = [
+  // Scanners & Analysis
+  { icon: BarChart2,       label: "PCR Dashboard",        path: "/pcr-dashboard",       group: "Analysis",   color: "#22c55e" },
+  { icon: TrendingUp,      label: "PCR Strategy",         path: "/pcr-strategy",        group: "Analysis",   color: "#22c55e" },
+  { icon: CandlestickChart,label: "Charts",               path: "/charts",              group: "Analysis",   color: "#3b82f6" },
+  { icon: Scan,            label: "Scan All",             path: "/scan-all",            group: "Analysis",   color: "#3b82f6" },
+  { icon: Activity,        label: "Options Analyzer",     path: "/analyzer",            group: "Analysis",   color: "#8b5cf6" },
+  { icon: ClipboardList,   label: "Watchlist",            path: "/watchlist",           group: "Analysis",   color: "#6366f1" },
+  { icon: Radio,           label: "Earnings Calendar",    path: "/earnings-calendar",   group: "Analysis",   color: "#f59e0b" },
+
+  // Strategies
+  { icon: LineChart,       label: "Velez Scanner",        path: "/velez-scanner",       group: "Strategies", color: "#22c55e" },
+  { icon: Activity,        label: "Intraday Scanner",     path: "/intraday-scanner",    group: "Strategies", color: "#3b82f6" },
+  { icon: GitMerge,        label: "VCP Strategy",         path: "/vcp-strategy",        group: "Strategies", color: "#8b5cf6" },
+  { icon: Zap,             label: "Catalyst Watch",       path: "/catalyst-watch",      group: "Strategies", color: "#f59e0b" },
+  { icon: TrendingDown,    label: "ICT Supply Zone",      path: "/ict-supply-zone",     group: "Strategies", color: "#ef4444" },
+  { icon: TrendingUp,      label: "EMA Pullback",         path: "/ema-pullback",        group: "Strategies", color: "#22c55e" },
+  { icon: Target,          label: "Opening Range Scalper",path: "/velez-scanner?tab=ors",group:"Strategies", color: "#f97316" },
+
+  // Alerts
+  { icon: Bell,            label: "IVR Alerts",           path: "/ivr-alerts",          group: "Alerts",     color: "#f59e0b" },
+  { icon: Bell,            label: "VCP Alerts",           path: "/vcp-alerts",          group: "Alerts",     color: "#f59e0b" },
+  { icon: Sparkles,        label: "Fib+EMA Alerts",       path: "/fib-ema-alerts",      group: "Alerts",     color: "#8b5cf6" },
+
+  // Execution
+  { icon: MessageSquare,   label: "Pit Advisor",          path: "/pit-advisor",         group: "Execution",  color: "#22c55e" },
+  { icon: Zap,             label: "AI Agent",             path: "/agent",               group: "Execution",  color: "#8b5cf6" },
+  { icon: Shield,          label: "Pre-Market Checklist", path: "/pre-market",          group: "Execution",  color: "#3b82f6" },
+  { icon: Sunrise,         label: "Morning Session",      path: "/morning-session",     group: "Execution",  color: "#f59e0b" },
+  { icon: ListChecks,      label: "Swing Watchlist",      path: "/swing-watchlist",     group: "Execution",  color: "#22c55e" },
+  { icon: MapPin,          label: "Liquidity Map",        path: "/liquidity-map",       group: "Execution",  color: "#6366f1" },
+  { icon: ClipboardList,   label: "Trade Log",            path: "/trade-log",           group: "Execution",  color: "#3b82f6" },
+  { icon: Upload,          label: "Analyze My Trades",    path: "/trade-upload",        group: "Execution",  color: "#f97316" },
+  { icon: BarChart2,       label: "Performance",          path: "/performance",         group: "Execution",  color: "#22c55e" },
+  { icon: BookOpen,        label: "Trade Proposals",      path: "/trade-proposals",     group: "Execution",  color: "#8b5cf6" },
+
+  // Playbook
+  { icon: BookMarked,      label: "Playbook & Tracker",   path: "/sri-playbook",        group: "Playbook",   color: "#22c55e" },
+
+  // Backtesting
+  { icon: FlaskConical,    label: "Backtester",           path: "/backtester",          group: "Backtesting",color: "#6366f1" },
+  { icon: Calculator,      label: "Position Sizer",       path: "/position-sizer",      group: "Backtesting",color: "#3b82f6" },
+
+  // Data
+  { icon: Zap,             label: "Options Flow",         path: "/options-flow",        group: "Data",       color: "#f59e0b" },
+  { icon: Database,        label: "COT Dashboard",        path: "/cot-dashboard",       group: "Data",       color: "#6366f1" },
+  { icon: HardDrive,       label: "Historical Data",      path: "/historical-data",     group: "Data",       color: "#3b82f6" },
+  { icon: Building2,       label: "Broker Settings",      path: "/broker-settings",     group: "Data",       color: "#6b7280" },
+  { icon: HelpCircle,      label: "Methodology",          path: "/methodology",         group: "Data",       color: "#6b7280" },
+  { icon: HelpCircle,      label: "Glossary",             path: "/glossary",            group: "Data",       color: "#6b7280" },
+];
+
+const GROUPS = ["Analysis", "Strategies", "Alerts", "Execution", "Playbook", "Backtesting", "Data"];
 
 // Map action key → Lucide icon component
 const ACTION_ICONS: Record<string, React.ElementType> = {
@@ -23,6 +106,189 @@ const ACTION_ICONS: Record<string, React.ElementType> = {
   "glossary": BookOpen,
   "pit-advisor": MessageSquare,
 };
+
+// ─── Top Nav Bar ──────────────────────────────────────────────────────────────
+
+function TopNavBar() {
+  const [, navigate] = useLocation();
+  const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const quickLinks = [
+    { label: "Dashboard",    path: "/dashboard" },
+    { label: "Playbook",     path: "/sri-playbook" },
+    { label: "PCR",          path: "/pcr-dashboard" },
+    { label: "Velez",        path: "/velez-scanner" },
+    { label: "Intraday",     path: "/intraday-scanner" },
+    { label: "Pit Advisor",  path: "/pit-advisor" },
+    { label: "Trade Log",    path: "/trade-log" },
+  ];
+
+  return (
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-border/60 shadow-sm">
+      <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">
+        {/* Logo */}
+        <button
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          onClick={() => navigate("/")}
+        >
+          <PitDeskLogo size={28} />
+          <span className="font-bold text-sm text-foreground">PitDesk</span>
+        </button>
+
+        {/* Quick links — desktop */}
+        <div className="hidden md:flex items-center gap-0.5">
+          {quickLinks.map(link => (
+            <button
+              key={link.path}
+              onClick={() => navigate(link.path)}
+              className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-md transition-all duration-150"
+            >
+              {link.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Right side */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            All Tools
+            <ChevronRight className="h-3 w-3" />
+          </button>
+
+          {/* Mobile menu toggle */}
+          <button
+            className="md:hidden p-1.5 rounded-md hover:bg-muted/60 transition-colors"
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
+            {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
+
+          {/* User avatar */}
+          {user && (
+            <div className="relative group">
+              <button className="w-7 h-7 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center hover:bg-green-200 transition-colors">
+                {user.name?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) ?? "SA"}
+              </button>
+              <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-border rounded-xl shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50">
+                <div className="px-3 py-2 border-b border-border/60">
+                  <div className="text-xs font-semibold truncate">{user.name}</div>
+                  <div className="text-[10px] text-muted-foreground truncate">{user.email}</div>
+                </div>
+                <button
+                  onClick={() => navigate("/profile")}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-muted/60 transition-colors"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  Account Settings
+                </button>
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile dropdown */}
+      {menuOpen && (
+        <div className="md:hidden border-t border-border/60 bg-white/95 backdrop-blur-md px-4 py-3">
+          <div className="grid grid-cols-2 gap-1">
+            {quickLinks.map(link => (
+              <button
+                key={link.path}
+                onClick={() => { navigate(link.path); setMenuOpen(false); }}
+                className="px-3 py-2 text-xs font-medium text-left text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-md transition-all"
+              >
+                {link.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+}
+
+// ─── Quick Access Grid ────────────────────────────────────────────────────────
+
+function QuickAccessGrid() {
+  const [, navigate] = useLocation();
+  const [activeGroup, setActiveGroup] = useState<string>("All");
+
+  const filtered = activeGroup === "All"
+    ? ALL_FEATURES
+    : ALL_FEATURES.filter(f => f.group === activeGroup);
+
+  return (
+    <div className="w-full max-w-5xl mt-10">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-semibold text-foreground/80 uppercase tracking-wider">All Tools</h2>
+        <span className="text-xs text-muted-foreground">{ALL_FEATURES.length} features</span>
+      </div>
+
+      {/* Group filter pills */}
+      <div className="flex items-center gap-1.5 flex-wrap mb-4">
+        {["All", ...GROUPS].map(g => (
+          <button
+            key={g}
+            onClick={() => setActiveGroup(g)}
+            className={`px-2.5 py-1 text-[10px] font-semibold rounded-full border transition-all duration-150 ${
+              activeGroup === g
+                ? "bg-green-600 text-white border-green-600"
+                : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+            }`}
+          >
+            {g}
+          </button>
+        ))}
+      </div>
+
+      {/* Feature grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+        {filtered.map(feature => {
+          const Icon = feature.icon;
+          return (
+            <button
+              key={feature.path}
+              onClick={() => navigate(feature.path)}
+              className="group flex flex-col items-start gap-2 p-3 rounded-xl border border-border/60 bg-white hover:border-border hover:shadow-sm transition-all duration-150 text-left"
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = feature.color + "60";
+                (e.currentTarget as HTMLElement).style.background = feature.color + "08";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = "";
+                (e.currentTarget as HTMLElement).style.background = "";
+              }}
+            >
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-150 group-hover:scale-110"
+                style={{ background: feature.color + "18" }}
+              >
+                <Icon className="h-3.5 w-3.5" style={{ color: feature.color }} />
+              </div>
+              <div>
+                <div className="text-xs font-medium text-foreground leading-tight">{feature.label}</div>
+                <div className="text-[10px] text-muted-foreground/70 mt-0.5">{feature.group}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const { user } = useAuth();
@@ -57,170 +323,156 @@ export default function Home() {
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
-      style={{ background: "var(--background)" }}
-    >
-      {/* ── Brand header ─────────────────────────────────────────────── */}
-      <div className="flex flex-col items-center mb-10 select-none">
-        {/* Real PitDesk logo */}
-        <div className="mb-4">
-          <PitDeskLogo size={56} className="rounded-2xl shadow-lg" />
-        </div>
-        <h1
-          className="text-3xl font-bold tracking-tight"
-          style={{ color: "var(--foreground)" }}
-        >
-          PitDesk
-        </h1>
-        <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>
-          {greeting}, {firstName} — what do you want to do today?
-        </p>
-      </div>
+    <>
+      {/* Persistent top nav */}
+      <TopNavBar />
 
-      {/* ── 6 Action Cards (from ROUTES.HOME_ACTIONS) ────────────────── */}
-      <div className="w-full max-w-3xl grid grid-cols-1 gap-3">
-        {HOME_ACTIONS.map((action, i) => {
-          const Icon = ACTION_ICONS[action.key] ?? BarChart2;
-          const accentBg = action.color + "14";
-          const accentBorder = action.color + "40";
-          return (
-            <button
-              key={action.key}
-              onClick={() => navigate(action.path)}
-              className="group w-full text-left rounded-2xl border transition-all duration-200"
-              style={{
-                background: accentBg,
-                borderColor: accentBorder,
-                animationDelay: `${i * 60}ms`,
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 32px ${action.color}22`;
-                (e.currentTarget as HTMLElement).style.borderColor = action.color;
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-                (e.currentTarget as HTMLElement).style.boxShadow = "none";
-                (e.currentTarget as HTMLElement).style.borderColor = accentBorder;
-              }}
-              onMouseDown={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "scale(0.99)";
-              }}
-              onMouseUp={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-              }}
-            >
-              <div className="flex items-center gap-5 px-6 py-5">
-                {/* Number badge */}
-                <span
-                  className="text-xs font-mono font-bold opacity-30 w-6 shrink-0"
-                  style={{ color: action.color }}
-                >
-                  {action.number}
-                </span>
-
-                {/* Icon */}
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
-                  style={{ background: action.color + "22" }}
-                >
-                  <Icon className="w-5 h-5" style={{ color: action.color }} />
-                </div>
-
-                {/* Text */}
-                <div className="flex-1 min-w-0">
-                  <div
-                    className="font-semibold text-base leading-tight"
-                    style={{ color: "var(--foreground)" }}
-                  >
-                    {action.label}
-                  </div>
-                  <div
-                    className="text-sm mt-0.5 leading-snug"
-                    style={{ color: "var(--muted-foreground)" }}
-                  >
-                    {action.description}
-                  </div>
-                </div>
-
-                {/* Arrow */}
-                <svg
-                  className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-1"
-                  style={{ color: action.color }}
-                  fill="none"
-                  viewBox="0 0 16 16"
-                >
-                  <path
-                    d="M3 8h10M9 4l4 4-4 4"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── This Week's Earnings ──────────────────────────────────── */}
-      {thisWeekEarnings.length > 0 && (
-        <div className="w-full max-w-3xl mt-6">
-          <div className="flex items-center gap-2 mb-3">
-            <CalendarDays className="w-4 h-4" style={{ color: "#f59e0b" }} />
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#f59e0b" }}>
-              Earnings This Week — Your Watchlist
-            </span>
+      <div
+        className="min-h-screen flex flex-col items-center px-4 pt-20 pb-16"
+        style={{ background: "var(--background)" }}
+      >
+        {/* ── Brand header ─────────────────────────────────────────────── */}
+        <div className="flex flex-col items-center mb-8 select-none mt-6">
+          <div className="mb-4">
+            <PitDeskLogo size={56} className="rounded-2xl shadow-lg" />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {thisWeekEarnings.map((r: { ticker: string; daysToEarnings: number | null }) => (
+          <h1
+            className="text-3xl font-bold tracking-tight"
+            style={{ color: "var(--foreground)" }}
+          >
+            PitDesk
+          </h1>
+          <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>
+            {greeting}, {firstName} — what do you want to do today?
+          </p>
+        </div>
+
+        {/* ── 6 Action Cards ────────────────── */}
+        <div className="w-full max-w-3xl grid grid-cols-1 gap-3">
+          {HOME_ACTIONS.map((action, i) => {
+            const Icon = ACTION_ICONS[action.key] ?? BarChart2;
+            const accentBg = action.color + "14";
+            const accentBorder = action.color + "40";
+            return (
               <button
-                key={r.ticker}
-                onClick={() => navigate(`${ROUTES.TICKER_ANALYSIS}?ticker=${r.ticker}`)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm font-medium transition-all duration-150 hover:scale-105 active:scale-95"
+                key={action.key}
+                onClick={() => navigate(action.path)}
+                className="group w-full text-left rounded-2xl border transition-all duration-200"
                 style={{
-                  background: r.daysToEarnings != null && r.daysToEarnings <= 2
-                    ? "rgba(239,68,68,0.10)"
-                    : r.daysToEarnings != null && r.daysToEarnings <= 4
-                    ? "rgba(249,115,22,0.10)"
-                    : "rgba(245,158,11,0.10)",
-                  borderColor: r.daysToEarnings != null && r.daysToEarnings <= 2
-                    ? "rgba(239,68,68,0.35)"
-                    : r.daysToEarnings != null && r.daysToEarnings <= 4
-                    ? "rgba(249,115,22,0.35)"
-                    : "rgba(245,158,11,0.35)",
-                  color: r.daysToEarnings != null && r.daysToEarnings <= 2
-                    ? "#dc2626"
-                    : r.daysToEarnings != null && r.daysToEarnings <= 4
-                    ? "#ea580c"
-                    : "#b45309",
+                  background: accentBg,
+                  borderColor: accentBorder,
+                  animationDelay: `${i * 60}ms`,
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+                  (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 32px ${action.color}22`;
+                  (e.currentTarget as HTMLElement).style.borderColor = action.color;
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                  (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                  (e.currentTarget as HTMLElement).style.borderColor = accentBorder;
+                }}
+                onMouseDown={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = "scale(0.99)";
+                }}
+                onMouseUp={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
                 }}
               >
-                <span className="font-bold">{r.ticker}</span>
-                <span className="opacity-70 text-xs">
-                  {r.daysToEarnings === 0 ? "today" : r.daysToEarnings === 1 ? "tomorrow" : `in ${r.daysToEarnings}d`}
-                </span>
+                <div className="flex items-center gap-5 px-6 py-5">
+                  <span
+                    className="text-xs font-mono font-bold opacity-30 w-6 shrink-0"
+                    style={{ color: action.color }}
+                  >
+                    {action.number}
+                  </span>
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
+                    style={{ background: action.color + "22" }}
+                  >
+                    <Icon className="w-5 h-5" style={{ color: action.color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className="font-semibold text-base leading-tight"
+                      style={{ color: "var(--foreground)" }}
+                    >
+                      {action.label}
+                    </div>
+                    <div
+                      className="text-sm mt-0.5 leading-snug"
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
+                      {action.description}
+                    </div>
+                  </div>
+                  <svg
+                    className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-1"
+                    style={{ color: action.color }}
+                    fill="none"
+                    viewBox="0 0 16 16"
+                  >
+                    <path
+                      d="M3 8h10M9 4l4 4-4 4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      )}
 
-      {/* ── Footer hint ──────────────────────────────────────────────── */}
-      <p
-        className="mt-10 text-xs text-center"
-        style={{ color: "var(--muted-foreground)", opacity: 0.5 }}
-      >
-        All power tools available at{" "}
-        <button
-          className="underline hover:opacity-80 transition-opacity"
-          onClick={() => navigate(ROUTES.DASHBOARD)}
-        >
-          /dashboard
-        </button>
-      </p>
-    </div>
+        {/* ── This Week's Earnings ──────────────────────────────────── */}
+        {thisWeekEarnings.length > 0 && (
+          <div className="w-full max-w-3xl mt-6">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarDays className="w-4 h-4" style={{ color: "#f59e0b" }} />
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#f59e0b" }}>
+                Earnings This Week — Your Watchlist
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {thisWeekEarnings.map((r: { ticker: string; daysToEarnings: number | null }) => (
+                <button
+                  key={r.ticker}
+                  onClick={() => navigate(`${ROUTES.TICKER_ANALYSIS}?ticker=${r.ticker}`)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm font-medium transition-all duration-150 hover:scale-105 active:scale-95"
+                  style={{
+                    background: r.daysToEarnings != null && r.daysToEarnings <= 2
+                      ? "rgba(239,68,68,0.10)"
+                      : r.daysToEarnings != null && r.daysToEarnings <= 4
+                      ? "rgba(249,115,22,0.10)"
+                      : "rgba(245,158,11,0.10)",
+                    borderColor: r.daysToEarnings != null && r.daysToEarnings <= 2
+                      ? "rgba(239,68,68,0.35)"
+                      : r.daysToEarnings != null && r.daysToEarnings <= 4
+                      ? "rgba(249,115,22,0.35)"
+                      : "rgba(245,158,11,0.35)",
+                    color: r.daysToEarnings != null && r.daysToEarnings <= 2
+                      ? "#dc2626"
+                      : r.daysToEarnings != null && r.daysToEarnings <= 4
+                      ? "#ea580c"
+                      : "#b45309",
+                  }}
+                >
+                  <span className="font-bold">{r.ticker}</span>
+                  <span className="opacity-70 text-xs">
+                    {r.daysToEarnings === 0 ? "today" : r.daysToEarnings === 1 ? "tomorrow" : `in ${r.daysToEarnings}d`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Full Quick Access Grid ──────────────────────────────────── */}
+        <QuickAccessGrid />
+      </div>
+    </>
   );
 }

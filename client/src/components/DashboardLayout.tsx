@@ -98,6 +98,7 @@ const NAV_SECTIONS = [
       { icon: Activity, label: "Intraday Scanner", path: "/intraday-scanner" },
       { icon: Zap, label: "Catalyst Watch", path: "/catalyst-watch" },
       { icon: TrendingDown, label: "ICT Supply Zone", path: "/ict-supply-zone" },
+      { icon: TrendingUp, label: "EMA Pullback", path: "/ema-pullback" },
       { icon: Target, label: "Opening Range Scalper", path: "/velez-scanner?tab=ors" },
     ],
   },

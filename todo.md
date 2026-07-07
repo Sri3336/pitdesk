@@ -528,3 +528,12 @@
 - [x] Progress bar shows drawdown/gain vs month-start (red warning if down, green if up)
 - [x] Progress bar footer shows "(fixed)" vs "(live)" to indicate target type
 - [x] Backfill July 2026 existing snapshots with locked baseline from earliest July snapshot
+
+## Phase 42 — EMA Pullback Scanner + Landing Page Nav
+- [x] Build emaPullback.ts server router (200/50 EMA + RSI + reversal candle + options bias)
+- [x] Register emaPullbackRouter in routers.ts
+- [x] Add EMA Pullback nav item to DashboardLayout sidebar (Strategies section)
+- [x] Add /ema-pullback route to App.tsx
+- [x] Build EMAPullbackScanner.tsx UI page (signal cards, trade math, options bias)
+- [x] Add persistent TopNavBar to Home.tsx with quick links to 7 most-used tools
+- [x] Add QuickAccessGrid to Home.tsx (all 36 features, filterable by group)
