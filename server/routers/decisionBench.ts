@@ -76,6 +76,20 @@ export interface WatchlistItem {
   updatedAt: number;
 }
 
+export interface TradeSetupSpecifics {
+  strategy: string;
+  expiry: string | null;
+  atmStrike: number | null;
+  shortStrike: number | null;       // suggested short strike (naked put / IC lower wing)
+  longStrike: number | null;        // hedge strike (IC only)
+  estimatedCredit: number | null;   // mid-price credit per share
+  breakeven: number | null;         // breakeven price at expiry
+  maxLoss: number | null;           // max loss per contract (in $)
+  targetDelta: number | null;       // delta of short strike
+  ivUsed: number | null;            // IV% used for estimate
+  note: string;                     // plain-English setup note
+}
+
 export interface MorningScanResult {
   ticker: string;
   sector: string;
@@ -89,6 +103,7 @@ export interface MorningScanResult {
   entryWindow: string;
   tradeRationale: string;
   score: number;
+  tradeSetup: TradeSetupSpecifics | null;
 }
 
 export interface PreTradeGateResult {
@@ -170,6 +185,130 @@ function signalStrength(score: number): "STRONG" | "MODERATE" | "WATCH" | "NONE"
   if (score >= 50) return "MODERATE";
   if (score >= 30) return "WATCH";
   return "NONE";
+}
+
+// ─── Trade Setup Specifics builder ─────────────────────────────────────────────
+import type { TradierOptionContract, TradierOptionsChain } from "../tradierClient";
+
+function buildTradeSetup(
+  ivRank: number | null,
+  dayChangePct: number | null,
+  price: number | null,
+  chain: TradierOptionsChain | null,
+): TradeSetupSpecifics | null {
+  if (!price || !chain) return null;
+
+  const { expiration, atmStrike, puts, calls } = chain;
+  const ivVal = chain.puts[0]?.greeks?.mid_iv ?? chain.calls[0]?.greeks?.mid_iv ?? null;
+  const ivPct = ivVal ? Math.round(ivVal * 100) : null;
+
+  // ── Naked Put (IVR >= 50, neutral/bullish) ─────────────────────────────────
+  if (ivRank !== null && ivRank >= 50) {
+    // Find short put ~10% OTM or nearest to 0.30 delta
+    const targetStrike = price * 0.90;
+    const candidatePuts = puts
+      .filter(p => p.strike <= atmStrike && p.bid > 0)
+      .sort((a, b) => Math.abs(a.strike - targetStrike) - Math.abs(b.strike - targetStrike));
+    const shortPut = candidatePuts[0] ?? null;
+    if (!shortPut) return null;
+
+    const credit = shortPut.bid > 0 ? parseFloat(((shortPut.bid + shortPut.ask) / 2).toFixed(2)) : null;
+    const breakeven = credit ? parseFloat((shortPut.strike - credit).toFixed(2)) : null;
+    const maxLoss = shortPut.strike ? parseFloat(((shortPut.strike - (credit ?? 0)) * 100).toFixed(0)) : null;
+    const delta = shortPut.greeks?.delta ? Math.abs(shortPut.greeks.delta) : null;
+
+    return {
+      strategy: "Naked Put",
+      expiry: expiration,
+      atmStrike,
+      shortStrike: shortPut.strike,
+      longStrike: null,
+      estimatedCredit: credit,
+      breakeven,
+      maxLoss,
+      targetDelta: delta ? parseFloat(delta.toFixed(2)) : null,
+      ivUsed: ivPct,
+      note: `Sell ${expiration} $${shortPut.strike}P${credit ? ` for ~$${credit} credit` : ""}. Breakeven: $${breakeven ?? "N/A"}. Max loss if assigned: $${maxLoss ?? "N/A"}.`,
+    };
+  }
+
+  // ── Iron Condor (IVR 35-49, range-bound) ──────────────────────────────────
+  if (ivRank !== null && ivRank >= 35) {
+    // Short put ~8% OTM, long put ~12% OTM; short call ~8% OTM, long call ~12% OTM
+    const shortPutTarget = price * 0.92;
+    const longPutTarget  = price * 0.88;
+    const shortCallTarget = price * 1.08;
+    const longCallTarget  = price * 1.12;
+
+    const shortPut  = puts.filter(p => p.strike <= atmStrike && p.bid > 0)
+      .sort((a, b) => Math.abs(a.strike - shortPutTarget) - Math.abs(b.strike - shortPutTarget))[0];
+    const longPut   = puts.filter(p => p.strike < (shortPut?.strike ?? 0) && p.ask > 0)
+      .sort((a, b) => Math.abs(a.strike - longPutTarget) - Math.abs(b.strike - longPutTarget))[0];
+    const shortCall = calls.filter(c => c.strike > atmStrike && c.bid > 0)
+      .sort((a, b) => Math.abs(a.strike - shortCallTarget) - Math.abs(b.strike - shortCallTarget))[0];
+    const longCall  = calls.filter(c => c.strike > (shortCall?.strike ?? 0) && c.ask > 0)
+      .sort((a, b) => Math.abs(a.strike - longCallTarget) - Math.abs(b.strike - longCallTarget))[0];
+
+    if (!shortPut || !shortCall) return null;
+
+    const putCredit  = shortPut.bid > 0 ? (shortPut.bid + shortPut.ask) / 2 : 0;
+    const putDebit   = longPut ? (longPut.bid + longPut.ask) / 2 : 0;
+    const callCredit = shortCall.bid > 0 ? (shortCall.bid + shortCall.ask) / 2 : 0;
+    const callDebit  = longCall ? (longCall.bid + longCall.ask) / 2 : 0;
+    const netCredit  = parseFloat((putCredit - putDebit + callCredit - callDebit).toFixed(2));
+    const wingWidth  = shortPut.strike - (longPut?.strike ?? shortPut.strike - 5);
+    const maxLoss    = parseFloat(((wingWidth - netCredit) * 100).toFixed(0));
+    const putBE      = parseFloat((shortPut.strike - netCredit).toFixed(2));
+    const callBE     = parseFloat(((shortCall?.strike ?? price * 1.08) + netCredit).toFixed(2));
+
+    return {
+      strategy: "Iron Condor",
+      expiry: expiration,
+      atmStrike,
+      shortStrike: shortPut.strike,
+      longStrike: longPut?.strike ?? null,
+      estimatedCredit: netCredit > 0 ? netCredit : null,
+      breakeven: putBE,
+      maxLoss,
+      targetDelta: shortPut.greeks?.delta ? parseFloat(Math.abs(shortPut.greeks.delta).toFixed(2)) : null,
+      ivUsed: ivPct,
+      note: `Iron Condor ${expiration}: Sell $${shortPut.strike}P/$${shortCall?.strike ?? "?"}C, Buy $${longPut?.strike ?? "?"}P/$${longCall?.strike ?? "?"}C. Net credit ~$${netCredit > 0 ? netCredit : "?"}/share. BE: $${putBE}–$${callBE}.`,
+    };
+  }
+
+  // ── Credit Spread (IVR 20-34, directional lean) ───────────────────────────
+  if (ivRank !== null && ivRank >= 20) {
+    // Bull put spread: sell ATM-1 put, buy ATM-2 put
+    const shortPut = puts.filter(p => p.strike < atmStrike && p.bid > 0)
+      .sort((a, b) => b.strike - a.strike)[0];
+    const longPut  = puts.filter(p => p.strike < (shortPut?.strike ?? 0) && p.ask > 0)
+      .sort((a, b) => b.strike - a.strike)[0];
+
+    if (!shortPut) return null;
+
+    const credit   = shortPut.bid > 0 ? parseFloat(((shortPut.bid + shortPut.ask) / 2).toFixed(2)) : null;
+    const debit    = longPut ? parseFloat(((longPut.bid + longPut.ask) / 2).toFixed(2)) : 0;
+    const netCred  = credit !== null ? parseFloat((credit - debit).toFixed(2)) : null;
+    const width    = shortPut.strike - (longPut?.strike ?? shortPut.strike - 5);
+    const maxLoss  = netCred !== null ? parseFloat(((width - netCred) * 100).toFixed(0)) : null;
+    const breakeven = netCred !== null ? parseFloat((shortPut.strike - netCred).toFixed(2)) : null;
+
+    return {
+      strategy: "Bull Put Spread",
+      expiry: expiration,
+      atmStrike,
+      shortStrike: shortPut.strike,
+      longStrike: longPut?.strike ?? null,
+      estimatedCredit: netCred,
+      breakeven,
+      maxLoss,
+      targetDelta: shortPut.greeks?.delta ? parseFloat(Math.abs(shortPut.greeks.delta).toFixed(2)) : null,
+      ivUsed: ivPct,
+      note: `Bull Put Spread ${expiration}: Sell $${shortPut.strike}P / Buy $${longPut?.strike ?? "?"}P. Net credit ~$${netCred ?? "?"}/share. Breakeven: $${breakeven ?? "N/A"}.`,
+    };
+  }
+
+  return null;
 }
 
 // ─── EMA helper (simple, from close prices) ───────────────────────────────────
@@ -378,14 +517,15 @@ export const decisionBenchRouter = router({
             const price = quote?.last ?? null;
             const dayChangePct = quote?.change_percentage ?? null;
 
-            // Get ATM IV
+            // Get ATM IV + keep chain for trade setup builder
             let ivRank: number | null = null;
             let ivVal: number | null = null;
+            let atmChain: import("../tradierClient").TradierOptionsChain | null = null;
             if (price) {
-              const chain = await getTradierAtmChain(ticker, price);
+              atmChain = await getTradierAtmChain(ticker, price);
               const atmContracts = [
-                ...(chain?.calls ?? []),
-                ...(chain?.puts ?? []),
+                ...(atmChain?.calls ?? []),
+                ...(atmChain?.puts ?? []),
               ].filter(c => c.greeks?.mid_iv && c.greeks.mid_iv > 0);
               if (atmContracts.length > 0) {
                 const sum = atmContracts.reduce((acc, c) => acc + (c.greeks?.mid_iv ?? 0), 0);
@@ -431,6 +571,7 @@ export const decisionBenchRouter = router({
             const recommendedStrategy = pickStrategy(ivRank, dayChangePct);
             const score = scoreSetup(ivRank, dayChangePct, signals);
             const strength = signalStrength(score);
+            const tradeSetup = buildTradeSetup(ivRank, dayChangePct, price, atmChain);
 
             return {
               ticker,
@@ -445,6 +586,7 @@ export const decisionBenchRouter = router({
               entryWindow: "10:00–11:00 AM ET",
               tradeRationale: signals.length > 0 ? signals[0] : "No clear signal — skip today",
               score,
+              tradeSetup,
             } satisfies MorningScanResult;
           } catch {
             return {
@@ -460,6 +602,7 @@ export const decisionBenchRouter = router({
               entryWindow: "10:00–11:00 AM ET",
               tradeRationale: "Could not fetch data",
               score: 0,
+              tradeSetup: null,
             } satisfies MorningScanResult;
           }
         })

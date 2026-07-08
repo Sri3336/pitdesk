@@ -49,6 +49,20 @@ interface WatchlistItem {
   sortOrder: number;
 }
 
+interface TradeSetupSpecifics {
+  strategy: string;
+  expiry: string | null;
+  atmStrike: number | null;
+  shortStrike: number | null;
+  longStrike: number | null;
+  estimatedCredit: number | null;
+  breakeven: number | null;
+  maxLoss: number | null;
+  targetDelta: number | null;
+  ivUsed: number | null;
+  note: string;
+}
+
 interface MorningScanResult {
   ticker: string;
   sector: string;
@@ -62,6 +76,7 @@ interface MorningScanResult {
   entryWindow: string;
   tradeRationale: string;
   score: number;
+  tradeSetup: TradeSetupSpecifics | null;
 }
 
 interface GateResult {
@@ -439,17 +454,76 @@ function ScanResultCard({ setup, rank, isTop }: { setup: MorningScanResult; rank
 
         {/* Expanded details */}
         {expanded && (
-          <div className="mt-3 pt-3 border-t border-border space-y-2">
+          <div className="mt-3 pt-3 border-t border-border space-y-3">
+            {/* Strategy + Entry Window */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
                 <span className="text-muted-foreground">Recommended Strategy</span>
-                <p className="font-medium mt-0.5">{setup.recommendedStrategy}</p>
+                <p className="font-semibold mt-0.5">{setup.recommendedStrategy}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Entry Window</span>
                 <p className="font-medium mt-0.5">{setup.entryWindow}</p>
               </div>
             </div>
+
+            {/* Trade Setup Specifics */}
+            {setup.tradeSetup && (
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-3.5 h-3.5 text-green-700" />
+                  <span className="text-xs font-semibold text-green-800">Trade Setup — {setup.tradeSetup.strategy}</span>
+                  {setup.tradeSetup.expiry && (
+                    <Badge variant="outline" className="text-xs border-green-300 text-green-700 ml-auto">
+                      {setup.tradeSetup.expiry}
+                    </Badge>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">Short Strike</span>
+                    <p className="font-bold text-sm mt-0.5">
+                      {setup.tradeSetup.shortStrike ? `$${setup.tradeSetup.shortStrike}` : "—"}
+                    </p>
+                  </div>
+                  {setup.tradeSetup.longStrike && (
+                    <div>
+                      <span className="text-muted-foreground">Long Strike</span>
+                      <p className="font-bold text-sm mt-0.5">${setup.tradeSetup.longStrike}</p>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-muted-foreground">Est. Credit</span>
+                    <p className="font-bold text-sm mt-0.5 text-green-700">
+                      {setup.tradeSetup.estimatedCredit ? `$${setup.tradeSetup.estimatedCredit}` : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Breakeven</span>
+                    <p className="font-bold text-sm mt-0.5">
+                      {setup.tradeSetup.breakeven ? `$${setup.tradeSetup.breakeven}` : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Max Loss</span>
+                    <p className="font-bold text-sm mt-0.5 text-red-600">
+                      {setup.tradeSetup.maxLoss ? `$${setup.tradeSetup.maxLoss.toLocaleString()}` : "—"}
+                    </p>
+                  </div>
+                  {setup.tradeSetup.targetDelta && (
+                    <div>
+                      <span className="text-muted-foreground">Delta</span>
+                      <p className="font-bold text-sm mt-0.5">{setup.tradeSetup.targetDelta}</p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-green-800 italic border-t border-green-200 pt-2 mt-1">
+                  {setup.tradeSetup.note}
+                </p>
+              </div>
+            )}
+
+            {/* Signals */}
             {setup.signals.length > 0 && (
               <div>
                 <span className="text-xs text-muted-foreground">Signals</span>
