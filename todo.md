@@ -565,3 +565,16 @@
 - [x] Single-ticker manual builder with expiry selector
 - [x] Sidebar nav entry + App.tsx route
 - [x] TypeScript clean, 45 tests passing
+
+## Phase 45 — Decision Bench (Two-Stage Pre-Trade Workflow)
+- [x] DB schema: decision_bench_watchlist + trade_voice_journal tables, migration applied
+- [x] Server router: decisionBench.ts with 10 procedures (getWatchlist, seedDefaultWatchlist, addTicker, removeTicker, checkSectorConcentration, runMorningScan, runPreTradeGate, uploadAudioAndTranscribe, saveVoiceJournal, getVoiceJournals)
+- [x] 20-ticker default watchlist seeded across 8 sectors (Memory/Storage, Semiconductors, AI Servers, AdTech/Mobile, Cloud/Software, Financials, Healthcare/Biotech, High Volatility)
+- [x] Morning Scan: scans all watchlist tickers, fetches IV rank + price + EMA trend, ranks by score, returns top 3 setups
+- [x] Pre-Trade Gate: 5-gate check (Market Context, Technical Setup, IV/Catalyst, Strategy Math, Playbook Rules) → GO / WAIT / NO-GO verdict
+- [x] DecisionBench.tsx UI: 3 tabs (Watchlist Manager, Morning Scan, Pre-Trade Gate)
+- [x] Sector concentration alert wired into SriPlaybook AddPositionDialog
+- [x] Voice Journal tab added to SriPlaybook: MediaRecorder recording, Whisper transcription, AI rationale/risk extraction, journal history
+- [x] Sidebar nav entry (Crosshair icon) + App.tsx route /decision-bench
+- [x] 11 unit tests for EMA helper, gate verdict logic, sector concentration (56 total passing)
+- [x] TypeScript clean (0 errors)

@@ -160,6 +160,12 @@ function AddPositionDialog({ onAdded }: { onAdded: () => void }) {
 
   const accountLabel = ACCOUNTS.find(a => a.id === form.accountId)?.label ?? form.accountId;
 
+  // Sector concentration check
+  const sectorCheck = trpc.decisionBench.checkSectorConcentration.useQuery(
+    { ticker: form.ticker },
+    { enabled: open && form.ticker.length >= 1 },
+  );
+
   function handleSubmit() {
     if (!form.expiry || !form.creditCollected || !form.contracts) {
       toast.error("Fill in expiry, credit, and contracts");
@@ -193,6 +199,13 @@ function AddPositionDialog({ onAdded }: { onAdded: () => void }) {
         <DialogHeader>
           <DialogTitle>Add Position to Playbook</DialogTitle>
         </DialogHeader>
+        {/* Sector concentration warning */}
+        {sectorCheck.data?.warning && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded-md px-3 py-2 text-sm text-amber-800">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+            <span>{sectorCheck.data.message}</span>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3 mt-2">
           <div>
             <Label>Account</Label>
@@ -880,6 +893,10 @@ export default function SriPlaybook() {
             <Sparkles className="w-4 h-4 mr-1" />
             Weekly Picks
           </TabsTrigger>
+          <TabsTrigger value="voice-journal">
+            <Activity className="w-4 h-4 mr-1" />
+            Voice Journal
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Open Positions Tab ── */}
@@ -1511,6 +1528,11 @@ export default function SriPlaybook() {
         {/* ── Weekly Picks Tab ── */}
         <TabsContent value="weekly-picks" className="mt-4">
           <WeeklyPicksTab />
+        </TabsContent>
+
+        {/* ── Voice Journal Tab ── */}
+        <TabsContent value="voice-journal" className="mt-4">
+          <VoiceJournalTab />
         </TabsContent>
       </Tabs>
 
@@ -2342,5 +2364,330 @@ export function TradeAnalysisModal({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── Voice Trade Journal Tab ──────────────────────────────────────────────────
+
+function VoiceJournalTab() {
+  const [ticker, setTicker] = React.useState("");
+  const [strategy, setStrategy] = React.useState("");
+  const [manualNote, setManualNote] = React.useState("");
+  const [entryPrice, setEntryPrice] = React.useState("");
+  const [isRecording, setIsRecording] = React.useState(false);
+  const [audioBlob, setAudioBlob] = React.useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = React.useState<string | null>(null);
+  const [lastResult, setLastResult] = React.useState<{
+    transcript: string;
+    aiRationale: string;
+    aiRisksIdentified: string;
+    aiSentiment: string;
+  } | null>(null);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const chunksRef = React.useRef<Blob[]>([]);
+
+  const utils = trpc.useUtils();
+
+  const { data: journals, isLoading: journalsLoading } = trpc.decisionBench.getVoiceJournals.useQuery(
+    { limit: 20 },
+  );
+
+  const transcribeMutation = trpc.decisionBench.uploadAudioAndTranscribe.useMutation({
+    onSuccess: (data: { transcript: string; aiRationale: string; aiRisksIdentified: string; aiSentiment: string; audioUrl: string }) => {
+      setLastResult({
+        transcript: data.transcript,
+        aiRationale: data.aiRationale,
+        aiRisksIdentified: data.aiRisksIdentified,
+        aiSentiment: data.aiSentiment,
+      });
+      utils.decisionBench.getVoiceJournals.invalidate();
+      toast.success("Voice note transcribed and saved!");
+      setAudioBlob(null);
+      setAudioUrl(null);
+      setTicker("");
+      setStrategy("");
+      setManualNote("");
+      setEntryPrice("");
+    },
+    onError: (e: { message: string }) => toast.error(`Transcription failed: ${e.message}`),
+  });
+
+  const saveTextMutation = trpc.decisionBench.saveVoiceJournal.useMutation({
+    onSuccess: () => {
+      utils.decisionBench.getVoiceJournals.invalidate();
+      toast.success("Journal entry saved!");
+      setManualNote("");
+      setTicker("");
+      setStrategy("");
+      setEntryPrice("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setAudioBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setIsRecording(true);
+    } catch (err) {
+      toast.error("Microphone access denied. Please allow mic access in your browser.");
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  }
+
+  async function submitVoice() {
+    if (!audioBlob) return;
+    if (!ticker.trim()) { toast.error("Enter a ticker"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      transcribeMutation.mutate({
+        audioDataUrl: dataUrl,
+        ticker: ticker.toUpperCase(),
+        strategy: strategy || undefined,
+        entryPrice: entryPrice ? parseFloat(entryPrice) : undefined,
+      });
+    };
+    reader.readAsDataURL(audioBlob);
+  }
+
+  function submitText() {
+    if (!ticker.trim()) { toast.error("Enter a ticker"); return; }
+    if (!manualNote.trim()) { toast.error("Enter a note"); return; }
+    saveTextMutation.mutate({
+      ticker: ticker.toUpperCase(),
+      strategy: strategy || undefined,
+      manualNote: manualNote,
+      entryPrice: entryPrice ? parseFloat(entryPrice) : undefined,
+    });
+  }
+
+  const sentimentColor = (s: string) => {
+    if (s === "confident") return "bg-green-100 text-green-800 border-green-200";
+    if (s === "hedged") return "bg-blue-100 text-blue-800 border-blue-200";
+    return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  };
+
+  return (
+    <div className="space-y-5 max-w-3xl">
+      {/* Record / Type form */}
+      <Card className="border border-border">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Activity className="w-4 h-4 text-green-600" />
+            New Voice Journal Entry
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Ticker + strategy + price */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label className="text-xs">Ticker</Label>
+              <Input
+                placeholder="e.g. WDC"
+                value={ticker}
+                onChange={e => setTicker(e.target.value.toUpperCase())}
+                className="uppercase mt-1"
+                maxLength={10}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Strategy</Label>
+              <Select value={strategy} onValueChange={setStrategy}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Optional" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STRATEGIES.map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Entry Price (optional)</Label>
+              <Input
+                placeholder="e.g. 42.50"
+                value={entryPrice}
+                onChange={e => setEntryPrice(e.target.value)}
+                type="number"
+                step="0.01"
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          {/* Voice recording */}
+          <div className="border border-dashed border-green-300 rounded-lg p-4 space-y-3 bg-green-50/20">
+            <div className="flex items-center gap-3">
+              {!isRecording && !audioBlob && (
+                <Button
+                  onClick={startRecording}
+                  className="bg-red-500 hover:bg-red-600 text-white"
+                  size="sm"
+                >
+                  <span className="w-2 h-2 rounded-full bg-white mr-2" />
+                  Start Recording
+                </Button>
+              )}
+              {isRecording && (
+                <Button
+                  onClick={stopRecording}
+                  className="bg-gray-700 hover:bg-gray-800 text-white animate-pulse"
+                  size="sm"
+                >
+                  <span className="w-2 h-2 rounded-full bg-red-400 mr-2" />
+                  Stop Recording
+                </Button>
+              )}
+              {audioBlob && audioUrl && (
+                <>
+                  <audio src={audioUrl} controls className="h-8 flex-1" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setAudioBlob(null); setAudioUrl(null); }}
+                  >
+                    Discard
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={submitVoice}
+                    disabled={transcribeMutation.isPending || !ticker.trim()}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {transcribeMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 animate-spin mr-1" />Transcribing...</>
+                    ) : (
+                      "Transcribe & Save"
+                    )}
+                  </Button>
+                </>
+              )}
+              {!audioBlob && !isRecording && (
+                <span className="text-xs text-muted-foreground">Click to record your trade rationale</span>
+              )}
+            </div>
+          </div>
+
+          {/* Manual text note */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Or type a note instead</Label>
+            <Textarea
+              placeholder="Why are you entering this trade? What's the setup? What could go wrong?"
+              value={manualNote}
+              onChange={e => setManualNote(e.target.value)}
+              rows={3}
+            />
+            <Button
+              size="sm"
+              onClick={submitText}
+              disabled={saveTextMutation.isPending || !ticker.trim() || !manualNote.trim()}
+              variant="outline"
+            >
+              {saveTextMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+              Save Text Note
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Last transcription result */}
+      {lastResult && (
+        <Card className="border border-green-300 bg-green-50/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-green-800">Last Transcription Result</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div>
+              <span className="text-xs font-medium text-muted-foreground">Transcript</span>
+              <p className="mt-0.5 italic text-muted-foreground">"{lastResult.transcript}"</p>
+            </div>
+            {lastResult.aiRationale && (
+              <div>
+                <span className="text-xs font-medium text-muted-foreground">AI Rationale</span>
+                <p className="mt-0.5">{lastResult.aiRationale}</p>
+              </div>
+            )}
+            {lastResult.aiRisksIdentified && (
+              <div>
+                <span className="text-xs font-medium text-muted-foreground">Risks Identified</span>
+                <p className="mt-0.5 text-amber-700">{lastResult.aiRisksIdentified}</p>
+              </div>
+            )}
+            <Badge variant="outline" className={`text-xs ${sentimentColor(lastResult.aiSentiment)}`}>
+              Sentiment: {lastResult.aiSentiment}
+            </Badge>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Journal history */}
+      <div>
+        <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Journal History</h3>
+        {journalsLoading ? (
+          <div className="flex items-center justify-center h-24">
+            <Loader2 className="w-5 h-5 animate-spin text-green-500" />
+          </div>
+        ) : !journals || journals.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            No journal entries yet. Record your first trade note above.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {journals.map((entry: any) => (
+              <Card key={entry.id} className="border border-border">
+                <CardContent className="pt-3 pb-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm">{entry.ticker}</span>
+                        {entry.strategy && (
+                          <Badge variant="outline" className="text-xs">{entry.strategy.replace("_", " ")}</Badge>
+                        )}
+                        {entry.aiSentiment && (
+                          <Badge variant="outline" className={`text-xs ${sentimentColor(entry.aiSentiment)}`}>
+                            {entry.aiSentiment}
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          {new Date(entry.recordedAt).toLocaleString()}
+                        </span>
+                      </div>
+                      {entry.aiRationale && (
+                        <p className="text-xs mt-1 text-foreground">{entry.aiRationale}</p>
+                      )}
+                      {entry.manualNote && (
+                        <p className="text-xs mt-1 text-muted-foreground italic">"{entry.manualNote}"</p>
+                      )}
+                      {entry.audioTranscript && !entry.aiRationale && (
+                        <p className="text-xs mt-1 text-muted-foreground italic">"{entry.audioTranscript}"</p>
+                      )}
+                      {entry.aiRisksIdentified && (
+                        <p className="text-xs mt-1 text-amber-700">⚠ {entry.aiRisksIdentified}</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

@@ -59,6 +59,7 @@ import {
   BookMarked,
   Chrome,
   Timer,
+  Crosshair,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -102,6 +103,7 @@ const NAV_SECTIONS = [
       { icon: TrendingUp, label: "EMA Pullback", path: "/ema-pullback" },
       { icon: BookOpen, label: "Chart Patterns", path: "/chart-patterns" },
       { icon: Timer, label: "Theta Machine", path: "/theta-machine" },
+      { icon: Crosshair, label: "Decision Bench", path: "/decision-bench" },
       { icon: Target, label: "Opening Range Scalper", path: "/velez-scanner?tab=ors" },
     ],
   },

@@ -847,3 +847,40 @@ export const userTrackedAccounts = mysqlTable("user_tracked_accounts", {
 });
 export type UserTrackedAccount = typeof userTrackedAccounts.$inferSelect;
 export type InsertUserTrackedAccount = typeof userTrackedAccounts.$inferInsert;
+
+// ─── Decision Bench Watchlist ─────────────────────────────────────────────────
+export const decisionBenchWatchlist = mysqlTable("decision_bench_watchlist", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  sector: varchar("sector", { length: 64 }).notNull(),
+  isActive: tinyint("is_active").default(1).notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  uniqBenchTicker: uniqueIndex("uniq_bench_ticker").on(t.userId, t.ticker),
+}));
+export type DecisionBenchWatchlistItem = typeof decisionBenchWatchlist.$inferSelect;
+export type InsertDecisionBenchWatchlistItem = typeof decisionBenchWatchlist.$inferInsert;
+
+// ─── Trade Voice Journal ──────────────────────────────────────────────────────
+export const tradeVoiceJournal = mysqlTable("trade_voice_journal", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  tradeLogId: int("trade_log_id"),
+  playbookPositionId: int("playbook_position_id"),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  strategy: varchar("strategy", { length: 64 }),
+  audioTranscript: text("audio_transcript"),
+  aiRationale: text("ai_rationale"),
+  aiRisksIdentified: text("ai_risks_identified"),
+  aiSentiment: varchar("ai_sentiment", { length: 16 }),
+  screenshotUrl: varchar("screenshot_url", { length: 512 }),
+  manualNote: varchar("manual_note", { length: 1024 }),
+  entryPrice: decimal("entry_price", { precision: 10, scale: 4 }),
+  recordedAt: bigint("recorded_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type TradeVoiceJournal = typeof tradeVoiceJournal.$inferSelect;
+export type InsertTradeVoiceJournal = typeof tradeVoiceJournal.$inferInsert;
