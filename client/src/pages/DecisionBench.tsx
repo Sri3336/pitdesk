@@ -369,7 +369,7 @@ function MorningScanTab() {
 
           {displayResults.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p>No setups found today. Consider sitting out.</p>
+              <p>No tickers returned data. Check your watchlist or try again during market hours.</p>
             </div>
           ) : (
             <div className="space-y-3">

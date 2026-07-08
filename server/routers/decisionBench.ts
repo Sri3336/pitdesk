@@ -156,10 +156,12 @@ function pickStrategy(ivRank: number | null, dayChangePct: number | null): strin
 function scoreSetup(ivRank: number | null, dayChangePct: number | null, signals: string[]): number {
   let score = 0;
   if (ivRank !== null) score += Math.min(ivRank, 60);
+  else score += 15; // base score when IV unavailable — still show ticker
   if (signals.length >= 3) score += 30;
   else if (signals.length >= 2) score += 20;
   else if (signals.length >= 1) score += 10;
   if (dayChangePct !== null && Math.abs(dayChangePct) < 2) score += 10; // stable price = good for premium selling
+  if (dayChangePct !== null && Math.abs(dayChangePct) > 0) score += 5; // has price movement data
   return Math.min(100, score);
 }
 
@@ -467,17 +469,19 @@ export const decisionBenchRouter = router({
       }
     }
 
-    // Sort by score descending, return top 3
+    // Sort by score descending, always return top 3 (even if low confidence)
     results.sort((a, b) => b.score - a.score);
-    const top3 = results.slice(0, 3);
+    // Always show top 3 — if all score 0 (e.g. no IV data outside market hours), still surface them
+    const top3 = results.slice(0, Math.min(3, results.length));
+    const hasStrongSetups = top3.some(r => r.score >= 30);
 
     return {
       setups: top3,
       allResults: results,
       scannedAt: new Date().toISOString(),
-      message: top3.length > 0
+      message: hasStrongSetups
         ? `Top ${top3.length} setup${top3.length > 1 ? "s" : ""} identified from ${watchlist.length} tickers`
-        : "No strong setups today — consider sitting out",
+        : `Showing top ${top3.length} tickers from ${watchlist.length} scanned — IV data may be limited outside market hours`,
     };
   }),
 
