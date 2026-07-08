@@ -58,6 +58,7 @@ import {
   FlaskConical,
   BookMarked,
   Chrome,
+  Timer,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -100,6 +101,7 @@ const NAV_SECTIONS = [
       { icon: TrendingDown, label: "ICT Supply Zone", path: "/ict-supply-zone" },
       { icon: TrendingUp, label: "EMA Pullback", path: "/ema-pullback" },
       { icon: BookOpen, label: "Chart Patterns", path: "/chart-patterns" },
+      { icon: Timer, label: "Theta Machine", path: "/theta-machine" },
       { icon: Target, label: "Opening Range Scalper", path: "/velez-scanner?tab=ors" },
     ],
   },

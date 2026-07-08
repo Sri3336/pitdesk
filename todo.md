@@ -553,3 +553,15 @@
 - [x] Wire PatternBadge into EMA Pullback Scanner signal cards
 - [x] Wire PatternBadge into ICT Supply Zone signal cards
 - [x] Add Chart Patterns to sidebar nav and App.tsx route
+
+## Phase 44 — Theta Machine (Calendar Spreads & Iron Butterfly)
+- [x] Server router: thetaMachine.ts with buildCalendar, buildIronButterfly, scan, getExpirations procedures
+- [x] findTargetDeltaContract helper for scan procedure
+- [x] scan procedure: scans multiple tickers for NEUTRAL/BULLISH/BEARISH/EARNINGS_BUTTERFLY modes
+- [x] ThetaMachine.tsx UI: tent P&L SVG diagram, iron butterfly P&L diagram
+- [x] 4 tabs: Neutral / Bullish / Bearish / Earnings Butterfly
+- [x] Signal cards with full trade math (debit, max profit, theta differential, breakevens)
+- [x] Learn mode toggle with plain-English explanations
+- [x] Single-ticker manual builder with expiry selector
+- [x] Sidebar nav entry + App.tsx route
+- [x] TypeScript clean, 45 tests passing

@@ -100,6 +100,7 @@ import { userAccountsRouter } from "./routers/userAccounts";
 import { weeklyPicksRouter } from "./routers/weeklyPicks";
 import { ictSupplyZoneRouter } from "./routers/ictSupplyZone";
 import { emaPullbackRouter } from "./routers/emaPullback";
+import { thetaMachineRouter } from "./routers/thetaMachine";
 import { pitAdvisorRouter } from "./routers/pitAdvisor";
 import { optionsFlowRouter } from "./routers/optionsFlow";
 import { catalystBreakoutRouter } from "./routers/catalystBreakout";
@@ -1572,5 +1573,6 @@ export const appRouter = router({
   weeklyPicks: weeklyPicksRouter,
   ictSupplyZone: ictSupplyZoneRouter,
   emaPullback: emaPullbackRouter,
+  thetaMachine: thetaMachineRouter,
 });
 export type AppRouter = typeof appRouter;

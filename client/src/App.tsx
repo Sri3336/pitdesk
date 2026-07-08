@@ -52,6 +52,7 @@ const IvrAlerts = lazy(() => import("./pages/IvrAlerts"));
 const ICTSupplyZone = lazy(() => import("./pages/ICTSupplyZone"));
 const EMAPullbackScanner = lazy(() => import("./pages/EMAPullbackScanner"));
 const ChartPatterns = lazy(() => import("./pages/ChartPatterns"));
+const ThetaMachine = lazy(() => import("./pages/ThetaMachine"));
 
 // Analysis pages
 const Analyzer = lazy(() => import("./pages/Analyzer"));
@@ -201,6 +202,7 @@ function Router() {
                 <Route path="/ict-supply-zone" component={ICTSupplyZone} />
                 <Route path="/ema-pullback" component={EMAPullbackScanner} />
                 <Route path="/chart-patterns" component={ChartPatterns} />
+                <Route path="/theta-machine" component={ThetaMachine} />
 
                 {/* Analysis */}
                 <Route path="/analyzer" component={Analyzer} />
