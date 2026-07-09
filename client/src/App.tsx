@@ -54,6 +54,7 @@ const EMAPullbackScanner = lazy(() => import("./pages/EMAPullbackScanner"));
 const ChartPatterns = lazy(() => import("./pages/ChartPatterns"));
 const ThetaMachine = lazy(() => import("./pages/ThetaMachine"));
 const DecisionBench = lazy(() => import("./pages/DecisionBench"));
+const LiveTraderFeed = lazy(() => import("./pages/LiveTraderFeed"));
 
 // Analysis pages
 const Analyzer = lazy(() => import("./pages/Analyzer"));
@@ -205,6 +206,7 @@ function Router() {
                 <Route path="/chart-patterns" component={ChartPatterns} />
                 <Route path="/theta-machine" component={ThetaMachine} />
                 <Route path="/decision-bench" component={DecisionBench} />
+                <Route path="/live-trader-feed" component={LiveTraderFeed} />
 
                 {/* Analysis */}
                 <Route path="/analyzer" component={Analyzer} />

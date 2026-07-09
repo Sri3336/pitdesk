@@ -60,6 +60,7 @@ import {
   Chrome,
   Timer,
   Crosshair,
+  Rss,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -104,6 +105,7 @@ const NAV_SECTIONS = [
       { icon: BookOpen, label: "Chart Patterns", path: "/chart-patterns" },
       { icon: Timer, label: "Theta Machine", path: "/theta-machine" },
       { icon: Crosshair, label: "Decision Bench", path: "/decision-bench" },
+      { icon: Rss, label: "Live Trader Feed", path: "/live-trader-feed" },
       { icon: Target, label: "Opening Range Scalper", path: "/velez-scanner?tab=ors" },
     ],
   },

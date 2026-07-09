@@ -578,3 +578,11 @@
 - [x] Sidebar nav entry (Crosshair icon) + App.tsx route /decision-bench
 - [x] 11 unit tests for EMA helper, gate verdict logic, sector concentration (56 total passing)
 - [x] TypeScript clean (0 errors)
+
+## Phase 46 — Live Trader Feed
+- [x] Server router: liveTraderFeed.ts — fetch posts from @OptionsHawk, @unusual_whales via X API; curated search for trade alerts mentioning watchlist tickers
+- [x] Credibility filter: 50K+ followers, account age 2+ years, post contains specific fills (bought/sold/entered + strike/expiry)
+- [x] Relevance scoring: boost posts mentioning user's watchlist tickers (SNDK, WDC, ASML, NBIS, etc.)
+- [x] Build LiveTraderFeed.tsx UI: feed cards with credibility badge, ticker tags, trade type, engagement metrics, refresh button
+- [x] Ticker filter bar: filter feed by ticker or strategy type
+- [x] Wire /live-trader-feed route in App.tsx and sidebar nav (Rss icon, Analysis section)
