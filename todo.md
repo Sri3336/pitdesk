@@ -586,3 +586,15 @@
 - [x] Build LiveTraderFeed.tsx UI: feed cards with credibility badge, ticker tags, trade type, engagement metrics, refresh button
 - [x] Ticker filter bar: filter feed by ticker or strategy type
 - [x] Wire /live-trader-feed route in App.tsx and sidebar nav (Rss icon, Analysis section)
+## Phase 47 — Nour Method Scanner
+- [x] Server router: nourScanner.ts — IV compression, range tightening, RS vs QQQ, volume surge, breakout/retest detection
+- [x] NourScanner.tsx UI: 4 phases (BREAKOUT NOW, RETEST ENTRY, CONSOLIDATING, WATCH), RS tab, Learn tab
+- [x] Sidebar nav entry + App.tsx route /nour-scanner
+- [x] TypeScript clean, tests passing
+
+## Phase 48 — Sri's Playbook: My System + Trader Journal
+- [x] DB tables: trader_lessons, trade_gate_checks (applied via webdev_execute_sql)
+- [x] Backend router: sriPlaybookRouter (getLessons, addLesson, updateLesson, deleteLesson, getGateChecks, saveGateCheck, getQQQRegime)
+- [x] MySystemTab: QQQ regime banner, 4-gate pre-trade checker, position sizing table, exit rules, ticker universe, gate check history
+- [x] TraderJournalTab: add/edit/delete trader lessons, seed Nour + Qullamaggie lessons, filter by adopt decision
+- [x] Tabs wired in SriPlaybook.tsx (My System + Trader Journal tabs)

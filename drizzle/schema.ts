@@ -884,3 +884,42 @@ export const tradeVoiceJournal = mysqlTable("trade_voice_journal", {
 });
 export type TradeVoiceJournal = typeof tradeVoiceJournal.$inferSelect;
 export type InsertTradeVoiceJournal = typeof tradeVoiceJournal.$inferInsert;
+
+// ─── Sri's Playbook: Trader Lessons (insights from videos/traders studied) ───
+export const traderLessons = mysqlTable("trader_lessons", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  traderName: varchar("trader_name", { length: 100 }).notNull(),
+  sourceUrl: varchar("source_url", { length: 500 }),
+  sourceType: varchar("source_type", { length: 50 }).notNull().default("youtube"),
+  title: varchar("title", { length: 200 }).notNull(),
+  keyInsight: text("key_insight").notNull(),
+  adoptDecision: varchar("adopt_decision", { length: 20 }).notNull().default("studying"),
+  adoptReason: text("adopt_reason"),
+  applicableStrategies: varchar("applicable_strategies", { length: 200 }),
+  tags: varchar("tags", { length: 300 }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+
+// ─── Sri's Playbook: Pre-Trade Gate Checks ────────────────────────────────────
+export const tradeGateChecks = mysqlTable("trade_gate_checks", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  strategy: varchar("strategy", { length: 50 }).notNull(),
+  checkDate: varchar("check_date", { length: 20 }).notNull(),
+  ivGatePass: tinyint("iv_gate_pass").notNull().default(0),
+  ivRank: int("iv_rank"),
+  regimeGatePass: tinyint("regime_gate_pass").notNull().default(0),
+  qqqRegimeNote: varchar("qqq_regime_note", { length: 200 }),
+  rangeGatePass: tinyint("range_gate_pass").notNull().default(0),
+  rangeNote: varchar("range_note", { length: 200 }),
+  catalystGatePass: tinyint("catalyst_gate_pass").notNull().default(0),
+  catalystNote: varchar("catalyst_note", { length: 200 }),
+  overallGrade: varchar("overall_grade", { length: 5 }).notNull().default("B"),
+  gatesPassedCount: int("gates_passed_count").notNull().default(0),
+  decision: varchar("decision", { length: 20 }).notNull().default("pending"),
+  notes: text("notes"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});

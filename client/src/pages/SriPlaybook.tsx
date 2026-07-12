@@ -897,6 +897,14 @@ export default function SriPlaybook() {
             <Activity className="w-4 h-4 mr-1" />
             Voice Journal
           </TabsTrigger>
+          <TabsTrigger value="my-system">
+            <Star className="w-4 h-4 mr-1" />
+            My System
+          </TabsTrigger>
+          <TabsTrigger value="trader-journal">
+            <BookOpen className="w-4 h-4 mr-1" />
+            Trader Journal
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Open Positions Tab ── */}
@@ -1533,6 +1541,16 @@ export default function SriPlaybook() {
         {/* ── Voice Journal Tab ── */}
         <TabsContent value="voice-journal" className="mt-4">
           <VoiceJournalTab />
+        </TabsContent>
+
+        {/* ── My System Tab ── */}
+        <TabsContent value="my-system" className="mt-4">
+          <MySystemTab />
+        </TabsContent>
+
+        {/* ── Trader Journal Tab ── */}
+        <TabsContent value="trader-journal" className="mt-4">
+          <TraderJournalTab />
         </TabsContent>
       </Tabs>
 
@@ -2688,6 +2706,569 @@ function VoiceJournalTab() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── My System Tab ────────────────────────────────────────────────────────────
+
+const ADOPT_COLORS: Record<string, string> = {
+  adopt: "bg-green-500/20 text-green-700 border-green-500/30",
+  partial: "bg-blue-500/20 text-blue-700 border-blue-500/30",
+  skip: "bg-slate-500/20 text-slate-500 border-slate-500/30",
+  studying: "bg-amber-500/20 text-amber-700 border-amber-500/30",
+};
+
+const GATE_RULES = [
+  {
+    id: "iv",
+    label: "Gate 1: IV Rank > 50",
+    icon: "📊",
+    description: "IVR must be above 50 — you're selling elevated premium, not cheap options",
+    failNote: "If IVR < 50, the premium isn't fat enough. Wait for IV to expand.",
+    color: "border-blue-500/40",
+  },
+  {
+    id: "regime",
+    label: "Gate 2: QQQ Regime Bullish",
+    icon: "📈",
+    description: "QQQ 10-day MA must be above 20-day MA — don't sell naked puts in a downtrend",
+    failNote: "If QQQ is bearish, switch to spreads only. No naked puts.",
+    color: "border-green-500/40",
+  },
+  {
+    id: "range",
+    label: "Gate 3: Clear Support/Resistance",
+    icon: "🎯",
+    description: "You must be able to define the range. If you can't draw the box, don't trade it.",
+    failNote: "If range is unclear (trending hard, no structure), pass. Wait for consolidation.",
+    color: "border-amber-500/40",
+  },
+  {
+    id: "catalyst",
+    label: "Gate 4: No Binary Event",
+    icon: "📅",
+    description: "No earnings, FDA, FOMC, or open-ended geopolitical event in the next 10 days",
+    failNote: "Binary events are gap risk. Sell premium AFTER the event, not before.",
+    color: "border-red-500/40",
+  },
+];
+
+const SIZING_RULES = [
+  { grade: "A+", gates: "All 4 pass", size: "15–20% of portfolio notional", color: "bg-green-500/20 text-green-700 border-green-500/30" },
+  { grade: "A", gates: "3 of 4 pass", size: "8–12% of portfolio notional", color: "bg-blue-500/20 text-blue-700 border-blue-500/30" },
+  { grade: "B", gates: "2 of 4 pass", size: "Don't take it", color: "bg-amber-500/20 text-amber-700 border-amber-500/30" },
+  { grade: "Skip", gates: "0–1 pass", size: "Hard pass — FOMO is not a strategy", color: "bg-slate-500/20 text-slate-500 border-slate-500/30" },
+];
+
+const EXIT_RULES = [
+  { rule: "Take Profit", detail: "Close at 50% of credit collected. Don't get greedy — theta decay accelerates after 50%." },
+  { rule: "Stop Loss", detail: "Close if loss = 2× credit collected. No exceptions. No hoping." },
+  { rule: "Roll Rule", detail: "If one leg is threatened with 5+ DTE remaining, roll that leg out 1 week for a credit or flat." },
+  { rule: "Hard Stop", detail: "If stock closes beyond your short strike, close the position next morning at open. No overnight hope." },
+  { rule: "Regime Stop", detail: "If QQQ 10-day crosses below 20-day, close all naked puts immediately. Switch to spreads only." },
+  { rule: "Time Stop", detail: "With < 5 DTE and position not at 50% profit, close it. Gamma risk accelerates — not worth the last few dollars." },
+];
+
+const TICKER_UNIVERSE_PLAYBOOK = [
+  { ticker: "WDC",  role: "Core",   ivProfile: "80–100%", why: "High IV, liquid options, you know the business well" },
+  { ticker: "TSLA", role: "Core",   ivProfile: "80–120%", why: "Independent catalyst from hardware cycle, very liquid" },
+  { ticker: "NVDA", role: "Core",   ivProfile: "60–90%",  why: "Highest options liquidity on earth, AI capex driver" },
+  { ticker: "LITE", role: "Core",   ivProfile: "70–100%", why: "Telecom/optical cycle — uncorrelated to storage" },
+  { ticker: "SMCI", role: "Core",   ivProfile: "80–130%", why: "High IV, AI server play, different from storage cycle" },
+  { ticker: "ASML", role: "Core",   ivProfile: "50–80%",  why: "EUV monopoly, earnings-driven IV spikes" },
+  { ticker: "META", role: "Add-on", ivProfile: "50–80%",  why: "Low correlation to hardware names, ad-tech cycle" },
+  { ticker: "AMZN", role: "Add-on", ivProfile: "45–75%",  why: "AWS + retail, multi-catalyst, very liquid" },
+  { ticker: "PLTR", role: "Add-on", ivProfile: "70–100%", why: "Defense AI, completely uncorrelated to tech hardware" },
+];
+
+function MySystemTab() {
+  const regimeQuery = trpc.sriPlaybook.getQQQRegime.useQuery();
+  const gateChecks = trpc.sriPlaybook.getGateChecks.useQuery();
+  const saveGateMutation = trpc.sriPlaybook.saveGateCheck.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Gate check saved — Grade: ${data.grade} (${data.gatesPassed}/4 gates)`);
+      gateChecks.refetch();
+      setGateForm({ ticker: "", strategy: "strangle", ivGatePass: false, ivRank: "", regimeGatePass: false, rangeGatePass: false, catalystGatePass: false, decision: "pending", notes: "" });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const [gateForm, setGateForm] = useState({
+    ticker: "",
+    strategy: "strangle",
+    ivGatePass: false,
+    ivRank: "",
+    regimeGatePass: false,
+    rangeGatePass: false,
+    catalystGatePass: false,
+    decision: "pending" as "entered" | "skipped" | "watching" | "pending",
+    notes: "",
+  });
+
+  const gatesPassed = [gateForm.ivGatePass, gateForm.regimeGatePass, gateForm.rangeGatePass, gateForm.catalystGatePass].filter(Boolean).length;
+  const liveGrade = gatesPassed === 4 ? "A+" : gatesPassed === 3 ? "A" : gatesPassed === 2 ? "B" : "Skip";
+  const liveGradeColor = liveGrade === "A+" ? "text-green-600 bg-green-50 border-green-300" : liveGrade === "A" ? "text-blue-600 bg-blue-50 border-blue-300" : liveGrade === "B" ? "text-amber-600 bg-amber-50 border-amber-300" : "text-slate-500 bg-slate-50 border-slate-300";
+
+  function handleSaveGate() {
+    if (!gateForm.ticker) { toast.error("Enter a ticker"); return; }
+    saveGateMutation.mutate({
+      ticker: gateForm.ticker,
+      strategy: gateForm.strategy,
+      checkDate: new Date().toISOString().split("T")[0],
+      ivGatePass: gateForm.ivGatePass,
+      ivRank: gateForm.ivRank ? parseFloat(gateForm.ivRank) : undefined,
+      regimeGatePass: gateForm.regimeGatePass,
+      qqqRegimeNote: regimeQuery.data?.note,
+      rangeGatePass: gateForm.rangeGatePass,
+      catalystGatePass: gateForm.catalystGatePass,
+      decision: gateForm.decision,
+      notes: gateForm.notes || undefined,
+    });
+  }
+
+  const regime = regimeQuery.data;
+
+  return (
+    <div className="space-y-6">
+      {/* QQQ Regime Banner */}
+      <Card className={`border-2 ${regime?.regime === "bullish" ? "border-green-500/50 bg-green-50" : regime?.regime === "bearish" ? "border-red-500/50 bg-red-50" : "border-amber-500/50 bg-amber-50"}`}>
+        <CardContent className="py-3 px-4">
+          <div className="flex items-center gap-3">
+            <div className={`text-2xl font-bold ${regime?.regime === "bullish" ? "text-green-700" : regime?.regime === "bearish" ? "text-red-700" : "text-amber-700"}`}>
+              {regime?.regime === "bullish" ? "🟢" : regime?.regime === "bearish" ? "🔴" : "🟡"}
+            </div>
+            <div>
+              <div className="font-semibold text-sm">
+                QQQ Regime: {regime?.regime?.toUpperCase() ?? "Loading..."}
+                {regime?.ma10 && regime?.ma20 && (
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    10d MA ${regime.ma10.toFixed(2)} vs 20d MA ${regime.ma20.toFixed(2)}
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">{regime?.note ?? "Fetching QQQ data..."}</div>
+            </div>
+            <Button size="sm" variant="ghost" className="ml-auto" onClick={() => regimeQuery.refetch()}>
+              <RefreshCw className="w-3 h-3" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* The 4 Gates */}
+      <div>
+        <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+          <Shield className="w-4 h-4 text-green-600" /> The 4 Pre-Trade Gates
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {GATE_RULES.map(gate => (
+            <Card key={gate.id} className={`border ${gate.color}`}>
+              <CardContent className="py-3 px-4">
+                <div className="font-semibold text-sm">{gate.icon} {gate.label}</div>
+                <div className="text-xs text-muted-foreground mt-1">{gate.description}</div>
+                <div className="text-xs text-red-600 mt-1 italic">If fail: {gate.failNote}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Pre-Trade Gate Checker */}
+      <Card className="border-border">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-green-600" /> Pre-Trade Gate Checker
+            <Badge className={`ml-auto border ${liveGradeColor} text-sm font-bold px-3`}>{liveGrade}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Ticker</Label>
+              <Input value={gateForm.ticker} onChange={e => setGateForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))} placeholder="NVDA" className="h-8 text-sm" />
+            </div>
+            <div>
+              <Label className="text-xs">Strategy</Label>
+              <Select value={gateForm.strategy} onValueChange={v => setGateForm(f => ({ ...f, strategy: v }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="strangle">Strangle</SelectItem>
+                  <SelectItem value="iron_condor">Iron Condor</SelectItem>
+                  <SelectItem value="naked_put">Naked Put</SelectItem>
+                  <SelectItem value="naked_call">Naked Call</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { key: "ivGatePass", label: "Gate 1: IVR > 50", extra: <Input value={gateForm.ivRank} onChange={e => setGateForm(f => ({ ...f, ivRank: e.target.value }))} placeholder="IVR value" className="h-7 text-xs mt-1" /> },
+              { key: "regimeGatePass", label: `Gate 2: QQQ Bullish (${regime?.regime ?? "..."})` },
+              { key: "rangeGatePass", label: "Gate 3: Clear Range Defined" },
+              { key: "catalystGatePass", label: "Gate 4: No Binary Event" },
+            ].map(({ key, label, extra }) => (
+              <div key={key} className={`rounded-lg border p-3 cursor-pointer transition-colors ${(gateForm as any)[key] ? "border-green-500 bg-green-50" : "border-border bg-muted/30"}`}
+                onClick={() => setGateForm(f => ({ ...f, [key]: !(f as any)[key] }))}>
+                <div className="flex items-center gap-2">
+                  {(gateForm as any)[key] ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-muted-foreground" />}
+                  <span className="text-xs font-medium">{label}</span>
+                </div>
+                {extra}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Decision</Label>
+              <Select value={gateForm.decision} onValueChange={v => setGateForm(f => ({ ...f, decision: v as any }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="entered">Entered Trade</SelectItem>
+                  <SelectItem value="skipped">Skipped — Discipline</SelectItem>
+                  <SelectItem value="watching">Watching</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Notes</Label>
+              <Input value={gateForm.notes} onChange={e => setGateForm(f => ({ ...f, notes: e.target.value }))} placeholder="Why skip / key level..." className="h-8 text-sm" />
+            </div>
+          </div>
+          <Button onClick={handleSaveGate} disabled={saveGateMutation.isPending} size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white">
+            {saveGateMutation.isPending ? "Saving..." : `Save Gate Check — ${liveGrade}`}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Position Sizing */}
+      <div>
+        <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+          <DollarSign className="w-4 h-4 text-green-600" /> Position Sizing by Grade
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {SIZING_RULES.map(r => (
+            <Card key={r.grade} className="border-border">
+              <CardContent className="py-3 px-4 text-center">
+                <Badge className={`border ${r.color} text-base font-bold px-3 mb-2`}>{r.grade}</Badge>
+                <div className="text-xs text-muted-foreground">{r.gates}</div>
+                <div className="text-sm font-semibold mt-1">{r.size}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Exit Rules */}
+      <div>
+        <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+          <Target className="w-4 h-4 text-amber-600" /> Exit Rules — Non-Negotiable
+        </h3>
+        <div className="space-y-2">
+          {EXIT_RULES.map(r => (
+            <div key={r.rule} className="flex gap-3 p-3 rounded-lg border border-border bg-muted/20">
+              <div className="font-semibold text-sm w-32 shrink-0 text-foreground">{r.rule}</div>
+              <div className="text-sm text-muted-foreground">{r.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Ticker Universe */}
+      <div>
+        <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-blue-600" /> Approved Ticker Universe
+        </h3>
+        <div className="rounded-lg border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ticker</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>IV Profile</TableHead>
+                <TableHead>Why It's In</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {TICKER_UNIVERSE_PLAYBOOK.map(t => (
+                <TableRow key={t.ticker}>
+                  <TableCell className="font-mono font-bold">{t.ticker}</TableCell>
+                  <TableCell><Badge className={t.role === "Core" ? "bg-green-500/20 text-green-700 border-green-500/30" : "bg-blue-500/20 text-blue-700 border-blue-500/30"}>{t.role}</Badge></TableCell>
+                  <TableCell className="text-sm">{t.ivProfile}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{t.why}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Gate Check History */}
+      {(gateChecks.data?.length ?? 0) > 0 && (
+        <div>
+          <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-purple-600" /> Gate Check History
+          </h3>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Ticker</TableHead>
+                  <TableHead>Strategy</TableHead>
+                  <TableHead>Gates</TableHead>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Decision</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {gateChecks.data?.map(c => (
+                  <TableRow key={c.id}>
+                    <TableCell className="text-xs">{c.checkDate}</TableCell>
+                    <TableCell className="font-mono font-bold">{c.ticker}</TableCell>
+                    <TableCell className="text-xs">{c.strategy}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {[c.ivGatePass, c.regimeGatePass, c.rangeGatePass, c.catalystGatePass].map((p, i) => (
+                          <span key={i}>{p ? "✅" : "❌"}</span>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell><Badge className={`border ${ADOPT_COLORS[c.overallGrade === "A+" ? "adopt" : c.overallGrade === "A" ? "partial" : "skip"] ?? ""}`}>{c.overallGrade}</Badge></TableCell>
+                    <TableCell className="text-xs capitalize">{c.decision}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Trader Journal Tab ───────────────────────────────────────────────────────
+
+function TraderJournalTab() {
+  const lessonsQuery = trpc.sriPlaybook.getLessons.useQuery();
+  const addMutation = trpc.sriPlaybook.addLesson.useMutation({
+    onSuccess: () => {
+      toast.success("Lesson saved to your journal");
+      setShowAdd(false);
+      setForm({ traderName: "", sourceUrl: "", sourceType: "youtube", title: "", keyInsight: "", adoptDecision: "studying", adoptReason: "", applicableStrategies: "", tags: "" });
+      lessonsQuery.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateMutation = trpc.sriPlaybook.updateLesson.useMutation({
+    onSuccess: () => { toast.success("Updated"); lessonsQuery.refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteMutation = trpc.sriPlaybook.deleteLesson.useMutation({
+    onSuccess: () => { toast.success("Deleted"); lessonsQuery.refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [filterAdopt, setFilterAdopt] = useState<string>("all");
+  const [form, setForm] = useState({
+    traderName: "",
+    sourceUrl: "",
+    sourceType: "youtube" as "youtube" | "article" | "book" | "podcast" | "other",
+    title: "",
+    keyInsight: "",
+    adoptDecision: "studying" as "adopt" | "partial" | "skip" | "studying",
+    adoptReason: "",
+    applicableStrategies: "",
+    tags: "",
+  });
+
+  const lessons = lessonsQuery.data ?? [];
+  const filtered = filterAdopt === "all" ? lessons : lessons.filter(l => l.adoptDecision === filterAdopt);
+
+  // Pre-populate with the two traders we've already studied
+  const SEED_LESSONS = [
+    {
+      traderName: "Nour",
+      sourceUrl: "https://youtu.be/_CWL-TWTuBo",
+      sourceType: "youtube" as const,
+      title: "IV Compression + Consolidation Breakout Strategy",
+      keyInsight: "Wait for IV to compress during consolidation (options get cheap), then buy the breakout when volume surges 2.5×+ and tape confirms (buyers hitting ask). For premium sellers: this is the OPPOSITE signal — sell premium DURING consolidation when IV is compressed, close before the breakout.",
+      adoptDecision: "partial" as const,
+      adoptReason: "Nour buys options; we sell them. But the IV compression observation is directly useful — consolidation = cheap premium to sell, breakout = close position before IV spikes against us.",
+      applicableStrategies: "strangle,iron_condor",
+      tags: "iv_compression,consolidation,tape_reading,volume",
+    },
+    {
+      traderName: "Qullamaggie / Lance",
+      sourceUrl: "https://youtu.be/H01JbbEY7ac",
+      sourceType: "youtube" as const,
+      title: "Stair-Step Breakout + MA Trailing System",
+      keyInsight: "Stocks make stair-step moves: big volume move up, then consolidation near 20-day MA, then next breakout. QQQ 10-day vs 20-day MA is the market regime filter — if 10d below 20d, stop buying breakouts. Lance exits immediately on MA break; Qullamaggie waits for daily close below MA.",
+      adoptDecision: "adopt" as const,
+      adoptReason: "QQQ regime filter (10d vs 20d MA) is now Gate 2 of our pre-trade system. Stair-step pattern tells us when a stock is in a healthy uptrend — good backdrop for selling puts (trend is our friend on the short put side). Exhaustion gap far above 20d MA = good call-selling setup.",
+      applicableStrategies: "naked_put,naked_call,strangle",
+      tags: "qqqregime,ma_filter,stair_step,trend,exhaustion_gap",
+    },
+  ];
+
+  function handleSeedLessons() {
+    SEED_LESSONS.forEach(l => addMutation.mutate(l));
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <h3 className="text-base font-semibold flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-blue-600" /> Trader Lessons Journal
+          <Badge variant="outline">{lessons.length} entries</Badge>
+        </h3>
+        <div className="ml-auto flex gap-2 flex-wrap">
+          {["all", "adopt", "partial", "studying", "skip"].map(f => (
+            <Button key={f} size="sm" variant={filterAdopt === f ? "default" : "outline"} onClick={() => setFilterAdopt(f)} className="capitalize text-xs h-7">
+              {f}
+            </Button>
+          ))}
+          {lessons.length === 0 && (
+            <Button size="sm" variant="outline" onClick={handleSeedLessons} className="text-xs h-7 border-blue-300 text-blue-600">
+              <Sparkles className="w-3 h-3 mr-1" /> Seed from studied traders
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setShowAdd(v => !v)} className="bg-green-600 hover:bg-green-700 text-white h-7">
+            <Plus className="w-3 h-3 mr-1" /> Add Lesson
+          </Button>
+        </div>
+      </div>
+
+      {/* Add Form */}
+      {showAdd && (
+        <Card className="border-green-500/30 bg-green-50/30">
+          <CardContent className="pt-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Trader Name</Label>
+                <Input value={form.traderName} onChange={e => setForm(f => ({ ...f, traderName: e.target.value }))} placeholder="e.g. Nour, Qullamaggie" className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs">Source Type</Label>
+                <Select value={form.sourceType} onValueChange={v => setForm(f => ({ ...f, sourceType: v as any }))}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="youtube">YouTube</SelectItem>
+                    <SelectItem value="article">Article</SelectItem>
+                    <SelectItem value="book">Book</SelectItem>
+                    <SelectItem value="podcast">Podcast</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <Label className="text-xs">Source URL (optional)</Label>
+                <Input value={form.sourceUrl} onChange={e => setForm(f => ({ ...f, sourceUrl: e.target.value }))} placeholder="https://youtube.com/..." className="h-8 text-sm" />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-xs">Title / Topic</Label>
+                <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. IV Compression + Breakout Strategy" className="h-8 text-sm" />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-xs">Key Insight (what did you learn?)</Label>
+                <Textarea value={form.keyInsight} onChange={e => setForm(f => ({ ...f, keyInsight: e.target.value }))} placeholder="The core lesson in your own words..." rows={3} className="text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs">Adopt Decision</Label>
+                <Select value={form.adoptDecision} onValueChange={v => setForm(f => ({ ...f, adoptDecision: v as any }))}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="adopt">✅ Adopt — adding to my system</SelectItem>
+                    <SelectItem value="partial">🔵 Partial — adapt for my style</SelectItem>
+                    <SelectItem value="studying">🟡 Still studying</SelectItem>
+                    <SelectItem value="skip">⬜ Skip — not for me</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Applicable Strategies (comma-sep)</Label>
+                <Input value={form.applicableStrategies} onChange={e => setForm(f => ({ ...f, applicableStrategies: e.target.value }))} placeholder="strangle, naked_put" className="h-8 text-sm" />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-xs">Why adopt / skip?</Label>
+                <Textarea value={form.adoptReason} onChange={e => setForm(f => ({ ...f, adoptReason: e.target.value }))} placeholder="Reason for your decision..." rows={2} className="text-sm" />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button size="sm" onClick={() => addMutation.mutate(form)} disabled={addMutation.isPending || !form.traderName || !form.title || !form.keyInsight} className="bg-green-600 hover:bg-green-700 text-white">
+                {addMutation.isPending ? "Saving..." : "Save Lesson"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Lessons List */}
+      {lessonsQuery.isLoading ? (
+        <div className="text-center py-8 text-muted-foreground">Loading lessons...</div>
+      ) : filtered.length === 0 ? (
+        <Card className="border-border">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <div className="font-semibold">No lessons yet</div>
+            <div className="text-sm mt-1">Click "Seed from studied traders" to add Nour + Qullamaggie lessons, or add your own.</div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(lesson => (
+            <Card key={lesson.id} className="border-border">
+              <CardContent className="py-3 px-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm">{lesson.traderName}</span>
+                      <Badge className={`border text-xs ${ADOPT_COLORS[lesson.adoptDecision] ?? ""}`}>
+                        {lesson.adoptDecision === "adopt" ? "✅ Adopted" : lesson.adoptDecision === "partial" ? "🔵 Partial" : lesson.adoptDecision === "studying" ? "🟡 Studying" : "⬜ Skipped"}
+                      </Badge>
+                      {lesson.sourceUrl && (
+                        <a href={lesson.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                          <ExternalLink className="w-3 h-3" /> Source
+                        </a>
+                      )}
+                      <span className="text-xs text-muted-foreground ml-auto">{new Date(lesson.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <div className="font-medium text-sm mt-1">{lesson.title}</div>
+                    <div className="text-sm text-muted-foreground mt-1">{lesson.keyInsight}</div>
+                    {lesson.adoptReason && (
+                      <div className="text-xs text-foreground mt-1 italic border-l-2 border-green-500/50 pl-2">
+                        {lesson.adoptReason}
+                      </div>
+                    )}
+                    {lesson.applicableStrategies && (
+                      <div className="flex gap-1 mt-2 flex-wrap">
+                        {lesson.applicableStrategies.split(",").map(s => (
+                          <Badge key={s} variant="outline" className="text-xs">{s.trim()}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    {(["adopt", "partial", "studying", "skip"] as const).map(d => (
+                      <Button key={d} size="sm" variant="ghost" className={`h-6 w-6 p-0 text-xs ${lesson.adoptDecision === d ? "bg-muted" : ""}`}
+                        onClick={() => updateMutation.mutate({ id: lesson.id, adoptDecision: d })}>
+                        {d === "adopt" ? "✅" : d === "partial" ? "🔵" : d === "studying" ? "🟡" : "⬜"}
+                      </Button>
+                    ))}
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                      onClick={() => deleteMutation.mutate({ id: lesson.id })}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
