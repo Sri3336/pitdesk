@@ -551,6 +551,10 @@ function AddTransferDialog({ onAdded }: { onAdded: () => void }) {
 export default function SriPlaybook() {
   const utils = trpc.useUtils();
   const [analyzePos, setAnalyzePos] = useState<any | null>(null);
+  const [manualEodOpen, setManualEodOpen] = useState(false);
+  const [manualSchwab, setManualSchwab] = useState("");
+  const [manualEt4723, setManualEt4723] = useState("");
+  const [manualEt2738, setManualEt2738] = useState("");
 
   const { data: snapshots = [] } = trpc.playbook.getLatestSnapshots.useQuery();
   const { data: openPositions = [], refetch: refetchOpen } = trpc.playbook.getOpenPositions.useQuery();
@@ -577,9 +581,13 @@ export default function SriPlaybook() {
       const d = data as any;
       const schwabNote = d.schwabSource === "api"
         ? ` | Schwab: ${fmt$(d.schwabVal)} ✔ live API`
-        : d.schwabSource === "extension_fallback"
-          ? ` | Schwab: ${fmt$(d.schwabVal)} (extension)`
-          : "";
+        : d.schwabSource === "manual"
+          ? ` | Schwab: ${fmt$(d.schwabVal)} ✔ manual`
+          : d.schwabSource === "extension_fallback"
+            ? ` | Schwab: ${fmt$(d.schwabVal)} (extension)`
+            : d.schwabVal > 0
+              ? ` | Schwab: ${fmt$(d.schwabVal)}`
+              : " | Schwab: missing ⚠️";
       toast.success(`EOD captured — Total: ${fmt$(data.totalValue)}${schwabNote} | Adj P&L: ${data.adjustedPnl !== null ? fmt$(data.adjustedPnl, { sign: true }) : "N/A (first snapshot)"}`);
       refetchEod();
       refetchAdjPnl();
@@ -669,17 +677,76 @@ export default function SriPlaybook() {
           <p className="text-muted-foreground text-sm mt-0.5">Premium income strategy — Iron Condor · Strangle · Naked Put/Call</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => captureEodMutation.mutate({})}
-            disabled={captureEodMutation.isPending || totalCapital === 0}
-            className="border-green-500/40 text-green-400 hover:bg-green-500/10"
-            title="Captures today's EOD snapshot from the latest extension sync data"
-          >
-            <Camera className="w-4 h-4 mr-1" />
-            {captureEodMutation.isPending ? "Capturing..." : "Capture EOD"}
-          </Button>
+          {/* Capture EOD — auto or manual override */}
+          <div className="flex">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => captureEodMutation.mutate({})}
+              disabled={captureEodMutation.isPending}
+              className="border-green-500/40 text-green-400 hover:bg-green-500/10 rounded-r-none border-r-0"
+              title="Auto-capture EOD from Schwab API + extension data"
+            >
+              <Camera className="w-4 h-4 mr-1" />
+              {captureEodMutation.isPending ? "Capturing..." : "Capture EOD"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setManualEodOpen(true)}
+              className="border-green-500/40 text-green-400 hover:bg-green-500/10 rounded-l-none px-2"
+              title="Enter account values manually (use when Schwab API is unavailable)"
+            >
+              <Settings className="w-3 h-3" />
+            </Button>
+          </div>
+          {/* Manual EOD Override Dialog */}
+          <Dialog open={manualEodOpen} onOpenChange={setManualEodOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Manual EOD Override</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 mt-2">
+                <p className="text-xs text-muted-foreground">Enter account values manually when Schwab API is unavailable. Leave blank to use extension sync data.</p>
+                {[
+                  { label: "Schwab ...764", val: manualSchwab, set: setManualSchwab },
+                  { label: "E*TRADE -4723", val: manualEt4723, set: setManualEt4723 },
+                  { label: "E*TRADE -2738", val: manualEt2738, set: setManualEt2738 },
+                ].map(({ label, val, set }) => (
+                  <div key={label}>
+                    <Label className="text-xs">{label} Total Value</Label>
+                    <Input
+                      className="h-8 text-sm"
+                      value={val}
+                      onChange={e => set(e.target.value)}
+                      placeholder="e.g. 222208"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2 mt-3">
+                <Button variant="outline" size="sm" onClick={() => setManualEodOpen(false)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  disabled={captureEodMutation.isPending}
+                  onClick={() => {
+                    captureEodMutation.mutate({
+                      manualSchwabValue: parseFloat(manualSchwab) || undefined,
+                      manualEt4723Value: parseFloat(manualEt4723) || undefined,
+                      manualEt2738Value: parseFloat(manualEt2738) || undefined,
+                    });
+                    setManualEodOpen(false);
+                    setManualSchwab("");
+                    setManualEt4723("");
+                    setManualEt2738("");
+                  }}
+                >
+                  {captureEodMutation.isPending ? "Capturing..." : "Capture with Overrides"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <EodSnapshotDialog onSaved={refetchAll} />
           <AddPositionDialog onAdded={refetchAll} />
         </div>
@@ -1065,16 +1132,27 @@ export default function SriPlaybook() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">EOD Capital History</CardTitle>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => captureEodMutation.mutate({})}
-                  disabled={captureEodMutation.isPending || totalCapital === 0}
-                  className="border-green-500/40 text-green-400 hover:bg-green-500/10"
-                >
-                  <Camera className="w-4 h-4 mr-1" />
-                  {captureEodMutation.isPending ? "Capturing..." : "Capture Today's EOD"}
-                </Button>
+                <div className="flex">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => captureEodMutation.mutate({})}
+                    disabled={captureEodMutation.isPending}
+                    className="border-green-500/40 text-green-400 hover:bg-green-500/10 rounded-r-none border-r-0"
+                  >
+                    <Camera className="w-4 h-4 mr-1" />
+                    {captureEodMutation.isPending ? "Capturing..." : "Capture Today's EOD"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setManualEodOpen(true)}
+                    className="border-green-500/40 text-green-400 hover:bg-green-500/10 rounded-l-none px-2"
+                    title="Enter values manually"
+                  >
+                    <Settings className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>

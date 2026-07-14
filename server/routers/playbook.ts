@@ -382,18 +382,26 @@ export const playbookRouter = router({
     .input(z.object({
       snapshotDate: z.string().optional(), // defaults to today
       notes: z.string().optional(),
+      manualSchwabValue: z.number().optional(),   // manual override when API unavailable
+      manualEt4723Value: z.number().optional(),   // manual override for E*TRADE -4723
+      manualEt2738Value: z.number().optional(),   // manual override for E*TRADE -2738
     }))
-    .mutation(async () => {
+    .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const now = Date.now();
-      const today = new Date().toISOString().split("T")[0];
+      const today = input.snapshotDate ?? new Date().toISOString().split("T")[0];
 
       // ── Step 1: Try to fetch Schwab value live from API ──────────────────────
       let schwabVal = 0;
       let schwabDayPnl = 0;
       let schwabSource = "none";
-      try {
+
+      // If manual override provided, use it directly (skip API call)
+      if (input.manualSchwabValue != null && input.manualSchwabValue > 0) {
+        schwabVal = input.manualSchwabValue;
+        schwabSource = "manual";
+      } else try {
         const schwabTokenRow = await getSchwabTokens(OWNER_USER_ID);
         if (schwabTokenRow && Date.now() < schwabTokenRow.refreshTokenExpiresAt) {
           const accessToken = await getValidAccessToken(OWNER_USER_ID);
@@ -452,16 +460,28 @@ export const playbookRouter = router({
       }
 
       // Use API value for Schwab if available, otherwise fall back to extension snapshot
-      if (schwabSource === "extension_fallback") {
+      if (schwabSource === "extension_fallback" || schwabSource === "none") {
         const schwabSnap = seen.get("schwab_764");
-        schwabVal = schwabSnap ? parseFloat(String(schwabSnap.totalValue)) : 0;
+        const snapVal = schwabSnap ? parseFloat(String(schwabSnap.totalValue)) : 0;
+        // Manual override wins over extension snapshot
+        schwabVal = (input.manualSchwabValue != null && input.manualSchwabValue > 0)
+          ? input.manualSchwabValue
+          : snapVal;
+        schwabSource = (input.manualSchwabValue != null && input.manualSchwabValue > 0)
+          ? "manual"
+          : (snapVal > 0 ? "extension_fallback" : "none");
       }
 
       const et4723 = seen.get("etrade_4723");
       const et2738 = seen.get("etrade_2738");
 
-      const et4723Val = et4723 ? parseFloat(String(et4723.totalValue)) : 0;
-      const et2738Val = et2738 ? parseFloat(String(et2738.totalValue)) : 0;
+      // Apply manual overrides for E*TRADE accounts if provided
+      const et4723Val = (input.manualEt4723Value != null && input.manualEt4723Value > 0)
+        ? input.manualEt4723Value
+        : (et4723 ? parseFloat(String(et4723.totalValue)) : 0);
+      const et2738Val = (input.manualEt2738Value != null && input.manualEt2738Value > 0)
+        ? input.manualEt2738Value
+        : (et2738 ? parseFloat(String(et2738.totalValue)) : 0);
       const totalValue = schwabVal + et4723Val + et2738Val;
 
       // Get previous EOD snapshot to compute P&L
