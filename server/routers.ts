@@ -105,6 +105,7 @@ import { decisionBenchRouter } from "./routers/decisionBench";
 import { liveTraderFeedRouter } from "./routers/liveTraderFeed";
 import { nourScannerRouter } from "./routers/nourScanner";
 import { sriPlaybookRouter } from "./routers/sriPlaybook";
+import { ictLiquidityRouter } from "./routers/ictLiquidity";
 import { pitAdvisorRouter } from "./routers/pitAdvisor";
 import { optionsFlowRouter } from "./routers/optionsFlow";
 import { catalystBreakoutRouter } from "./routers/catalystBreakout";
@@ -1582,5 +1583,6 @@ export const appRouter = router({
   liveTraderFeed: liveTraderFeedRouter,
   nourScanner: nourScannerRouter,
   sriPlaybook: sriPlaybookRouter,
+  ictLiquidity: ictLiquidityRouter,
 });
 export type AppRouter = typeof appRouter;

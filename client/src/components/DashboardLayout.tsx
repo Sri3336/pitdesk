@@ -61,6 +61,7 @@ import {
   Timer,
   Crosshair,
   Rss,
+  Layers,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -101,6 +102,7 @@ const NAV_SECTIONS = [
       { icon: Activity, label: "Intraday Scanner", path: "/intraday-scanner" },
       { icon: Zap, label: "Catalyst Watch", path: "/catalyst-watch" },
       { icon: TrendingDown, label: "ICT Supply Zone", path: "/ict-supply-zone" },
+      { icon: Layers, label: "ICT Liquidity Scanner", path: "/ict-liquidity" },
       { icon: TrendingUp, label: "EMA Pullback", path: "/ema-pullback" },
       { icon: BookOpen, label: "Chart Patterns", path: "/chart-patterns" },
       { icon: Timer, label: "Theta Machine", path: "/theta-machine" },

@@ -598,3 +598,10 @@
 - [x] MySystemTab: QQQ regime banner, 4-gate pre-trade checker, position sizing table, exit rules, ticker universe, gate check history
 - [x] TraderJournalTab: add/edit/delete trader lessons, seed Nour + Qullamaggie lessons, filter by adopt decision
 - [x] Tabs wired in SriPlaybook.tsx (My System + Trader Journal tabs)
+
+## Phase 49: ICT Liquidity Scanner
+- [x] Server: ictLiquidity.ts — prev day H/L, opening range (first 5-min candle), retest detection, sell zone classification (SELL_PUT_ZONE / SELL_CALL_ZONE / NEUTRAL / AVOID)
+- [x] tRPC: ictLiquidity.scan procedure wired in routers.ts
+- [x] UI: IctLiquidity.tsx — full scanner page with direction bias cards, liquidity level grid, sell zone badges, premium placement guide, multi-timeframe regime summary
+- [ ] Add ICT Liquidity badges to Morning Scan / VelezScanner ticker cards (deferred — Morning Scan has its own signal system)
+- [x] Wire /ict-liquidity route in App.tsx and sidebar nav (under STRATEGIES)
