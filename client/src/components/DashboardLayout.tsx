@@ -104,7 +104,6 @@ const NAV_SECTIONS = [
       { icon: Zap, label: "Catalyst Watch", path: "/catalyst-watch" },
       { icon: TrendingDown, label: "ICT Supply Zone", path: "/ict-supply-zone" },
       { icon: Layers, label: "ICT Liquidity Scanner", path: "/ict-liquidity" },
-      { icon: GitBranch, label: "Strategy Visualizer", path: "/strategy-visualizer" },
       { icon: TrendingUp, label: "EMA Pullback", path: "/ema-pullback" },
       { icon: BookOpen, label: "Chart Patterns", path: "/chart-patterns" },
       { icon: Timer, label: "Theta Machine", path: "/theta-machine" },

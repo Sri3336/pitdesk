@@ -8,8 +8,10 @@ import {
   AlertTriangle, ArrowDownCircle, BarChart2, CalendarDays, ChevronDown, ChevronUp,
   Download, Info, Loader2, RefreshCw, TrendingDown, TrendingUp, Zap, Share2, Play,
 } from "lucide-react";
-import { useState as useStateLocal, useRef as useRefLocal } from "react";
+import { useState as useStateLocal, useRef as useRefLocal, lazy, Suspense } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +37,8 @@ import {
 import type { AnalysisResult, StrategyResult, EarningsInfo } from "../../../server/analysisEngine";
 import { EventImpactPanel } from "@/components/EventImpactPanel";
 import { TICKER_UNIVERSE } from "../../../shared/tickerUniverse";
+
+const StrategyVisualizerContent = lazy(() => import("./StrategyVisualizer"));
 
 // ─── Quantum & AI tickers set ─────────────────────────────────────────────────
 const QMAI_TICKERS = new Set(
@@ -1637,9 +1641,9 @@ export default function Analyzer() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gradient-gold">PitDesk</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gradient-gold">Options Analyzer</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            13-strategy analysis — credit and debit — ranked by composite score across POP, IV/RV, directional fit, theta, and more.
+            13-strategy analysis · Payoff Lab · Trade Performance
           </p>
         </div>
         {result && (
@@ -1655,6 +1659,31 @@ export default function Analyzer() {
           </Button>
         )}
       </div>
+
+      {/* Tab switcher */}
+      <Tabs defaultValue="analyzer" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="analyzer">Strategy Analyzer</TabsTrigger>
+          <TabsTrigger value="payoff">Payoff Lab</TabsTrigger>
+          <TabsTrigger value="performance">Performance</TabsTrigger>
+        </TabsList>
+
+        {/* ── Payoff Lab tab ── */}
+        <TabsContent value="payoff" className="mt-0">
+          <Suspense fallback={<div className="flex items-center justify-center py-20 text-muted-foreground text-sm">Loading Payoff Lab…</div>}>
+            <StrategyVisualizerContent />
+          </Suspense>
+        </TabsContent>
+
+        {/* ── Performance tab ── */}
+        <TabsContent value="performance" className="mt-0">
+          <Suspense fallback={<div className="flex items-center justify-center py-20 text-muted-foreground text-sm">Loading Performance…</div>}>
+            <StrategyVisualizerContent />
+          </Suspense>
+        </TabsContent>
+
+        {/* ── Strategy Analyzer tab (existing content) ── */}
+        <TabsContent value="analyzer" className="mt-0">
 
       {/* Analysis Form */}
       <Card className="border-border/50 bg-card">
@@ -1911,6 +1940,9 @@ export default function Analyzer() {
           </div>
         </div>
       )}
+
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
