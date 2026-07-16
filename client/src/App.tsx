@@ -57,6 +57,7 @@ const DecisionBench = lazy(() => import("./pages/DecisionBench"));
 const LiveTraderFeed = lazy(() => import("./pages/LiveTraderFeed"));
 const NourScanner = lazy(() => import("./pages/NourScanner"));
 const IctLiquidity = lazy(() => import("./pages/IctLiquidity"));
+const StrategyVisualizer = lazy(() => import("./pages/StrategyVisualizer"));
 
 // Analysis pages
 const Analyzer = lazy(() => import("./pages/Analyzer"));
@@ -211,6 +212,7 @@ function Router() {
                 <Route path="/live-trader-feed" component={LiveTraderFeed} />
                 <Route path="/nour-scanner" component={NourScanner} />
                 <Route path="/ict-liquidity" component={IctLiquidity} />
+                <Route path="/strategy-visualizer" component={StrategyVisualizer} />
 
                 {/* Analysis */}
                 <Route path="/analyzer" component={Analyzer} />

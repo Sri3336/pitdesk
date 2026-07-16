@@ -605,3 +605,11 @@
 - [x] UI: IctLiquidity.tsx — full scanner page with direction bias cards, liquidity level grid, sell zone badges, premium placement guide, multi-timeframe regime summary
 - [ ] Add ICT Liquidity badges to Morning Scan / VelezScanner ticker cards (deferred — Morning Scan has its own signal system)
 - [x] Wire /ict-liquidity route in App.tsx and sidebar nav (under STRATEGIES)
+
+## Phase 50: Strategy Visualizer + Performance Explorer
+- [x] Backend: strategyVisualizer.ts — computePayoff (Black-Scholes payoff curve + Greeks), getTradeHistory, getSetupStats, getFilterOptions
+- [x] Wire strategyVisualizerRouter into appRouter in routers.ts
+- [x] UI: StrategyVisualizer.tsx — strategy template picker, leg builder, payoff chart (expiry + today lines), IV slider, time decay slider, Greeks bar, summary metrics
+- [x] UI: PerformanceExplorer panel — setup stats cards, win rate bar chart, trade history list with filters
+- [x] Wire /strategy-visualizer route in App.tsx
+- [x] Add "Strategy Visualizer" to sidebar nav under Strategies (GitBranch icon)
