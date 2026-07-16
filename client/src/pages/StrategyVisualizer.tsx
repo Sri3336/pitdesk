@@ -96,12 +96,12 @@ function PayoffChart({ curve, currentPrice, breakevens }: PayoffChartProps) {
     const d = payload[0]?.payload;
     if (!d) return null;
     return (
-      <div className="bg-[#1e2130] border border-[#374151] rounded-lg p-3 shadow-xl text-xs">
-        <div className="font-bold text-white mb-1">${Number(label).toFixed(2)}</div>
+      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-xl text-xs">
+        <div className="font-bold text-gray-900 mb-1">${Number(label).toFixed(2)}</div>
         <div className={cn("font-semibold", d.pnlExpiry >= 0 ? "text-green-400" : "text-red-400")}>
           Expiry P&L: {fmt$(d.pnlExpiry, 2)}
         </div>
-        <div className={cn("text-gray-300", d.pnlNow >= 0 ? "text-green-300" : "text-red-300")}>
+        <div className={cn("text-gray-600", d.pnlNow >= 0 ? "text-green-600" : "text-red-600")}>
           Today P&L: {fmt$(d.pnlNow, 2)}
         </div>
       </div>
@@ -127,24 +127,24 @@ function PayoffChart({ curve, currentPrice, breakevens }: PayoffChartProps) {
               <stop offset="95%" stopColor="#ef4444" stopOpacity={0.3} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e2130" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
             dataKey="price"
             tickFormatter={(v) => `$${Number(v).toFixed(0)}`}
-            tick={{ fill: "#64748b", fontSize: 10 }}
+            tick={{ fill: "#6b7280", fontSize: 10 }}
             tickLine={false}
             axisLine={{ stroke: "#374151" }}
             interval="preserveStartEnd"
           />
           <YAxis
             tickFormatter={(v) => `$${Number(v).toFixed(0)}`}
-            tick={{ fill: "#64748b", fontSize: 10 }}
+            tick={{ fill: "#6b7280", fontSize: 10 }}
             tickLine={false}
             axisLine={{ stroke: "#374151" }}
             domain={[minPnl - yPad, maxPnl + yPad]}
           />
           <Tooltip content={<CustomTooltip />} />
-          <ReferenceLine y={0} stroke="#374151" strokeWidth={1.5} />
+          <ReferenceLine y={0} stroke="#d1d5db" strokeWidth={1.5} />
           <ReferenceLine
             x={currentPrice}
             stroke="#facc15"
@@ -156,7 +156,7 @@ function PayoffChart({ curve, currentPrice, breakevens }: PayoffChartProps) {
             <ReferenceLine
               key={i}
               x={bv}
-              stroke="#94a3b8"
+              stroke="#9ca3af"
               strokeWidth={1}
               strokeDasharray="2 2"
               label={{ value: `BE $${bv.toFixed(0)}`, fill: "#94a3b8", fontSize: 9, position: "insideTopRight" }}
@@ -264,7 +264,7 @@ function LegRow({ leg, onChange, onRemove }: {
         onChange={e => update("contracts", Math.max(1, Number(e.target.value)))}
         className="h-7 text-xs px-2"
       />
-      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={onRemove}>
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600" onClick={onRemove}>
         <Trash2 className="h-3.5 w-3.5" />
       </Button>
     </div>
@@ -341,7 +341,7 @@ function PerformanceExplorer() {
           <div className="grid grid-cols-2 gap-2">
             {stats.slice(0, 6).map(s => (
               <div key={s.strategy} className={cn("rounded-lg border p-2.5 text-xs", s.totalPnl >= 0 ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20")}>
-                <div className="font-semibold text-white truncate">{s.strategy}</div>
+                <div className="font-semibold text-gray-900 truncate">{s.strategy}</div>
                 <div className="flex justify-between mt-1">
                   <span className="text-gray-400">{s.trades} trades</span>
                   <span className={s.winRate >= 50 ? "text-green-400" : "text-red-400"}>{s.winRate}% WR</span>
@@ -367,15 +367,15 @@ function PerformanceExplorer() {
           <div className="h-36">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={statsChartData} margin={{ top: 4, right: 8, bottom: 20, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2130" />
-                <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 9 }} tickLine={false} axisLine={{ stroke: "#374151" }} interval={0} angle={-20} textAnchor="end" />
-                <YAxis tick={{ fill: "#64748b", fontSize: 9 }} tickLine={false} axisLine={{ stroke: "#374151" }} domain={[0, 100]} tickFormatter={v => `${v}%`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="name" tick={{ fill: "#6b7280", fontSize: 9 }} tickLine={false} axisLine={{ stroke: "#374151" }} interval={0} angle={-20} textAnchor="end" />
+                <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} tickLine={false} axisLine={{ stroke: "#374151" }} domain={[0, 100]} tickFormatter={v => `${v}%`} />
                 <Tooltip
                   formatter={(v: any, name: string) => [name === "winRate" ? `${v}%` : fmt$(v), name === "winRate" ? "Win Rate" : "Avg P&L"]}
-                  contentStyle={{ background: "#1e2130", border: "1px solid #374151", borderRadius: 8, fontSize: 11 }}
-                  labelStyle={{ color: "white" }}
+                  contentStyle={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11 }}
+                  labelStyle={{ color: "#111827" }}
                 />
-                <ReferenceLine y={50} stroke="#374151" strokeDasharray="3 3" />
+                <ReferenceLine y={50} stroke="#d1d5db" strokeDasharray="3 3" />
                 <Bar dataKey="winRate" radius={[3, 3, 0, 0]}>
                   {statsChartData.map((entry: { name: string; winRate: number; avgPnl: number; trades: number; profitFactor: number }, i: number) => (
                     <Cell key={i} fill={entry.winRate >= 50 ? "#22c55e" : "#ef4444"} fillOpacity={0.8} />
@@ -441,7 +441,7 @@ function PerformanceExplorer() {
                 <div key={t.id} className={cn("rounded-lg border px-3 py-2 text-xs", outcomeBg(t.outcome))}>
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-bold text-white">{t.ticker}</span>
+                      <span className="font-bold text-gray-900">{t.ticker}</span>
                       <span className="text-gray-400 ml-2">{t.strategyType || "—"}</span>
                       {t.expiryDate && <span className="text-gray-500 ml-2">exp {t.expiryDate}</span>}
                     </div>
@@ -547,11 +547,11 @@ export default function StrategyVisualizer() {
   const isCredit = netCredit > 0;
 
   return (
-    <div className="flex flex-col h-full min-h-0 p-4 gap-4 bg-[#0d1117]">
+    <div className="flex flex-col h-full min-h-0 p-4 gap-4 bg-gray-50">
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <Activity className="h-5 w-5 text-green-400" />
             Strategy Visualizer
           </h1>
@@ -570,8 +570,8 @@ export default function StrategyVisualizer() {
       </div>
 
       {showLearnMore && (
-        <div className="bg-[#161b22] border border-[#374151] rounded-lg p-3 text-xs text-gray-400 flex-shrink-0">
-          <strong className="text-white">How to use:</strong> Enter your option legs below (strike, expiry, premium, IV). The payoff chart updates in real-time.
+        <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-400 flex-shrink-0">
+          <strong className="text-gray-900">How to use:</strong> Enter your option legs below (strike, expiry, premium, IV). The payoff chart updates in real-time.
           Use the <strong className="text-yellow-400">Time slider</strong> to simulate theta decay — drag right to see how your position looks as days pass.
           Use the <strong className="text-purple-400">IV slider</strong> to simulate IV crush (drag left) or IV expansion (drag right).
           The <strong className="text-green-400">green line</strong> shows P&L at expiration. The <strong className="text-blue-400">blue dashed line</strong> shows P&L today with current IV.
@@ -585,9 +585,9 @@ export default function StrategyVisualizer() {
         <div className="flex flex-col gap-3 w-[55%] min-w-0 overflow-y-auto">
 
           {/* Template picker */}
-          <Card className="bg-[#161b22] border-[#374151] flex-shrink-0">
+          <Card className="bg-white border-gray-200 flex-shrink-0">
             <CardHeader className="pb-2 pt-3 px-4">
-              <CardTitle className="text-sm text-white flex items-center gap-2">
+              <CardTitle className="text-sm text-gray-900 flex items-center gap-2">
                 <Zap className="h-4 w-4 text-yellow-400" />
                 Strategy Template
               </CardTitle>
@@ -602,7 +602,7 @@ export default function StrategyVisualizer() {
                       "px-2.5 py-1 rounded-md text-xs font-medium transition-colors border",
                       selectedTemplate === name
                         ? "bg-green-500/20 border-green-500/50 text-green-400"
-                        : "bg-[#0d1117] border-[#374151] text-gray-400 hover:border-gray-500 hover:text-gray-300"
+                        : "bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-500 hover:text-gray-300"
                     )}
                   >
                     {name}
@@ -613,7 +613,7 @@ export default function StrategyVisualizer() {
           </Card>
 
           {/* Underlying price */}
-          <Card className="bg-[#161b22] border-[#374151] flex-shrink-0">
+          <Card className="bg-white border-gray-200 flex-shrink-0">
             <CardContent className="px-4 py-3">
               <div className="flex items-center gap-4">
                 <div className="flex-1">
@@ -634,10 +634,10 @@ export default function StrategyVisualizer() {
           </Card>
 
           {/* Legs */}
-          <Card className="bg-[#161b22] border-[#374151] flex-shrink-0">
+          <Card className="bg-white border-gray-200 flex-shrink-0">
             <CardHeader className="pb-2 pt-3 px-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm text-white">Option Legs</CardTitle>
+                <CardTitle className="text-sm text-gray-900">Option Legs</CardTitle>
                 <Button size="sm" variant="outline" className="h-6 text-xs gap-1" onClick={addLeg}>
                   <Plus className="h-3 w-3" /> Add Leg
                 </Button>
@@ -670,7 +670,7 @@ export default function StrategyVisualizer() {
 
           {/* Summary metrics */}
           {payoff && (
-            <Card className="bg-[#161b22] border-[#374151] flex-shrink-0">
+            <Card className="bg-white border-gray-200 flex-shrink-0">
               <CardContent className="px-4 py-3">
                 <div className="grid grid-cols-4 gap-3 mb-3">
                   <div className="text-center">
@@ -708,9 +708,9 @@ export default function StrategyVisualizer() {
           )}
 
           {/* Payoff Chart */}
-          <Card className="bg-[#161b22] border-[#374151] flex-shrink-0">
+          <Card className="bg-white border-gray-200 flex-shrink-0">
             <CardHeader className="pb-1 pt-3 px-4">
-              <CardTitle className="text-sm text-white flex items-center gap-2">
+              <CardTitle className="text-sm text-gray-900 flex items-center gap-2">
                 <BarChart2 className="h-4 w-4 text-green-400" />
                 Payoff Diagram
               </CardTitle>
@@ -731,7 +731,7 @@ export default function StrategyVisualizer() {
           </Card>
 
           {/* Sliders */}
-          <Card className="bg-[#161b22] border-[#374151] flex-shrink-0">
+          <Card className="bg-white border-gray-200 flex-shrink-0">
             <CardContent className="px-4 py-3 flex flex-col gap-4">
               {/* Time slider */}
               <div>
@@ -790,7 +790,7 @@ export default function StrategyVisualizer() {
 
           {/* Greeks */}
           {payoff?.greeks && (
-            <Card className="bg-[#161b22] border-[#374151] flex-shrink-0">
+            <Card className="bg-white border-gray-200 flex-shrink-0">
               <CardHeader className="pb-1 pt-3 px-4">
                 <CardTitle className="text-xs text-gray-400 uppercase tracking-wide">Position Greeks</CardTitle>
               </CardHeader>
@@ -808,9 +808,9 @@ export default function StrategyVisualizer() {
 
         {/* ── RIGHT: Performance Explorer ── */}
         <div className="flex flex-col w-[45%] min-w-0 overflow-y-auto">
-          <Card className="bg-[#161b22] border-[#374151] flex-1 min-h-0">
+          <Card className="bg-white border-gray-200 flex-1 min-h-0">
             <CardHeader className="pb-2 pt-3 px-4 flex-shrink-0">
-              <CardTitle className="text-sm text-white flex items-center gap-2">
+              <CardTitle className="text-sm text-gray-900 flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-blue-400" />
                 Trade Setup Performance
               </CardTitle>
@@ -825,3 +825,4 @@ export default function StrategyVisualizer() {
     </div>
   );
 }
+// light theme
