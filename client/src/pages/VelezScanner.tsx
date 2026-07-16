@@ -216,6 +216,55 @@ function FibLevelsPanel({ signal }: { signal: DailySignal }) {
 
 // ─── Signal Row ───────────────────────────────────────────────────────────────
 
+function IctZoneBadge({ ticker }: { ticker: string }) {
+  const { data } = trpc.ictLiquidity.scanOne.useQuery(
+    { ticker },
+    { staleTime: 5 * 60 * 1000, retry: false }
+  );
+  if (!data) return null;
+  const zone = data.sellZone;
+  if (zone === "SELL_PUT_ZONE") return (
+    <Tooltip>
+      <TooltipTrigger>
+        <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 border border-green-300 font-semibold">
+          🟢 Sell Put
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[200px]">
+        <p className="font-semibold">ICT: Sell Put Zone</p>
+        <p className="text-xs mt-0.5">{data.sellZoneReason}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+  if (zone === "SELL_CALL_ZONE") return (
+    <Tooltip>
+      <TooltipTrigger>
+        <Badge className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700 border border-red-300 font-semibold">
+          🔴 Sell Call
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[200px]">
+        <p className="font-semibold">ICT: Sell Call Zone</p>
+        <p className="text-xs mt-0.5">{data.sellZoneReason}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+  if (zone === "AVOID") return (
+    <Tooltip>
+      <TooltipTrigger>
+        <Badge className="text-[10px] px-1.5 py-0 bg-yellow-100 text-yellow-700 border border-yellow-300 font-semibold">
+          ⚠ Avoid
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[200px]">
+        <p className="font-semibold">ICT: Avoid — Stop Hunt Zone</p>
+        <p className="text-xs mt-0.5">{data.sellZoneReason}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+  return null;
+}
+
 function SignalRow({ signal }: { signal: DailySignal }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -273,6 +322,7 @@ function SignalRow({ signal }: { signal: DailySignal }) {
                 <TooltipContent>Swept Previous Day Low ({signal.prevDayLow != null ? `$${Number(signal.prevDayLow).toFixed(2)}` : '—'}) — liquidity grab below prior lows</TooltipContent>
               </Tooltip>
             )}
+            <IctZoneBadge ticker={signal.ticker} />
           </div>
           <div className="text-[10px] text-muted-foreground">{signal.signalDate}</div>
         </td>

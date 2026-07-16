@@ -95,14 +95,28 @@ function PayoffChart({ curve, currentPrice, breakevens }: PayoffChartProps) {
     if (!active || !payload?.length) return null;
     const d = payload[0]?.payload;
     if (!d) return null;
+    const priceDist = currentPrice > 0 ? ((Number(label) - currentPrice) / currentPrice * 100) : 0;
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-xl text-xs">
-        <div className="font-bold text-gray-900 mb-1">${Number(label).toFixed(2)}</div>
-        <div className={cn("font-semibold", d.pnlExpiry >= 0 ? "text-green-400" : "text-red-400")}>
-          Expiry P&L: {fmt$(d.pnlExpiry, 2)}
+      <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-xl text-xs min-w-[160px]">
+        <div className="font-bold text-gray-900 mb-1 flex justify-between">
+          <span>${Number(label).toFixed(2)}</span>
+          <span className={priceDist >= 0 ? "text-green-600" : "text-red-600"}>
+            {priceDist >= 0 ? "+" : ""}{priceDist.toFixed(1)}% from current
+          </span>
         </div>
-        <div className={cn("text-gray-600", d.pnlNow >= 0 ? "text-green-600" : "text-red-600")}>
-          Today P&L: {fmt$(d.pnlNow, 2)}
+        <div className="border-t border-gray-100 pt-1.5 space-y-1">
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-500">At Expiry</span>
+            <span className={cn("font-bold font-mono", d.pnlExpiry >= 0 ? "text-green-600" : "text-red-600")}>
+              {fmt$(d.pnlExpiry, 2)}
+            </span>
+          </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-500">Today</span>
+            <span className={cn("font-mono", d.pnlNow >= 0 ? "text-green-600" : "text-red-500")}>
+              {fmt$(d.pnlNow, 2)}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -212,7 +226,7 @@ function LegRow({ leg, onChange, onRemove }: {
   return (
     <div className="grid grid-cols-[80px_70px_80px_90px_90px_70px_50px_32px] gap-1.5 items-center text-xs">
       <Select value={leg.action} onValueChange={v => update("action", v)}>
-        <SelectTrigger className={cn("h-7 text-xs", leg.action === "sell" ? "text-red-400 border-red-900" : "text-green-400 border-green-900")}>
+        <SelectTrigger className={cn("h-7 text-xs", leg.action === "sell" ? "text-red-600 border-red-300" : "text-green-600 border-green-300")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -264,7 +278,7 @@ function LegRow({ leg, onChange, onRemove }: {
         onChange={e => update("contracts", Math.max(1, Number(e.target.value)))}
         className="h-7 text-xs px-2"
       />
-      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600" onClick={onRemove}>
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={onRemove}>
         <Trash2 className="h-3.5 w-3.5" />
       </Button>
     </div>
@@ -275,11 +289,11 @@ function LegRow({ leg, onChange, onRemove }: {
 
 function GreeksBar({ greeks }: { greeks: { delta: number; gamma: number; theta: number; vega: number; rho: number } }) {
   const items = [
-    { label: "Delta", value: greeks.delta.toFixed(3), color: greeks.delta > 0 ? "text-green-400" : "text-red-400" },
-    { label: "Gamma", value: greeks.gamma.toFixed(4), color: "text-blue-400" },
-    { label: "Theta", value: greeks.theta.toFixed(2), color: greeks.theta < 0 ? "text-red-400" : "text-green-400" },
-    { label: "Vega",  value: greeks.vega.toFixed(2),  color: "text-purple-400" },
-    { label: "Rho",   value: greeks.rho.toFixed(2),   color: "text-gray-400" },
+    { label: "Delta", value: greeks.delta.toFixed(3), color: greeks.delta > 0 ? "text-green-600" : "text-red-600" },
+    { label: "Gamma", value: greeks.gamma.toFixed(4), color: "text-blue-600" },
+    { label: "Theta", value: greeks.theta.toFixed(2), color: greeks.theta < 0 ? "text-red-600" : "text-green-600" },
+    { label: "Vega",  value: greeks.vega.toFixed(2),  color: "text-purple-600" },
+    { label: "Rho",   value: greeks.rho.toFixed(2),   color: "text-gray-600" },
   ];
   return (
     <div className="flex gap-4 flex-wrap">
@@ -310,18 +324,29 @@ function PerformanceExplorer() {
   });
 
   const outcomeColor = (outcome: string) => {
-    if (outcome === "win")  return "text-green-400";
-    if (outcome === "loss") return "text-red-400";
-    if (outcome === "open") return "text-yellow-400";
-    return "text-gray-400";
+    if (outcome === "win")  return "text-green-700";
+    if (outcome === "loss") return "text-red-700";
+    if (outcome === "open") return "text-yellow-700";
+    return "text-gray-600";
   };
 
   const outcomeBg = (outcome: string) => {
-    if (outcome === "win")  return "bg-green-500/10 border-green-500/30";
-    if (outcome === "loss") return "bg-red-500/10 border-red-500/30";
-    if (outcome === "open") return "bg-yellow-500/10 border-yellow-500/30";
-    return "bg-gray-500/10 border-gray-500/30";
+    if (outcome === "win")  return "bg-green-50 border-green-200";
+    if (outcome === "loss") return "bg-red-50 border-red-200";
+    if (outcome === "open") return "bg-yellow-50 border-yellow-200";
+    return "bg-gray-50 border-gray-200";
   };
+
+  // Best and worst trades
+  const allStats = stats || [];
+  const bestStrategy = allStats.reduce((best: NonNullable<typeof stats>[number] | null, s: NonNullable<typeof stats>[number]) => {
+    if (!best) return s;
+    return s.winRate > best.winRate ? s : best;
+  }, null);
+  const worstStrategy = allStats.reduce((worst: NonNullable<typeof stats>[number] | null, s: NonNullable<typeof stats>[number]) => {
+    if (!worst) return s;
+    return s.winRate < worst.winRate ? s : worst;
+  }, null);
 
   // Chart data for strategy stats
   const statsChartData = (stats || []).map((s: NonNullable<typeof stats>[number]) => ({
@@ -334,25 +359,71 @@ function PerformanceExplorer() {
 
   return (
     <div className="flex flex-col gap-4 h-full">
+      {/* Best / Worst callouts */}
+      {allStats.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {bestStrategy && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-2.5 text-xs">
+              <div className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-0.5">🏆 Best Setup</div>
+              <div className="font-bold text-gray-900 truncate">{bestStrategy.strategy}</div>
+              <div className="flex justify-between mt-1">
+                <span className="text-gray-500">{bestStrategy.trades} trades</span>
+                <span className="text-green-700 font-bold">{bestStrategy.winRate}% WR</span>
+              </div>
+              <div className="flex justify-between mt-0.5">
+                <span className="text-gray-500">Avg P&L</span>
+                <span className="text-green-700 font-mono font-bold">{fmt$(bestStrategy.avgPnl)}</span>
+              </div>
+              {bestStrategy.bestPnl != null && (
+                <div className="flex justify-between mt-0.5">
+                  <span className="text-gray-500">Best trade</span>
+                  <span className="text-green-600 font-mono">{fmt$(bestStrategy.bestPnl)}</span>
+                </div>
+              )}
+            </div>
+          )}
+          {worstStrategy && worstStrategy !== bestStrategy && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs">
+              <div className="text-[10px] text-red-600 font-semibold uppercase tracking-wide mb-0.5">⚠ Needs Work</div>
+              <div className="font-bold text-gray-900 truncate">{worstStrategy.strategy}</div>
+              <div className="flex justify-between mt-1">
+                <span className="text-gray-500">{worstStrategy.trades} trades</span>
+                <span className="text-red-700 font-bold">{worstStrategy.winRate}% WR</span>
+              </div>
+              <div className="flex justify-between mt-0.5">
+                <span className="text-gray-500">Avg P&L</span>
+                <span className="text-red-700 font-mono font-bold">{fmt$(worstStrategy.avgPnl)}</span>
+              </div>
+              {worstStrategy.worstPnl != null && (
+                <div className="flex justify-between mt-0.5">
+                  <span className="text-gray-500">Worst trade</span>
+                  <span className="text-red-600 font-mono">{fmt$(worstStrategy.worstPnl)}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Strategy Stats Cards */}
       {stats && stats.length > 0 && (
         <div>
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Setup Performance by Strategy</div>
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">All Strategies</div>
           <div className="grid grid-cols-2 gap-2">
             {stats.slice(0, 6).map(s => (
-              <div key={s.strategy} className={cn("rounded-lg border p-2.5 text-xs", s.totalPnl >= 0 ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20")}>
+              <div key={s.strategy} className={cn("rounded-lg border p-2.5 text-xs", s.totalPnl >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200")}>
                 <div className="font-semibold text-gray-900 truncate">{s.strategy}</div>
                 <div className="flex justify-between mt-1">
-                  <span className="text-gray-400">{s.trades} trades</span>
-                  <span className={s.winRate >= 50 ? "text-green-400" : "text-red-400"}>{s.winRate}% WR</span>
+                  <span className="text-gray-500">{s.trades} trades</span>
+                  <span className={s.winRate >= 50 ? "text-green-700" : "text-red-700"}>{s.winRate}% WR</span>
                 </div>
                 <div className="flex justify-between mt-0.5">
                   <span className="text-gray-500">Avg P&L</span>
-                  <span className={s.avgPnl >= 0 ? "text-green-400 font-mono" : "text-red-400 font-mono"}>{fmt$(s.avgPnl)}</span>
+                  <span className={s.avgPnl >= 0 ? "text-green-700 font-mono" : "text-red-700 font-mono"}>{fmt$(s.avgPnl)}</span>
                 </div>
                 <div className="flex justify-between mt-0.5">
-                  <span className="text-gray-500">Total</span>
-                  <span className={s.totalPnl >= 0 ? "text-green-400 font-mono" : "text-red-400 font-mono"}>{fmt$(s.totalPnl)}</span>
+                  <span className="text-gray-500">Avg DTE</span>
+                  <span className="text-gray-600 font-mono">{s.avgDte != null ? `${s.avgDte}d` : '—'}</span>
                 </div>
               </div>
             ))}
@@ -363,7 +434,7 @@ function PerformanceExplorer() {
       {/* Win Rate Chart */}
       {statsChartData.length > 0 && (
         <div>
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Win Rate by Strategy</div>
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Win Rate by Strategy</div>
           <div className="h-36">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={statsChartData} margin={{ top: 4, right: 8, bottom: 20, left: 0 }}>
@@ -425,7 +496,7 @@ function PerformanceExplorer() {
 
       {/* Trade List */}
       <div className="flex-1 min-h-0">
-        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
           Trade History {trades ? `(${trades.length})` : ""}
         </div>
         {isLoading ? (
@@ -442,7 +513,7 @@ function PerformanceExplorer() {
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="font-bold text-gray-900">{t.ticker}</span>
-                      <span className="text-gray-400 ml-2">{t.strategyType || "—"}</span>
+                      <span className="text-gray-500 ml-2">{t.strategyType || "—"}</span>
                       {t.expiryDate && <span className="text-gray-500 ml-2">exp {t.expiryDate}</span>}
                     </div>
                     <div className="flex items-center gap-2">
@@ -450,7 +521,7 @@ function PerformanceExplorer() {
                         {t.outcome.toUpperCase()}
                       </Badge>
                       {t.realizedPnl != null && (
-                        <span className={cn("font-mono font-bold", t.realizedPnl >= 0 ? "text-green-400" : "text-red-400")}>
+                        <span className={cn("font-mono font-bold", t.realizedPnl >= 0 ? "text-green-700" : "text-red-700")}>
                           {fmt$(t.realizedPnl)}
                         </span>
                       )}
@@ -461,7 +532,7 @@ function PerformanceExplorer() {
                     {t.exitDate  && <span>Exit: {t.exitDate}</span>}
                     {t.entryPrice != null && <span>@ {fmt$(t.entryPrice, 2)}</span>}
                     {t.pnlPct != null && (
-                      <span className={t.pnlPct >= 0 ? "text-green-400" : "text-red-400"}>
+                      <span className={t.pnlPct >= 0 ? "text-green-700" : "text-red-700"}>
                         {t.pnlPct > 0 ? "+" : ""}{t.pnlPct}% of risk
                       </span>
                     )}
@@ -552,7 +623,7 @@ export default function StrategyVisualizer() {
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Activity className="h-5 w-5 text-green-400" />
+            <Activity className="h-5 w-5 text-green-600" />
             Strategy Visualizer
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">Build any options strategy, visualize P&L, and compare against your trade history</p>
@@ -560,7 +631,7 @@ export default function StrategyVisualizer() {
         <Button
           variant="ghost"
           size="sm"
-          className="text-gray-400 text-xs"
+          className="text-gray-500 text-xs"
           onClick={() => setShowLearnMore(v => !v)}
         >
           <Info className="h-3.5 w-3.5 mr-1" />
@@ -570,11 +641,11 @@ export default function StrategyVisualizer() {
       </div>
 
       {showLearnMore && (
-        <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-400 flex-shrink-0">
+        <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-600 flex-shrink-0">
           <strong className="text-gray-900">How to use:</strong> Enter your option legs below (strike, expiry, premium, IV). The payoff chart updates in real-time.
-          Use the <strong className="text-yellow-400">Time slider</strong> to simulate theta decay — drag right to see how your position looks as days pass.
-          Use the <strong className="text-purple-400">IV slider</strong> to simulate IV crush (drag left) or IV expansion (drag right).
-          The <strong className="text-green-400">green line</strong> shows P&L at expiration. The <strong className="text-blue-400">blue dashed line</strong> shows P&L today with current IV.
+          Use the <strong className="text-amber-600">Time slider</strong> to simulate theta decay — drag right to see how your position looks as days pass.
+          Use the <strong className="text-purple-600">IV slider</strong> to simulate IV crush (drag left) or IV expansion (drag right).
+          The <strong className="text-green-600">green line</strong> shows P&L at expiration. The <strong className="text-blue-600">blue dashed line</strong> shows P&L today with current IV.
         </div>
       )}
 
@@ -588,7 +659,7 @@ export default function StrategyVisualizer() {
           <Card className="bg-white border-gray-200 flex-shrink-0">
             <CardHeader className="pb-2 pt-3 px-4">
               <CardTitle className="text-sm text-gray-900 flex items-center gap-2">
-                <Zap className="h-4 w-4 text-yellow-400" />
+                <Zap className="h-4 w-4 text-amber-500" />
                 Strategy Template
               </CardTitle>
             </CardHeader>
@@ -601,8 +672,8 @@ export default function StrategyVisualizer() {
                     className={cn(
                       "px-2.5 py-1 rounded-md text-xs font-medium transition-colors border",
                       selectedTemplate === name
-                        ? "bg-green-500/20 border-green-500/50 text-green-400"
-                        : "bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-500 hover:text-gray-300"
+                        ? "bg-green-100 border-green-400 text-green-700"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:text-gray-800"
                     )}
                   >
                     {name}
@@ -617,7 +688,7 @@ export default function StrategyVisualizer() {
             <CardContent className="px-4 py-3">
               <div className="flex items-center gap-4">
                 <div className="flex-1">
-                  <Label className="text-xs text-gray-400">Underlying Price ($)</Label>
+                  <Label className="text-xs text-gray-600">Underlying Price ($)</Label>
                   <Input
                     type="number"
                     value={currentPrice}
@@ -626,7 +697,7 @@ export default function StrategyVisualizer() {
                   />
                 </div>
                 <div className="flex-1">
-                  <Label className="text-xs text-gray-400">Account Size (for sizing)</Label>
+                  <Label className="text-xs text-gray-600">Account Size (for sizing)</Label>
                   <Input type="number" defaultValue={100000} className="h-8 mt-1 text-sm font-mono" />
                 </div>
               </div>
@@ -675,31 +746,31 @@ export default function StrategyVisualizer() {
                 <div className="grid grid-cols-4 gap-3 mb-3">
                   <div className="text-center">
                     <div className="text-[10px] text-gray-500 uppercase">Net {isCredit ? "Credit" : "Debit"}</div>
-                    <div className={cn("text-base font-bold font-mono", isCredit ? "text-green-400" : "text-red-400")}>
+                    <div className={cn("text-base font-bold font-mono", isCredit ? "text-green-600" : "text-red-600")}>
                       {fmt$(Math.abs(netCredit), 2)}
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-gray-500 uppercase">Max Profit</div>
-                    <div className="text-base font-bold font-mono text-green-400">
+                    <div className="text-base font-bold font-mono text-green-600">
                       {payoff.maxProfit > 50000 ? "Unlimited" : fmt$(payoff.maxProfit)}
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-gray-500 uppercase">Max Loss</div>
-                    <div className="text-base font-bold font-mono text-red-400">
+                    <div className="text-base font-bold font-mono text-red-600">
                       {payoff.maxLoss < -50000 ? "Unlimited" : fmt$(payoff.maxLoss)}
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="text-[10px] text-gray-500 uppercase">Prob. Profit</div>
-                    <div className={cn("text-base font-bold font-mono", payoff.pop >= 60 ? "text-green-400" : payoff.pop >= 40 ? "text-yellow-400" : "text-red-400")}>
+                    <div className={cn("text-base font-bold font-mono", payoff.pop >= 60 ? "text-green-600" : payoff.pop >= 40 ? "text-amber-600" : "text-red-600")}>
                       {payoff.pop}%
                     </div>
                   </div>
                 </div>
                 {payoff.breakevens.length > 0 && (
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-gray-600">
                     Breakeven{payoff.breakevens.length > 1 ? "s" : ""}: {payoff.breakevens.map(b => `$${b.toFixed(2)}`).join(" / ")}
                   </div>
                 )}
@@ -711,7 +782,7 @@ export default function StrategyVisualizer() {
           <Card className="bg-white border-gray-200 flex-shrink-0">
             <CardHeader className="pb-1 pt-3 px-4">
               <CardTitle className="text-sm text-gray-900 flex items-center gap-2">
-                <BarChart2 className="h-4 w-4 text-green-400" />
+                <BarChart2 className="h-4 w-4 text-green-600" />
                 Payoff Diagram
               </CardTitle>
             </CardHeader>
@@ -736,11 +807,11 @@ export default function StrategyVisualizer() {
               {/* Time slider */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <Label className="text-xs text-yellow-400 font-semibold flex items-center gap-1">
+                  <Label className="text-xs text-amber-600 font-semibold flex items-center gap-1">
                     <Target className="h-3.5 w-3.5" />
                     Time Decay — Days Elapsed
                   </Label>
-                  <span className="text-xs font-mono text-yellow-400">
+                  <span className="text-xs font-mono text-amber-600">
                     Day {clampedDays} of {maxDte} ({maxDte - clampedDays} DTE remaining)
                   </span>
                 </div>
@@ -761,11 +832,11 @@ export default function StrategyVisualizer() {
               {/* IV slider */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <Label className="text-xs text-purple-400 font-semibold flex items-center gap-1">
+                  <Label className="text-xs text-purple-600 font-semibold flex items-center gap-1">
                     <Percent className="h-3.5 w-3.5" />
                     IV Shift
                   </Label>
-                  <span className={cn("text-xs font-mono", ivShift > 0 ? "text-red-400" : ivShift < 0 ? "text-green-400" : "text-gray-400")}>
+                  <span className={cn("text-xs font-mono", ivShift > 0 ? "text-red-600" : ivShift < 0 ? "text-green-600" : "text-gray-500")}>
                     {ivShift > 0 ? "+" : ""}{Math.round(ivShift * 100)}% IV
                     {ivShift < 0 && " (IV Crush ✓)"}
                     {ivShift > 0 && " (IV Expansion ↑)"}
@@ -780,9 +851,9 @@ export default function StrategyVisualizer() {
                   className="[&_[role=slider]]:bg-purple-400 [&_[role=slider]]:border-purple-400"
                 />
                 <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                  <span className="text-green-400">-30% IV Crush</span>
-                  <span className="text-gray-400">No change</span>
-                  <span className="text-red-400">+30% IV Expansion</span>
+                  <span className="text-green-600">-30% IV Crush</span>
+                  <span className="text-gray-500">No change</span>
+                  <span className="text-red-600">+30% IV Expansion</span>
                 </div>
               </div>
             </CardContent>
@@ -792,13 +863,13 @@ export default function StrategyVisualizer() {
           {payoff?.greeks && (
             <Card className="bg-white border-gray-200 flex-shrink-0">
               <CardHeader className="pb-1 pt-3 px-4">
-                <CardTitle className="text-xs text-gray-400 uppercase tracking-wide">Position Greeks</CardTitle>
+                <CardTitle className="text-xs text-gray-500 uppercase tracking-wide">Position Greeks</CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-3">
                 <GreeksBar greeks={payoff.greeks} />
                 {payoff.currentPnl !== 0 && (
-                  <div className="mt-2 text-xs text-gray-400">
-                    Current P&L (with sliders): <span className={cn("font-mono font-bold", payoff.currentPnl >= 0 ? "text-green-400" : "text-red-400")}>{fmt$(payoff.currentPnl, 2)}</span>
+                  <div className="mt-2 text-xs text-gray-500">
+                    Current P&L (with sliders): <span className={cn("font-mono font-bold", payoff.currentPnl >= 0 ? "text-green-600" : "text-red-600")}>{fmt$(payoff.currentPnl, 2)}</span>
                   </div>
                 )}
               </CardContent>
@@ -811,7 +882,7 @@ export default function StrategyVisualizer() {
           <Card className="bg-white border-gray-200 flex-1 min-h-0">
             <CardHeader className="pb-2 pt-3 px-4 flex-shrink-0">
               <CardTitle className="text-sm text-gray-900 flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-blue-400" />
+                <BookOpen className="h-4 w-4 text-blue-600" />
                 Trade Setup Performance
               </CardTitle>
               <p className="text-[11px] text-gray-500">Your historical trades — see which setups actually work</p>
