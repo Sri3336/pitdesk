@@ -923,3 +923,105 @@ export const tradeGateChecks = mysqlTable("trade_gate_checks", {
   notes: text("notes"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });
+
+// ─── Per-User Playbook: Personal Trading Rules ────────────────────────────────
+// Each user can define their own rules. Rules are checked against every strategy recommendation.
+export const playbookRules = mysqlTable("playbook_rules", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  ruleText: varchar("rule_text", { length: 512 }).notNull(),       // e.g. "Never trade within 5 days of earnings"
+  ruleType: mysqlEnum("ruleType", ["hard_block", "soft_warn", "guideline"]).default("soft_warn").notNull(),
+  // Condition fields for auto-checking
+  conditionField: varchar("condition_field", { length: 64 }),      // e.g. "daysToEarnings", "ivRank", "bidAskSpreadPct", "openInterest"
+  conditionOp: varchar("condition_op", { length: 16 }),            // "lt", "gt", "lte", "gte", "eq"
+  conditionValue: decimal("condition_value", { precision: 12, scale: 4 }), // threshold value
+  category: varchar("category", { length: 64 }).default("general").notNull(), // "risk", "liquidity", "timing", "strategy", "general"
+  isActive: tinyint("is_active").default(1).notNull(),
+  timesTriggered: int("times_triggered").default(0).notNull(),     // how many times this rule fired
+  timesOverridden: int("times_overridden").default(0).notNull(),   // how many times user traded anyway
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type PlaybookRule = typeof playbookRules.$inferSelect;
+export type InsertPlaybookRule = typeof playbookRules.$inferInsert;
+
+// ─── Per-User Playbook: Style Profile (auto-computed from trade log) ──────────
+// One row per user, updated whenever trade log changes
+export const playbookStyleProfile = mysqlTable("playbook_style_profile", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull().unique(),
+  // Auto-detected style tag
+  styleTag: varchar("style_tag", { length: 64 }).default("Unknown").notNull(), // "Premium Seller", "Breakout Trader", "Momentum Swing", "Earnings Trader"
+  // Top strategies by win rate (computed from manualTrades)
+  topStrategy1: varchar("top_strategy_1", { length: 64 }),
+  topStrategy1WinRate: decimal("top_strategy_1_win_rate", { precision: 5, scale: 2 }),
+  topStrategy2: varchar("top_strategy_2", { length: 64 }),
+  topStrategy2WinRate: decimal("top_strategy_2_win_rate", { precision: 5, scale: 2 }),
+  topStrategy3: varchar("top_strategy_3", { length: 64 }),
+  topStrategy3WinRate: decimal("top_strategy_3_win_rate", { precision: 5, scale: 2 }),
+  // Weak spots (auto-detected losing patterns)
+  weakSpot1: varchar("weak_spot_1", { length: 256 }),  // e.g. "Lose 68% of trades within 5 days of earnings"
+  weakSpot2: varchar("weak_spot_2", { length: 256 }),
+  weakSpot3: varchar("weak_spot_3", { length: 256 }),
+  // Overall stats
+  totalTrades: int("total_trades").default(0).notNull(),
+  winRate: decimal("win_rate", { precision: 5, scale: 2 }).default("0").notNull(),
+  avgWin: decimal("avg_win", { precision: 10, scale: 2 }).default("0").notNull(),
+  avgLoss: decimal("avg_loss", { precision: 10, scale: 2 }).default("0").notNull(),
+  profitFactor: decimal("profit_factor", { precision: 6, scale: 2 }).default("0").notNull(),
+  // Rule compliance this month
+  ruleCompliancePct: decimal("rule_compliance_pct", { precision: 5, scale: 2 }).default("100").notNull(),
+  rulesCheckedThisMonth: int("rules_checked_this_month").default(0).notNull(),
+  rulesViolatedThisMonth: int("rules_violated_this_month").default(0).notNull(),
+  computedAt: bigint("computed_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type PlaybookStyleProfile = typeof playbookStyleProfile.$inferSelect;
+export type InsertPlaybookStyleProfile = typeof playbookStyleProfile.$inferInsert;
+
+// ─── Per-User Playbook: Rule Check Log ────────────────────────────────────────
+// Every time a strategy recommendation is checked against rules, log the result
+export const playbookRuleChecks = mysqlTable("playbook_rule_checks", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  ruleId: int("rule_id").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  strategy: varchar("strategy", { length: 64 }).notNull(),
+  triggered: tinyint("triggered").notNull(),           // 1 = rule fired, 0 = rule passed
+  overridden: tinyint("overridden").default(0).notNull(), // 1 = user traded anyway
+  contextJson: text("context_json"),                   // snapshot of the values that triggered it
+  checkedAt: bigint("checked_at", { mode: "number" }).notNull(),
+});
+export type PlaybookRuleCheck = typeof playbookRuleChecks.$inferSelect;
+export type InsertPlaybookRuleCheck = typeof playbookRuleChecks.$inferInsert;
+
+// ─── Per-User Watchlist (for guided flow ticker-first entry) ──────────────────
+export const userWatchlist = mysqlTable("user_watchlist", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  addedFrom: varchar("added_from", { length: 32 }).default("manual").notNull(), // "manual" | "session" | "scanner"
+  sortOrder: int("sort_order").default(0).notNull(),
+  isActive: tinyint("is_active").default(1).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  uniqUserTicker: uniqueIndex("uniq_user_watchlist").on(t.userId, t.ticker),
+}));
+export type UserWatchlistItem = typeof userWatchlist.$inferSelect;
+export type InsertUserWatchlistItem = typeof userWatchlist.$inferInsert;
+
+// ─── User Preferences (theme, guided flow defaults) ───────────────────────────
+export const userPreferences = mysqlTable("user_preferences", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull().unique(),
+  theme: varchar("theme", { length: 16 }).default("light").notNull(),   // "light" | "dark"
+  defaultTimeframe: varchar("default_timeframe", { length: 16 }).default("swing").notNull(), // "intraday" | "swing"
+  defaultRisk: varchar("default_risk", { length: 16 }).default("conservative").notNull(),    // "conservative" | "moderate" | "aggressive"
+  defaultCapitalBucket: varchar("default_capital_bucket", { length: 16 }).default("1k_5k").notNull(), // "under_1k" | "1k_5k" | "5k_25k" | "25k_plus"
+  showPlaybookBadges: tinyint("show_playbook_badges").default(1).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type UserPreferences = typeof userPreferences.$inferSelect;
+export type InsertUserPreferences = typeof userPreferences.$inferInsert;

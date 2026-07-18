@@ -335,6 +335,32 @@ function ScoreRadarChart({ rec }: { rec: StrategyResult }) {
   );
 }
 
+// ─── Playbook Compliance Badge ───────────────────────────────────────────────
+function PlaybookBadge({ ticker, strategy, daysToEarnings, ivrRank }: {
+  ticker: string; strategy: string; daysToEarnings?: number; ivrRank?: number;
+}) {
+  const { data: check } = trpc.playbookRules.checkTrade.useQuery(
+    { ticker, strategy, daysToEarnings, ivrRank },
+    { enabled: !!ticker && !!strategy, staleTime: 5 * 60 * 1000, retry: 1 }
+  );
+  if (!check) return null;
+  if (check.badge === "block") return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border" style={{ background: "rgba(239,68,68,0.1)", borderColor: "rgba(239,68,68,0.3)", color: "#ef4444" }}>
+      🚫 Breaks Your Rules
+    </span>
+  );
+  if (check.badge === "warn") return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border" style={{ background: "rgba(245,158,11,0.1)", borderColor: "rgba(245,158,11,0.3)", color: "#f59e0b" }}>
+      ⚠️ Review First
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border" style={{ background: "rgba(34,197,94,0.1)", borderColor: "rgba(34,197,94,0.3)", color: "#22c55e" }}>
+      ✅ Fits Your Playbook
+    </span>
+  );
+}
+
 // ─── Recommendation Card ──────────────────────────────────────────────────────
 function RecommendationCard({ result }: { result: AnalysisResult }) {
   const rec = result.recommendation;
@@ -350,11 +376,17 @@ function RecommendationCard({ result }: { result: AnalysisResult }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Primary Recommendation</p>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h2 className="text-2xl font-bold tracking-tight" style={{ color }}>{rec.name}</h2>
               <Badge variant="outline" className="text-xs" style={{ borderColor: color + "50", color }}>
                 Rank #{rec.rank}
               </Badge>
+              <PlaybookBadge
+                ticker={result.ticker}
+                strategy={rec.name}
+                daysToEarnings={result.earningsInfo?.daysToEarnings ?? undefined}
+                ivrRank={r.ivPercentileRank}
+              />
             </div>
           </div>
           <div className="text-right">

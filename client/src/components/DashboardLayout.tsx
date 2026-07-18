@@ -162,6 +162,7 @@ const NAV_SECTIONS = [
     defaultOpen: false,
     accent: "#14b8a6",
     items: [
+      { icon: Shield,         label: "My Playbook",        path: "/my-playbook",       desc: "Your personal rules & style profile" },
       { icon: BookMarked,     label: "Sri's Playbook",     path: "/sri-playbook",      desc: "Personal strategy guide" },
       { icon: BookOpen,       label: "Methodology",        path: "/methodology",       desc: "System documentation" },
       { icon: HelpCircle,     label: "Glossary",           path: "/glossary",          desc: "Options terminology" },

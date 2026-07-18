@@ -95,6 +95,7 @@ const HistoricalData = lazy(() => import("./pages/HistoricalData"));
 const Backtester = lazy(() => import("./pages/Backtester"));
 const PositionSizer = lazy(() => import("./pages/PositionSizer"));
 const SriPlaybook = lazy(() => import("./pages/SriPlaybook"));
+const MyPlaybook = lazy(() => import("./pages/MyPlaybook"));
 const ExtensionSettings = lazy(() => import("./pages/ExtensionSettings"));
 
 const PageLoader = () => (
@@ -134,6 +135,19 @@ function Router() {
           <Suspense fallback={<PageLoader />}>
             <Home />
           </Suspense>
+        </AuthGuard>
+      </Route>
+
+      {/* ── My Playbook ───────────────────────────────────────────────── */}
+      <Route path="/my-playbook">
+        <AuthGuard>
+          <DashboardLayout>
+            <ScrollableRoute>
+              <Suspense fallback={<PageLoader />}>
+                <MyPlaybook />
+              </Suspense>
+            </ScrollableRoute>
+          </DashboardLayout>
         </AuthGuard>
       </Route>
 
@@ -284,7 +298,7 @@ function ComingSoon({ title }: { title: string }) {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="light" switchable>
         <TooltipProvider>
           <Toaster />
           <Router />

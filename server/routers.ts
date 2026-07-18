@@ -107,6 +107,7 @@ import { nourScannerRouter } from "./routers/nourScanner";
 import { sriPlaybookRouter } from "./routers/sriPlaybook";
 import { ictLiquidityRouter } from "./routers/ictLiquidity";
 import { strategyVisualizerRouter } from "./routers/strategyVisualizer";
+import { playbookRulesRouter } from "./routers/playbookRules";
 import { pitAdvisorRouter } from "./routers/pitAdvisor";
 import { optionsFlowRouter } from "./routers/optionsFlow";
 import { catalystBreakoutRouter } from "./routers/catalystBreakout";
@@ -1586,5 +1587,6 @@ export const appRouter = router({
   sriPlaybook: sriPlaybookRouter,
   ictLiquidity: ictLiquidityRouter,
   strategyVisualizer: strategyVisualizerRouter,
+  playbookRules: playbookRulesRouter,
 });
 export type AppRouter = typeof appRouter;
