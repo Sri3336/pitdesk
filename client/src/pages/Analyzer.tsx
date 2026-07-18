@@ -158,6 +158,8 @@ const STRATEGY_COLORS: Record<string, string> = {
   "Cash-Secured Put": "#84cc16",
   "Covered Call": "#fb923c",
   "Butterfly Spread": "#8b5cf6",
+  "Jade Lizard": "#14b8a6",
+  "Broken Wing Butterfly": "#f97316",
 };
 
 const STRATEGY_BADGES: Record<string, string> = {
@@ -174,6 +176,8 @@ const STRATEGY_BADGES: Record<string, string> = {
   "Cash-Secured Put": "bg-lime-50 text-lime-700 border-lime-200",
   "Covered Call": "bg-orange-50 text-orange-700 border-orange-200",
   "Butterfly Spread": "bg-violet-50 text-violet-700 border-violet-200",
+  "Jade Lizard": "bg-teal-50 text-teal-700 border-teal-200",
+  "Broken Wing Butterfly": "bg-orange-50 text-orange-700 border-orange-200",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -238,6 +242,12 @@ function TradeActionBox({ rec, ticker, expiry }: { rec: StrategyResult; ticker: 
     "Naked Call": `Sell 1 call on ${ticker} to collect premium. Profit if price stays below breakeven at expiration.`,
     "Short Strangle": `Sell 1 put and 1 call on ${ticker} simultaneously. Profit if price stays between both breakevens at expiration.`,
     "Iron Condor": `Sell a put spread and a call spread on ${ticker}. Defined-risk trade; profit if price stays inside the short strikes at expiration.`,
+    "Jade Lizard": `Sell 1 put and a call spread on ${ticker}. If total credit collected exceeds the call spread width, there is ZERO upside risk — you only lose if the stock drops below the put breakeven.`,
+    "Bull Put Spread": `Sell a higher put and buy a lower put on ${ticker}. Collect a net credit; profit if price stays above the short put at expiration. Max loss is capped at the spread width minus credit.`,
+    "Bear Call Spread": `Sell a lower call and buy a higher call on ${ticker}. Collect a net credit; profit if price stays below the short call at expiration. Max loss is capped at the spread width minus credit.`,
+    "Broken Wing Butterfly": `Sell a skewed put butterfly on ${ticker} for a net credit. Zero upside risk if the stock rallies. Max profit if price pins near the short put strikes at expiration.`,
+    "Covered Call": `Sell a call against your existing ${ticker} shares. Collect premium and reduce your cost basis; cap upside above the short strike.`,
+    "Cash-Secured Put": `Sell a put on ${ticker} fully backed by cash. Collect premium; if assigned, you acquire shares at the strike minus the credit received.`,
   };
   const summary = summaryMap[rec.name] ?? "Sell premium to collect net credit.";
 
@@ -441,6 +451,8 @@ const DTE_SUITABILITY: Record<string, { label: string; color: string }> = {
   "Cash-Secured Put":{ label: "30-45d",    color: "text-lime-600" },
   "Covered Call":    { label: "30-45d",    color: "text-orange-500" },
   "Butterfly Spread":{ label: "7-21d",     color: "text-violet-500" },
+  "Jade Lizard":     { label: "35-50d",    color: "text-teal-600" },
+  "Broken Wing Butterfly": { label: "30-45d", color: "text-orange-500" },
 };
 
 function DteBadge({ name }: { name: string }) {
@@ -1643,7 +1655,7 @@ export default function Analyzer() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gradient-gold">Options Analyzer</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            13-strategy analysis · Payoff Lab · Trade Performance
+            <span className="text-violet-600 font-semibold">15 strategies</span> ranked by fit · Jade Lizard · BWB · Iron Condor · <span className="text-violet-600 font-semibold">Payoff Lab</span> for visual payout testing
           </p>
         </div>
         {result && (

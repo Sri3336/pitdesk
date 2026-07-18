@@ -63,6 +63,15 @@ import {
   Rss,
   Layers,
   GitBranch,
+  Search,
+  FlaskRound,
+  LayoutDashboard,
+  AlertCircle,
+  BarChart3,
+  Telescope,
+  Flame,
+  BookCheck,
+  Gauge,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -70,118 +79,121 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { ROUTES } from "@/lib/routes";
 
 const SIDEBAR_WIDTH_KEY = "pitdesk-sidebar-width";
-const SIDEBAR_SECTIONS_KEY = "pitdesk-sidebar-sections-v3";
+const SIDEBAR_SECTIONS_KEY = "pitdesk-sidebar-sections-v4";
 const DEFAULT_WIDTH = 260;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 380;
 
-// ─── Nav items ────────────────────────────────────────────────────────────────
+// ─── Nav structure: two primary workflows + supporting sections ────────────────
 
 const NAV_SECTIONS = [
   {
-    key: "analysis",
-    label: "Analysis",
+    key: "find_trade",
+    label: "🎯 Find the Best Trade",
     defaultOpen: true,
+    accent: "#22c55e",
     items: [
-      { icon: Home, label: "Dashboard", path: "/dashboard" },
-      { icon: BarChart2, label: "PCR Dashboard", path: "/pcr-dashboard" },
-      { icon: CandlestickChart, label: "Charts", path: "/charts" },
-      { icon: Scan, label: "Scan All", path: "/scan-all" },
-      { icon: Activity, label: "Options Analyzer", path: "/analyzer" },
-      { icon: ClipboardList, label: "Watchlist", path: "/watchlist" },
-      { icon: Radio, label: "Earnings Calendar", path: "/earnings-calendar" },
+      { icon: Home,           label: "Dashboard",          path: "/dashboard",         desc: "Overview & quick stats" },
+      { icon: Search,         label: "Analyze a Ticker",   path: "/ticker-analysis",   desc: "Full 5-dimension analysis" },
+      { icon: Zap,            label: "Day Picks",          path: "/day-picks",         desc: "Top intraday setups today" },
+      { icon: TrendingUp,     label: "Swing Picks",        path: "/swing-picks",       desc: "Best 3–10 day setups" },
+      { icon: BarChart2,      label: "PCR Dashboard",      path: "/pcr-dashboard",     desc: "Put/Call ratio signals" },
+      { icon: CandlestickChart, label: "Charts",           path: "/charts",            desc: "TradingView charts" },
+      { icon: Scan,           label: "Scan All",           path: "/scan-all",          desc: "Multi-strategy scanner" },
+      { icon: LineChart,      label: "Velez Scanner",      path: "/velez-scanner",     desc: "Daily Fib+EMA signals" },
+      { icon: Activity,       label: "Intraday Scanner",   path: "/intraday-scanner",  desc: "5-min Grade-A setups" },
+      { icon: GitMerge,       label: "VCP Strategy",       path: "/vcp-strategy",      desc: "Volatility contraction" },
+      { icon: Flame,          label: "Catalyst Watch",     path: "/catalyst-watch",    desc: "BCOS breakout signals" },
+      { icon: Radio,          label: "Earnings Calendar",  path: "/earnings-calendar", desc: "Upcoming earnings" },
+      { icon: ClipboardList,  label: "Watchlist",          path: "/watchlist",         desc: "Your tracked tickers" },
     ],
   },
   {
-    key: "strategies",
-    label: "Strategies",
+    key: "test_trade",
+    label: "🧪 Test & Visualize Payout",
     defaultOpen: true,
+    accent: "#8b5cf6",
     items: [
-      { icon: TrendingUp, label: "PCR Strategy", path: "/pcr-strategy" },
-      { icon: GitMerge, label: "VCP Strategy", path: "/vcp-strategy" },
-      { icon: LineChart, label: "Velez Scanner", path: "/velez-scanner" },
-      { icon: Activity, label: "Intraday Scanner", path: "/intraday-scanner" },
-      { icon: Zap, label: "Catalyst Watch", path: "/catalyst-watch" },
-      { icon: TrendingDown, label: "ICT Supply Zone", path: "/ict-supply-zone" },
-      { icon: Layers, label: "ICT Liquidity Scanner", path: "/ict-liquidity" },
-      { icon: TrendingUp, label: "EMA Pullback", path: "/ema-pullback" },
-      { icon: BookOpen, label: "Chart Patterns", path: "/chart-patterns" },
-      { icon: Timer, label: "Theta Machine", path: "/theta-machine" },
-      { icon: Crosshair, label: "Decision Bench", path: "/decision-bench" },
-      { icon: Rss, label: "Live Trader Feed", path: "/live-trader-feed" },
-      { icon: Zap, label: "Nour Scanner", path: "/nour-scanner" },
-      { icon: Target, label: "Opening Range Scalper", path: "/velez-scanner?tab=ors" },
+      { icon: Activity,       label: "Options Analyzer",   path: "/analyzer",          desc: "15-strategy engine" },
+      { icon: FlaskConical,   label: "Payoff Lab",         path: "/analyzer?tab=payoff", desc: "Visual payoff builder" },
+      { icon: MessageSquare,  label: "Pit Advisor",        path: "/pit-advisor",       desc: "AI trade analysis" },
+      { icon: Calculator,     label: "Position Sizer",     path: "/position-sizer",    desc: "Risk & size calculator" },
+      { icon: FlaskRound,     label: "Backtester",         path: "/backtester",        desc: "Strategy backtesting" },
+      { icon: TrendingDown,   label: "ICT Supply Zone",    path: "/ict-supply-zone",   desc: "Supply/demand zones" },
+      { icon: Layers,         label: "ICT Liquidity",      path: "/ict-liquidity",     desc: "Liquidity scanner" },
+      { icon: TrendingUp,     label: "EMA Pullback",       path: "/ema-pullback",      desc: "EMA reversion setups" },
+      { icon: Timer,          label: "Theta Machine",      path: "/theta-machine",     desc: "Premium decay tracker" },
+      { icon: Crosshair,      label: "Decision Bench",     path: "/decision-bench",    desc: "Trade decision tool" },
+    ],
+  },
+  {
+    key: "execution",
+    label: "Execute & Track",
+    defaultOpen: true,
+    accent: "#f59e0b",
+    items: [
+      { icon: Shield,         label: "Pre-Market Checklist", path: "/pre-market",      desc: "Daily prep routine" },
+      { icon: Sunrise,        label: "Morning Session",    path: "/morning-session",   desc: "Session planning" },
+      { icon: ClipboardList,  label: "Trade Log",          path: "/trade-log",         desc: "Journal & review" },
+      { icon: Upload,         label: "Analyze My Trades",  path: "/trade-upload",      desc: "Upload brokerage CSV" },
+      { icon: BarChart3,      label: "Performance",        path: "/performance",       desc: "P&L analytics" },
+      { icon: BookOpen,       label: "Trade Proposals",    path: "/trade-proposals",   desc: "Pre-trade plans" },
+      { icon: ListChecks,     label: "Swing Watchlist",    path: "/swing-watchlist",   desc: "Multi-day tracking" },
+      { icon: MapPin,         label: "Liquidity Map",      path: "/liquidity-map",     desc: "Key price levels" },
     ],
   },
   {
     key: "alerts",
     label: "Alerts",
-    defaultOpen: true,
+    defaultOpen: false,
+    accent: "#f97316",
     items: [
-      { icon: Bell, label: "IVR Alerts", path: "/ivr-alerts" },
-      { icon: Bell, label: "VCP Alerts", path: "/vcp-alerts" },
-      { icon: Sparkles, label: "Fib+EMA Alerts", path: "/fib-ema-alerts" },
-    ],
-  },
-  {
-    key: "execution",
-    label: "Execution",
-    defaultOpen: true,
-    items: [
-      { icon: MessageSquare, label: "Pit Advisor", path: "/pit-advisor" },
-      { icon: Zap, label: "AI Agent", path: "/agent" },
-      { icon: Shield, label: "Pre-Market Checklist", path: "/pre-market" },
-      { icon: Sunrise, label: "Morning Session", path: "/morning-session" },
-      { icon: ListChecks, label: "Swing Watchlist", path: "/swing-watchlist" },
-      { icon: MapPin, label: "Liquidity Map", path: "/liquidity-map" },
-      { icon: ClipboardList, label: "Trade Log", path: "/trade-log" },
-      { icon: Upload, label: "Analyze My Trades", path: "/trade-upload" },
-      { icon: BarChart2, label: "Performance", path: "/performance" },
-      { icon: BookOpen, label: "Trade Proposals", path: "/trade-proposals" },
+      { icon: Bell,           label: "IVR Alerts",         path: "/ivr-alerts",        desc: "IV rank alerts" },
+      { icon: Bell,           label: "VCP Alerts",         path: "/vcp-alerts",        desc: "VCP pattern alerts" },
+      { icon: Sparkles,       label: "Fib+EMA Alerts",     path: "/fib-ema-alerts",    desc: "Fibonacci alerts" },
+      { icon: Zap,            label: "AI Agent",           path: "/agent",             desc: "Autonomous agent" },
+      { icon: Rss,            label: "Live Trader Feed",   path: "/live-trader-feed",  desc: "Real-time feed" },
+      { icon: Zap,            label: "Nour Scanner",       path: "/nour-scanner",      desc: "Nour signals" },
     ],
   },
   {
     key: "playbook",
-    label: "Sri's Playbook",
-    defaultOpen: true,
+    label: "Playbook & Reference",
+    defaultOpen: false,
+    accent: "#14b8a6",
     items: [
-      { icon: BookMarked, label: "Playbook & Tracker", path: "/sri-playbook" },
-    ],
-  },
-  {
-    key: "backtesting",
-    label: "Backtesting",
-    defaultOpen: true,
-    items: [
-      { icon: FlaskConical, label: "Backtester", path: "/backtester" },
-      { icon: Calculator, label: "Position Sizer", path: "/position-sizer" },
+      { icon: BookMarked,     label: "Sri's Playbook",     path: "/sri-playbook",      desc: "Personal strategy guide" },
+      { icon: BookOpen,       label: "Methodology",        path: "/methodology",       desc: "System documentation" },
+      { icon: HelpCircle,     label: "Glossary",           path: "/glossary",          desc: "Options terminology" },
+      { icon: HelpCircle,     label: "How-To",             path: "/how-to",            desc: "Usage guides" },
     ],
   },
   {
     key: "data",
     label: "Data & Settings",
-    defaultOpen: true,
+    defaultOpen: false,
+    accent: "#6b7280",
     items: [
-      { icon: Zap, label: "Options Flow", path: "/options-flow" },
-      { icon: Database, label: "COT Dashboard", path: "/cot-dashboard" },
-      { icon: HardDrive, label: "Historical Data", path: "/historical-data" },
-      { icon: Building2, label: "Broker Settings", path: "/broker-settings" },
-      { icon: Chrome, label: "Extension Settings", path: "/extension-settings" },
-    ],
-  },
-  {
-    key: "reference",
-    label: "Reference",
-    defaultOpen: true,
-    items: [
-      { icon: BookOpen, label: "Methodology", path: "/methodology" },
-      { icon: HelpCircle, label: "Glossary", path: "/glossary" },
-      { icon: HelpCircle, label: "How-To", path: "/how-to" },
+      { icon: Zap,            label: "Options Flow",       path: "/options-flow",      desc: "Unusual options activity" },
+      { icon: Database,       label: "COT Dashboard",      path: "/cot-dashboard",     desc: "Commitment of traders" },
+      { icon: HardDrive,      label: "Historical Data",    path: "/historical-data",   desc: "Price history" },
+      { icon: Building2,      label: "Broker Settings",    path: "/broker-settings",   desc: "E*TRADE / Schwab" },
+      { icon: Chrome,         label: "Extension Settings", path: "/extension-settings", desc: "Browser extension" },
     ],
   },
 ] as const;
 
 type SectionKey = (typeof NAV_SECTIONS)[number]["key"];
+
+// ─── Workflow badge colors ─────────────────────────────────────────────────────
+const SECTION_ACCENT: Record<string, string> = {
+  find_trade: "#22c55e",
+  test_trade: "#8b5cf6",
+  execution: "#f59e0b",
+  alerts: "#f97316",
+  playbook: "#14b8a6",
+  data: "#6b7280",
+};
 
 // ─── CollapsibleNavSection ─────────────────────────────────────────────────────
 
@@ -194,45 +206,66 @@ function CollapsibleNavSection({
 }: {
   sectionKey: SectionKey;
   label: string;
-  items: readonly { icon: React.ElementType; label: string; path: string }[];
+  items: readonly { icon: React.ElementType; label: string; path: string; desc: string }[];
   isOpen: boolean;
   onToggle: (key: SectionKey) => void;
 }) {
   const [location, navigate] = useLocation();
+  const accent = SECTION_ACCENT[sectionKey] ?? "#22c55e";
+  const isPrimary = sectionKey === "find_trade" || sectionKey === "test_trade";
 
   return (
     <div className="w-full">
       <Collapsible open={isOpen} onOpenChange={() => onToggle(sectionKey)}>
         <CollapsibleTrigger asChild>
           <button
-            className="flex items-center justify-between w-full px-2 py-1.5 mt-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 hover:text-muted-foreground transition-colors rounded-md group"
+            className="flex items-center justify-between w-full px-2 py-1.5 mt-2 rounded-md group transition-colors hover:bg-muted/40"
           >
-            <span>{label}</span>
+            <span
+              className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                isPrimary ? "text-foreground/80" : "text-muted-foreground/70 group-hover:text-muted-foreground"
+              }`}
+              style={isPrimary ? { color: accent } : {}}
+            >
+              {label}
+            </span>
             <ChevronDown
               className={`h-3 w-3 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-0" : "-rotate-90"}`}
+              style={{ color: isPrimary ? accent : undefined }}
             />
           </button>
         </CollapsibleTrigger>
+        {isPrimary && (
+          <div
+            className="h-px mx-2 mb-1 rounded-full opacity-30"
+            style={{ background: accent }}
+          />
+        )}
         <CollapsibleContent>
           <SidebarMenu className="px-1 pb-1">
             {items.map((item) => {
-              const [, itemQuery] = item.path.split("?");
+              const [itemPath, itemQuery] = item.path.split("?");
               const fullLocation =
                 typeof window !== "undefined"
                   ? window.location.pathname + (window.location.search || "")
                   : location;
               const isActive = itemQuery
                 ? fullLocation === item.path || fullLocation.startsWith(item.path)
-                : location === item.path;
+                : location === itemPath;
               return (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton
                     isActive={isActive}
                     onClick={() => navigate(item.path)}
-                    className={`cursor-pointer h-8 text-sm transition-all duration-150 ${isActive ? 'text-green-700 font-semibold' : ''}`}
-                    style={isActive ? { background: 'oklch(0.60 0.175 145 / 10%)', borderLeft: '2px solid oklch(0.60 0.175 145)' } : {}}
+                    className={`cursor-pointer h-8 text-sm transition-all duration-150 group/item ${isActive ? "font-semibold" : ""}`}
+                    style={isActive ? {
+                      background: accent + "14",
+                      borderLeft: `2px solid ${accent}`,
+                      color: accent,
+                    } : {}}
+                    title={item.desc}
                   >
-                    <item.icon className="h-3.5 w-3.5 shrink-0" />
+                    <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color: accent } : {}} />
                     <span className="truncate">{item.label}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -253,7 +286,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
 
-  // Persist which sections are open/closed
   const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>(() => {
     try {
       const saved = localStorage.getItem(SIDEBAR_SECTIONS_KEY);
@@ -336,6 +368,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="text-[10px] text-muted-foreground leading-tight">← Home</div>
             </div>
           </button>
+
+          {/* Two workflow quick-access buttons */}
+          <div className="flex gap-1.5 mt-3">
+            <button
+              onClick={() => navigate(ROUTES.TICKER_ANALYSIS)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{ background: "#22c55e18", color: "#22c55e", border: "1px solid #22c55e33" }}
+            >
+              <Target className="h-3 w-3" />
+              Find Trade
+            </button>
+            <button
+              onClick={() => navigate(ROUTES.ANALYZER)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{ background: "#8b5cf618", color: "#8b5cf6", border: "1px solid #8b5cf633" }}
+            >
+              <FlaskConical className="h-3 w-3" />
+              Test Payout
+            </button>
+          </div>
         </SidebarHeader>
 
         {/* Nav — all sections collapsible */}
@@ -380,19 +432,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               {user.role === "admin" && (
                 <>
-                  <DropdownMenuItem     onClick={() => navigate("/admin/users")} className="cursor-pointer">
+                  <DropdownMenuItem onClick={() => navigate("/admin/users")} className="cursor-pointer">
                     <Shield className="h-4 w-4 mr-2 text-green-600" />
                     User Management
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem     onClick={() => navigate("/profile")} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => navigate("/profile")} className="cursor-pointer">
                 <Settings className="h-4 w-4 mr-2" />
                 Account Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout} className="text-red-600 cursor-pointer">
+              <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-600 focus:text-red-600">
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign out
               </DropdownMenuItem>
@@ -401,28 +453,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </SidebarFooter>
       </Sidebar>
 
-      {/* Desktop resize handle */}
-      {!isMobile && (
-        <div
-          className="w-1 cursor-col-resize bg-transparent hover:bg-green-400 transition-colors z-10 shrink-0"
-          onMouseDown={handleMouseDown}
-        />
-      )}
+      {/* Drag handle */}
+      <div
+        className="fixed top-0 bottom-0 w-1 cursor-col-resize z-50 hover:bg-primary/20 transition-colors"
+        style={{ left: `${sidebarWidth}px` }}
+        onMouseDown={handleMouseDown}
+      />
 
-      <SidebarInset className="flex flex-col h-screen overflow-hidden">
-        {/* Mobile top bar with hamburger */}
+      <SidebarInset>
         {isMobile && (
-          <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-background shrink-0 z-10">
-            <SidebarTrigger className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors">
-              <PanelLeft className="h-5 w-5" />
-            </SidebarTrigger>
-            <div className="flex items-center gap-2">
-              <PitDeskLogo size={28} />
-              <span className="font-semibold text-sm">PitDesk</span>
-            </div>
-          </header>
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-background sticky top-0 z-40">
+            <SidebarTrigger className="h-8 w-8" />
+            <PitDeskLogo size={24} />
+            <span className="font-bold text-sm">PitDesk</span>
+          </div>
         )}
-        <main className="flex-1 overflow-hidden min-h-0">{children}</main>
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

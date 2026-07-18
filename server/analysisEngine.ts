@@ -17,7 +17,9 @@ export type StrategyName =
   | "Long Strangle"
   | "Cash-Secured Put"
   | "Covered Call"
-  | "Butterfly Spread";
+  | "Butterfly Spread"
+  | "Jade Lizard"
+  | "Broken Wing Butterfly";
 
 export interface PriceBar {
   date: string;
@@ -376,6 +378,8 @@ function scoreStrategy(
     strategy === "Iron Condor" || strategy === "Butterfly Spread" ? 20
     : strategy === "Bull Put Spread" || strategy === "Bear Call Spread"
       || strategy === "Bull Call Spread" || strategy === "Bear Put Spread" ? 18
+    : strategy === "Jade Lizard" ? 16 // put side naked, call side defined — partial protection
+    : strategy === "Broken Wing Butterfly" ? 17 // net credit, defined risk with skewed protection
     : strategy === "Short Strangle" || strategy === "Cash-Secured Put"
       || strategy === "Covered Call" ? 10
     : strategy === "Long Straddle" || strategy === "Long Strangle" ? 14 // defined risk (debit paid)
@@ -406,6 +410,12 @@ function scoreStrategy(
     dirScore = 20 - Math.abs(directionalScore) * 4;
   } else if (strategy === "Short Strangle") {
     dirScore = 18 - Math.abs(directionalScore) * 2.5;
+  } else if (strategy === "Jade Lizard") {
+    // Bullish-to-neutral: short put + short call spread. Best when slightly bullish.
+    dirScore = 10 + directionalScore * 3;
+  } else if (strategy === "Broken Wing Butterfly") {
+    // Bearish-to-neutral: best when slightly bearish or neutral, skewed short call side.
+    dirScore = 12 - directionalScore * 3;
   } else {
     // Iron Condor: best in neutral
     dirScore = 20 - Math.abs(directionalScore) * 3.5;
@@ -479,6 +489,8 @@ function buildRationale(strategy: StrategyName, scores: StrategyResult["scores"]
     "Cash-Secured Put": `Sell put fully cash-secured. Collect premium; acquire stock at discount if assigned. Breakeven at ${be}. Composite score ${s}/100.`,
     "Covered Call": `Sell call against long stock position. Collect premium; cap upside above ${be}. Income strategy. Composite score ${s}/100.`,
     "Butterfly Spread": `Buy 1 lower call, sell 2 ATM calls, buy 1 higher call. Max profit if price pins at ${be} at expiry. Defined risk. Composite score ${s}/100.`,
+    "Jade Lizard": `Short put + short call spread. If total credit > call spread width, there is ZERO upside risk. Only risk is to the downside below ${be}. Bullish-to-neutral. Composite score ${s}/100.`,
+    "Broken Wing Butterfly": `Skewed short butterfly (1×2×1 with skipped strike) that generates a net credit. Zero upside risk if stock rallies. Max profit if price pins near short strikes. Breakevens at ${be}. Composite score ${s}/100.`,
   };
   return map[strategy] ?? `Composite score ${s}/100. IV/RV ${ivRvLabel}, bias ${biasLabel}.`;
 }
@@ -1078,10 +1090,124 @@ export function runAnalysis(
     }
   }
 
+  // ── 14. Jade Lizard (short put + short call spread) ──
+  // Structure: sell OTM put (16-22 delta) + sell OTM call spread (short call + long call above)
+  // Key property: if total credit > call spread width → ZERO upside risk
+  const jlPut = findClosestByDelta(chainForExpiry, "put", 0.20);
+  const jlShortCall = findClosestByDelta(chainForExpiry, "call", 0.20);
+  if (jlPut && jlShortCall) {
+    const strikeStep = lastPrice * 0.005;
+    const callSpreadWidth = Math.max(strikeStep * 3, Math.round(lastPrice * 0.03 / 5) * 5);
+    const jlLongCall = findWing(chainForExpiry, "call", jlShortCall.strike, callSpreadWidth);
+    if (jlLongCall) {
+      const callSpreadCredit = jlShortCall.mid - jlLongCall.mid;
+      const putCredit = jlPut.mid;
+      const totalCredit = putCredit + callSpreadCredit;
+      const actualCallWidth = jlLongCall.strike - jlShortCall.strike;
+      // Zero upside risk condition: totalCredit >= callSpreadWidth
+      const hasZeroUpsideRisk = totalCredit >= actualCallWidth;
+      if (totalCredit > 0.01) {
+        const beLow = jlPut.strike - totalCredit;
+        // Max loss: put side only (call side is fully hedged if zero upside risk)
+        const putMaxLoss = jlPut.strike * 100; // put goes to zero
+        const callSideMaxLoss = hasZeroUpsideRisk ? 0 : (actualCallWidth - callSpreadCredit) * 100;
+        const maxLoss = putMaxLoss; // dominated by put side
+        const bp = Math.min(jlPut.strike * 100 * 0.20, accountSize);
+        const pop = (1 - Math.abs(jlPut.delta) + 1 - Math.abs(jlShortCall.delta)) / 2;
+        const shortPutL = { ...jlPut, position: "short" };
+        const shortCallL = { ...jlShortCall, position: "short" };
+        const longCallL = { ...jlLongCall, position: "long" };
+        const pnlCurve = generatePnlCurve("Jade Lizard", [shortPutL, shortCallL, longCallL], totalCredit, lastPrice);
+        const scores = scoreStrategy("Jade Lizard", [jlPut, jlShortCall, jlLongCall], totalCredit, maxLoss, pop, regime);
+        const composite = Math.min(100, Object.values(scores).reduce((a, b) => a + b, 0));
+        const zeroRiskNote = hasZeroUpsideRisk ? " ZERO upside risk (credit > spread width)." : " Upside risk capped at call spread width.";
+        strategies.push({
+          name: "Jade Lizard", legs: [shortPutL, shortCallL, longCallL],
+          netCredit: parseFloat(totalCredit.toFixed(2)),
+          maxProfit: parseFloat((totalCredit * 100).toFixed(2)),
+          maxLoss: parseFloat(maxLoss.toFixed(2)),
+          buyingPower: parseFloat(bp.toFixed(2)),
+          pop: parseFloat(pop.toFixed(4)),
+          delta: parseFloat((jlPut.delta + jlShortCall.delta + jlLongCall.delta).toFixed(4)),
+          gamma: parseFloat((jlPut.gamma + jlShortCall.gamma + jlLongCall.gamma).toFixed(6)),
+          theta: parseFloat((jlPut.theta + jlShortCall.theta + jlLongCall.theta).toFixed(4)),
+          vega: parseFloat((jlPut.vega + jlShortCall.vega + jlLongCall.vega).toFixed(4)),
+          rho: parseFloat((jlPut.rho + jlShortCall.rho + jlLongCall.rho).toFixed(4)),
+          breakevens: [parseFloat(beLow.toFixed(2))],
+          scores, compositeScore: parseFloat(composite.toFixed(2)),
+          rank: 0,
+          rationale: `Short put @ ${jlPut.strike} + short call spread ${jlShortCall.strike}/${jlLongCall.strike}. Total credit $${totalCredit.toFixed(2)}.${zeroRiskNote} Breakeven at ${beLow.toFixed(2)}. Composite score ${composite.toFixed(1)}/100.`,
+          pnlCurve,
+        });
+      }
+    }
+  }
+
+  // ── 15. Broken Wing Butterfly (BWB) — skewed short butterfly for net credit ──
+  // Structure: long 1 OTM put, short 2 lower puts, long 1 even-lower put (skipped strike)
+  // Net credit because the long wing is further OTM than the short wing width implies
+  // Key property: generates a net credit; zero upside risk; max profit if price pins at short strikes
+  const bwbShortPut = findClosestByDelta(chainForExpiry, "put", 0.30);
+  if (bwbShortPut) {
+    const strikeStep = lastPrice * 0.005;
+    const innerWidth = Math.max(strikeStep * 3, Math.round(lastPrice * 0.03 / 5) * 5);
+    const outerWidth = innerWidth * 2; // skipped strike — outer wing is 2x the inner width
+    // Long put above short puts (closer to ATM)
+    const bwbLongPutUpper = chainForExpiry
+      .filter(l => l.type === "put" && l.strike > bwbShortPut.strike)
+      .sort((a, b) => Math.abs(a.strike - (bwbShortPut.strike + innerWidth)) - Math.abs(b.strike - (bwbShortPut.strike + innerWidth)))[0];
+    // Long put below short puts (further OTM — the skipped wing)
+    const bwbLongPutLower = chainForExpiry
+      .filter(l => l.type === "put" && l.strike < bwbShortPut.strike)
+      .sort((a, b) => Math.abs(a.strike - (bwbShortPut.strike - outerWidth)) - Math.abs(b.strike - (bwbShortPut.strike - outerWidth)))[0];
+    if (bwbLongPutUpper && bwbLongPutLower && bwbLongPutUpper.strike !== bwbShortPut.strike && bwbLongPutLower.strike !== bwbShortPut.strike) {
+      // Net credit = 2 × short put mid - long upper mid - long lower mid
+      const credit = 2 * bwbShortPut.mid - bwbLongPutUpper.mid - bwbLongPutLower.mid;
+      if (credit > 0.01) {
+        // Max profit: if price pins at short put strike at expiry
+        const upperWidth = bwbLongPutUpper.strike - bwbShortPut.strike;
+        const lowerWidth = bwbShortPut.strike - bwbLongPutLower.strike;
+        const maxProfit = (upperWidth + credit) * 100;
+        // Max loss: the wider lower wing minus credit received
+        const maxLoss = Math.max(0, (lowerWidth - upperWidth - credit)) * 100;
+        const beLow = bwbLongPutLower.strike + (lowerWidth - upperWidth - credit);
+        const beHigh = bwbLongPutUpper.strike + credit; // above this, keep full credit
+        const pop = (1 - Math.abs(bwbShortPut.delta));
+        const bp = maxLoss > 0 ? maxLoss : upperWidth * 100;
+        const longUpperL = { ...bwbLongPutUpper, position: "long" };
+        const shortPut1 = { ...bwbShortPut, position: "short" };
+        const shortPut2 = { ...bwbShortPut, position: "short" };
+        const longLowerL = { ...bwbLongPutLower, position: "long" };
+        const pnlCurve = generatePnlCurve("Broken Wing Butterfly", [longUpperL, shortPut1, shortPut2, longLowerL], credit, lastPrice);
+        const scores = scoreStrategy("Broken Wing Butterfly", [bwbLongPutUpper, bwbShortPut, bwbLongPutLower], credit, maxLoss > 0 ? maxLoss : null, pop, regime);
+        const composite = Math.min(100, Object.values(scores).reduce((a, b) => a + b, 0));
+        strategies.push({
+          name: "Broken Wing Butterfly", legs: [longUpperL, shortPut1, shortPut2, longLowerL],
+          netCredit: parseFloat(credit.toFixed(2)),
+          maxProfit: parseFloat(maxProfit.toFixed(2)),
+          maxLoss: maxLoss > 0 ? parseFloat(maxLoss.toFixed(2)) : null,
+          buyingPower: parseFloat(bp.toFixed(2)),
+          pop: parseFloat(pop.toFixed(4)),
+          delta: parseFloat((bwbLongPutUpper.delta - 2 * bwbShortPut.delta + bwbLongPutLower.delta).toFixed(4)),
+          gamma: parseFloat((bwbLongPutUpper.gamma - 2 * bwbShortPut.gamma + bwbLongPutLower.gamma).toFixed(6)),
+          theta: parseFloat((bwbLongPutUpper.theta - 2 * bwbShortPut.theta + bwbLongPutLower.theta).toFixed(4)),
+          vega: parseFloat((bwbLongPutUpper.vega - 2 * bwbShortPut.vega + bwbLongPutLower.vega).toFixed(4)),
+          rho: parseFloat((bwbLongPutUpper.rho - 2 * bwbShortPut.rho + bwbLongPutLower.rho).toFixed(4)),
+          breakevens: [parseFloat(beLow.toFixed(2)), parseFloat(beHigh.toFixed(2))],
+          scores, compositeScore: parseFloat(composite.toFixed(2)),
+          rank: 0,
+          rationale: `Long ${bwbLongPutUpper.strike}P / Short 2× ${bwbShortPut.strike}P / Long ${bwbLongPutLower.strike}P. Net credit $${credit.toFixed(2)}. Zero upside risk. Max profit if price pins at ${bwbShortPut.strike}. Composite score ${composite.toFixed(1)}/100.`,
+          pnlCurve,
+        });
+      }
+    }
+  }
+
   // ── Apply strategy category filter ──
   const CREDIT_STRATEGIES = new Set([
     "Naked Put", "Naked Call", "Short Strangle", "Iron Condor",
     "Bull Put Spread", "Bear Call Spread", "Cash-Secured Put", "Covered Call",
+    "Jade Lizard", "Broken Wing Butterfly",
   ]);
   const DEBIT_STRATEGIES = new Set([
     "Bull Call Spread", "Bear Put Spread", "Long Straddle", "Long Strangle", "Butterfly Spread",

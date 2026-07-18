@@ -64,6 +64,16 @@ const STRATEGY_TEMPLATES: Record<string, Leg[]> = {
     { id: "1", action: "buy", type: "put",  strike: 0, expiry: "", premium: 0, iv: 0.30, contracts: 1 },
     { id: "2", action: "buy", type: "call", strike: 0, expiry: "", premium: 0, iv: 0.30, contracts: 1 },
   ],
+  "Jade Lizard": [
+    { id: "1", action: "sell", type: "put",  strike: 0, expiry: "", premium: 0, iv: 0.30, contracts: 1 },
+    { id: "2", action: "sell", type: "call", strike: 0, expiry: "", premium: 0, iv: 0.30, contracts: 1 },
+    { id: "3", action: "buy",  type: "call", strike: 0, expiry: "", premium: 0, iv: 0.30, contracts: 1 },
+  ],
+  "Broken Wing Butterfly": [
+    { id: "1", action: "buy",  type: "put", strike: 0, expiry: "", premium: 0, iv: 0.30, contracts: 1 },
+    { id: "2", action: "sell", type: "put", strike: 0, expiry: "", premium: 0, iv: 0.30, contracts: 2 },
+    { id: "3", action: "buy",  type: "put", strike: 0, expiry: "", premium: 0, iv: 0.30, contracts: 1 },
+  ],
   "Custom": [],
 };
 

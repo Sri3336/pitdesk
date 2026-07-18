@@ -347,84 +347,131 @@ export default function Home() {
           </p>
         </div>
 
-        {/* ── 6 Action Cards ────────────────── */}
-        <div className="w-full max-w-3xl grid grid-cols-1 gap-3">
-          {HOME_ACTIONS.map((action, i) => {
-            const Icon = ACTION_ICONS[action.key] ?? BarChart2;
-            const accentBg = action.color + "14";
-            const accentBorder = action.color + "40";
-            return (
-              <button
-                key={action.key}
-                onClick={() => navigate(action.path)}
-                className="group w-full text-left rounded-2xl border transition-all duration-200"
-                style={{
-                  background: accentBg,
-                  borderColor: accentBorder,
-                  animationDelay: `${i * 60}ms`,
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                  (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 32px ${action.color}22`;
-                  (e.currentTarget as HTMLElement).style.borderColor = action.color;
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-                  (e.currentTarget as HTMLElement).style.boxShadow = "none";
-                  (e.currentTarget as HTMLElement).style.borderColor = accentBorder;
-                }}
-                onMouseDown={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = "scale(0.99)";
-                }}
-                onMouseUp={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                }}
-              >
-                <div className="flex items-center gap-5 px-6 py-5">
-                  <span
-                    className="text-xs font-mono font-bold opacity-30 w-6 shrink-0"
-                    style={{ color: action.color }}
+        {/* ── Two Workflow Sections ────────────────── */}
+        <div className="w-full max-w-3xl space-y-6">
+
+          {/* Workflow 1: Find the Best Trade */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-px flex-1 rounded-full" style={{ background: "#22c55e33" }} />
+              <span className="text-[11px] font-bold uppercase tracking-widest px-2" style={{ color: "#22c55e" }}>
+                🎯 Find the Best Trade
+              </span>
+              <div className="h-px flex-1 rounded-full" style={{ background: "#22c55e33" }} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {HOME_ACTIONS.filter((a: any) => a.workflow === "find").map((action, i) => {
+                const Icon = ACTION_ICONS[action.key] ?? BarChart2;
+                const accentBg = action.color + "10";
+                const accentBorder = action.color + "35";
+                return (
+                  <button
+                    key={action.key}
+                    onClick={() => navigate(action.path)}
+                    className="group w-full text-left rounded-xl border transition-all duration-200 p-4"
+                    style={{ background: accentBg, borderColor: accentBorder }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+                      (e.currentTarget as HTMLElement).style.boxShadow = `0 6px 24px ${action.color}20`;
+                      (e.currentTarget as HTMLElement).style.borderColor = action.color;
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                      (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                      (e.currentTarget as HTMLElement).style.borderColor = accentBorder;
+                    }}
+                    onMouseDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.98)"; }}
+                    onMouseUp={(e) => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
                   >
-                    {action.number}
-                  </span>
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
-                    style={{ background: action.color + "22" }}
-                  >
-                    <Icon className="w-5 h-5" style={{ color: action.color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
                     <div
-                      className="font-semibold text-base leading-tight"
-                      style={{ color: "var(--foreground)" }}
+                      className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 transition-transform duration-200 group-hover:scale-110"
+                      style={{ background: action.color + "20" }}
                     >
-                      {action.label}
+                      <Icon className="w-4.5 h-4.5" style={{ color: action.color }} />
                     </div>
-                    <div
-                      className="text-sm mt-0.5 leading-snug"
-                      style={{ color: "var(--muted-foreground)" }}
-                    >
-                      {action.description}
-                    </div>
-                  </div>
-                  <svg
-                    className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-1"
-                    style={{ color: action.color }}
-                    fill="none"
-                    viewBox="0 0 16 16"
+                    <div className="font-semibold text-sm leading-tight text-foreground mb-1">{action.label}</div>
+                    <div className="text-xs leading-snug text-muted-foreground">{action.description}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Workflow 2: Test & Visualize Payout */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-px flex-1 rounded-full" style={{ background: "#8b5cf633" }} />
+              <span className="text-[11px] font-bold uppercase tracking-widest px-2" style={{ color: "#8b5cf6" }}>
+                🧪 Test & Visualize Payout
+              </span>
+              <div className="h-px flex-1 rounded-full" style={{ background: "#8b5cf633" }} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {HOME_ACTIONS.filter((a: any) => a.workflow === "test").map((action, i) => {
+                const Icon = ACTION_ICONS[action.key] ?? BarChart2;
+                const accentBg = action.color + "10";
+                const accentBorder = action.color + "35";
+                return (
+                  <button
+                    key={action.key}
+                    onClick={() => navigate(action.path)}
+                    className="group w-full text-left rounded-xl border transition-all duration-200 p-4"
+                    style={{ background: accentBg, borderColor: accentBorder }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+                      (e.currentTarget as HTMLElement).style.boxShadow = `0 6px 24px ${action.color}20`;
+                      (e.currentTarget as HTMLElement).style.borderColor = action.color;
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                      (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                      (e.currentTarget as HTMLElement).style.borderColor = accentBorder;
+                    }}
+                    onMouseDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.98)"; }}
+                    onMouseUp={(e) => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
                   >
-                    <path
-                      d="M3 8h10M9 4l4 4-4 4"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-              </button>
-            );
-          })}
+                    <div
+                      className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 transition-transform duration-200 group-hover:scale-110"
+                      style={{ background: action.color + "20" }}
+                    >
+                      <Icon className="w-4.5 h-4.5" style={{ color: action.color }} />
+                    </div>
+                    <div className="font-semibold text-sm leading-tight text-foreground mb-1">{action.label}</div>
+                    <div className="text-xs leading-snug text-muted-foreground">{action.description}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quick shortcut to Options Analyzer */}
+          <button
+            onClick={() => navigate("/analyzer")}
+            className="w-full flex items-center justify-between px-5 py-3.5 rounded-xl border transition-all duration-200 group"
+            style={{ background: "#8b5cf608", borderColor: "#8b5cf633" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.borderColor = "#8b5cf6";
+              (e.currentTarget as HTMLElement).style.background = "#8b5cf610";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.borderColor = "#8b5cf633";
+              (e.currentTarget as HTMLElement).style.background = "#8b5cf608";
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#8b5cf620" }}>
+                <Activity className="w-4 h-4" style={{ color: "#8b5cf6" }} />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-semibold text-foreground">Options Analyzer + Payoff Lab</div>
+                <div className="text-xs text-muted-foreground">15-strategy engine · Jade Lizard · BWB · Iron Condor · visual payoff chart</div>
+              </div>
+            </div>
+            <svg className="w-4 h-4 opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" style={{ color: "#8b5cf6" }} fill="none" viewBox="0 0 16 16">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
         </div>
 
         {/* ── This Week's Earnings ──────────────────────────────────── */}

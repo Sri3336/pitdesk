@@ -580,10 +580,10 @@ export default function TickerAnalysis() {
                         ))}
                       </div>
                     </div>
-                    {/* All 13 strategies ranked */}
+                    {/* All 15 strategies ranked */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">All 13 Strategies Ranked</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">All 15 Strategies Ranked</div>
                         <button
                           className="text-xs text-blue-500 hover:underline"
                           onClick={() => navigate(`/analyzer?ticker=${activeTicker}`)}
@@ -689,7 +689,7 @@ export default function TickerAnalysis() {
               {/* More tools */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
                 {[
-                  { label: "Full Options Analyzer", desc: "All 13 strategies ranked", icon: <Zap className="w-4 h-4" />, color: "#3b82f6", path: `/analyzer?ticker=${activeTicker}` },
+                  { label: "Full Options Analyzer", desc: "All 15 strategies ranked", icon: <Zap className="w-4 h-4" />, color: "#3b82f6", path: `/analyzer?ticker=${activeTicker}` },
                   { label: "Velez Scanner", desc: "Daily Fib + EMA signals", icon: <TrendingUp className="w-4 h-4" />, color: "#22c55e", path: "/velez-scanner" },
                   { label: "Intraday Scanner", desc: "5-min Grade-A setups", icon: <Activity className="w-4 h-4" />, color: "#f59e0b", path: "/intraday-scanner" },
                   { label: "VCP Strategy", desc: "Volatility contraction", icon: <BarChart2 className="w-4 h-4" />, color: "#6366f1", path: "/vcp-strategy" },

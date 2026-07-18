@@ -103,6 +103,7 @@ export async function generateExcelReport(result: AnalysisResult): Promise<strin
     "Naked Put", "Naked Call", "Short Strangle", "Iron Condor",
     "Bull Put Spread", "Bear Call Spread", "Bull Call Spread", "Bear Put Spread",
     "Long Straddle", "Long Strangle", "Cash-Secured Put", "Covered Call", "Butterfly Spread",
+    "Jade Lizard", "Broken Wing Butterfly",
   ];
   for (const name of stratOrder) {
     const s = result.strategies.find(st => st.name === name);
@@ -147,6 +148,8 @@ export async function generateExcelReport(result: AnalysisResult): Promise<strin
     "Cash-Secured Put": "Cash_Secured_Put",
     "Covered Call": "Covered_Call",
     "Butterfly Spread": "Butterfly_Spread",
+    "Jade Lizard": "Jade_Lizard",
+    "Broken Wing Butterfly": "Broken_Wing_Butterfly",
   };
 
   for (const name of stratOrder) {
