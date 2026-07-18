@@ -12,7 +12,8 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { priceBars } from "../../drizzle/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
+import { tickerDataCoverage, ivHistory } from "../../drizzle/schema";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -326,6 +327,74 @@ export const backtesterRouter = router({
         maxDrawdownPct: stats.maxDrawdownPct,
         dataMonths,
       };
+    }),
+
+  /**
+   * getCoverage — per-ticker data health for the coverage dashboard.
+   */
+  getCoverage: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return { tickers: [], summary: { total: 0, healthy: 0, stale: 0, missing: 0 } };
+
+    const rows = await db.select().from(tickerDataCoverage).orderBy(desc(tickerDataCoverage.updatedAt));
+    const barStats = await db
+      .select({
+        ticker: priceBars.ticker,
+        bars: sql<number>`COUNT(*)`,
+        oldest: sql<string>`MIN(${priceBars.date})`,
+        newest: sql<string>`MAX(${priceBars.date})`,
+      })
+      .from(priceBars)
+      .where(eq(priceBars.interval, "1d"))
+      .groupBy(priceBars.ticker);
+
+    const coverageMap = new Map(rows.map(r => [r.ticker, r]));
+    const barMap = new Map(barStats.map(r => [r.ticker, r]));
+    const allTickers = new Set([...Array.from(coverageMap.keys()), ...Array.from(barMap.keys())]);
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
+    const tickers = Array.from(allTickers).map(ticker => {
+      const cov = coverageMap.get(ticker);
+      const bar = barMap.get(ticker);
+      const newest = cov?.ohlcvNewest ?? bar?.newest ?? null;
+      const isStale = newest ? newest < yesterday : true;
+      const ohlcvBars = cov?.ohlcvBars ?? Number(bar?.bars ?? 0);
+      return {
+        ticker,
+        ohlcvBars,
+        ohlcvOldest: cov?.ohlcvOldest ?? bar?.oldest ?? null,
+        ohlcvNewest: newest,
+        ivBars: cov?.ivBars ?? 0,
+        ivOldest: cov?.ivOldest ?? null,
+        ivNewest: cov?.ivNewest ?? null,
+        lastSyncAt: cov?.lastSyncAt ?? null,
+        lastSyncStatus: cov?.lastSyncStatus ?? "never",
+        isStale,
+        isHealthy: !isStale && ohlcvBars > 200,
+      };
+    }).sort((a, b) => a.ticker.localeCompare(b.ticker));
+
+    const healthy = tickers.filter(t => t.isHealthy).length;
+    const stale = tickers.filter(t => t.isStale && t.ohlcvBars > 0).length;
+    const missing = tickers.filter(t => t.ohlcvBars === 0).length;
+    return { tickers, summary: { total: tickers.length, healthy, stale, missing } };
+  }),
+
+  /**
+   * getIVHistory — fetch stored IV rank history for a ticker (for charts).
+   */
+  getIVHistory: protectedProcedure
+    .input(z.object({ ticker: z.string().min(1).max(20).toUpperCase(), days: z.number().min(30).max(365).default(90) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const cutoff = new Date(Date.now() - input.days * 86400000).toISOString().split("T")[0];
+      return db
+        .select()
+        .from(ivHistory)
+        .where(and(eq(ivHistory.ticker, input.ticker), sql`${ivHistory.date} >= ${cutoff}`))
+        .orderBy(ivHistory.date)
+        .limit(input.days);
     }),
 
   getDataReadiness: protectedProcedure.query(async () => {

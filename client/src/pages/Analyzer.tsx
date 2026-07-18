@@ -461,10 +461,66 @@ function RecommendationCard({ result }: { result: AnalysisResult }) {
           </div>
         )}
 
-        {/* Score Radar Chart */}
+                {/* Score Radar Chart */}
         <ScoreRadarChart rec={rec} />
+        {/* Quick Proof — local backtest bar */}
+        <QuickProofBar ticker={result.ticker} />
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Quick Proof Bar ─────────────────────────────────────────────────────────
+function QuickProofBar({ ticker }: { ticker: string }) {
+  const { data, isLoading } = trpc.backtester.quickProof.useQuery(
+    { ticker, strategy: "velez_pullback" },
+    { staleTime: 5 * 60 * 1000 }
+  );
+  if (isLoading) return (
+    <div className="mt-4 p-3 rounded-lg border border-border/30 bg-muted/20 flex items-center gap-2 text-xs text-muted-foreground">
+      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading backtest proof...
+    </div>
+  );
+  if (!data?.hasData) return (
+    <div className="mt-4 p-3 rounded-lg border border-dashed border-border/30 bg-muted/10 text-xs text-muted-foreground flex items-center gap-2">
+      <span className="opacity-50">📊</span>
+      No local price history yet — download data from Historical Data to enable Quick Proof.
+    </div>
+  );
+  const winColor = data.winRate >= 60 ? "text-profit" : data.winRate >= 45 ? "text-neutral-gold" : "text-loss";
+  const winBarColor = data.winRate >= 60 ? "bg-green-500" : data.winRate >= 45 ? "bg-amber-500" : "bg-red-500";
+  return (
+    <div className="mt-4 p-3 rounded-lg border border-border/30 bg-muted/20">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Proof — {data.dataMonths}mo local data</span>
+        <span className="text-[10px] text-muted-foreground">Velez pullback strategy</span>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-muted-foreground">Win Rate</span>
+            <span className={`text-sm font-bold num ${winColor}`}>{data.winRate}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${winBarColor}`} style={{ width: `${Math.min(data.winRate, 100)}%` }} />
+          </div>
+        </div>
+        <div className="text-center">
+          <div className="text-xs text-muted-foreground">Avg P&L</div>
+          <div className={`text-sm font-bold num ${data.avgPnlPct >= 0 ? "text-profit" : "text-loss"}`}>
+            {data.avgPnlPct >= 0 ? "+" : ""}{data.avgPnlPct}%
+          </div>
+        </div>
+        <div className="text-center">
+          <div className="text-xs text-muted-foreground">Max DD</div>
+          <div className="text-sm font-bold num text-loss">-{data.maxDrawdownPct}%</div>
+        </div>
+        <div className="text-center">
+          <div className="text-xs text-muted-foreground">Trades</div>
+          <div className="text-sm font-bold num">{data.totalTrades}</div>
+        </div>
+      </div>
+    </div>
   );
 }
 

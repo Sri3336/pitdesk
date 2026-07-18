@@ -260,6 +260,9 @@ export default function HistoricalData() {
           <TabsTrigger value="export" className="flex items-center gap-1.5">
             <FileDown className="h-3.5 w-3.5" /> Export CSV
           </TabsTrigger>
+          <TabsTrigger value="health" className="flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Data Health
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Download Tab ── */}
@@ -559,7 +562,135 @@ export default function HistoricalData() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── Data Health Tab ── */}
+        <TabsContent value="health" className="mt-4 space-y-4">
+          <DataHealthTab />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// ─── Data Health Tab ────────────────────────────────────────────────────────
+function DataHealthTab() {
+  const coverageQuery = trpc.backtester.getCoverage.useQuery(undefined, { refetchInterval: 30000 });
+  const utils = trpc.useUtils();
+  const [syncing, setSyncing] = useState(false);
+
+  const handleManualSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/scheduled/price-sync", { method: "POST" });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(`Sync complete: ${data.synced} tickers updated, ${data.ivComputed} IV computed`);
+        utils.backtester.getCoverage.invalidate();
+      } else {
+        toast.error(data.error ?? "Sync failed");
+      }
+    } catch {
+      toast.error("Sync request failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const coverage = coverageQuery.data;
+
+  return (
+    <div className="space-y-4">
+      {/* Summary row */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-6">
+          {coverage && (
+            <>
+              <div className="flex items-center gap-1.5 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span className="font-semibold text-green-700">{coverage.summary.healthy}</span>
+                <span className="text-muted-foreground">healthy</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm">
+                <Clock className="h-4 w-4 text-amber-500" />
+                <span className="font-semibold text-amber-700">{coverage.summary.stale}</span>
+                <span className="text-muted-foreground">stale</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm">
+                <XCircle className="h-4 w-4 text-red-500" />
+                <span className="font-semibold text-red-700">{coverage.summary.missing}</span>
+                <span className="text-muted-foreground">missing</span>
+              </div>
+            </>
+          )}
+        </div>
+        <Button size="sm" variant="outline" onClick={handleManualSync} disabled={syncing} className="gap-1.5">
+          {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          {syncing ? "Syncing..." : "Sync Now"}
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {coverageQuery.isLoading ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading coverage data...
+            </div>
+          ) : !coverage || coverage.tickers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
+              <Database className="h-8 w-8 opacity-40" />
+              <p className="text-sm">No data yet. Download tickers from the Download tab first.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40">
+                    <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground">Ticker</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-xs text-muted-foreground">OHLCV Bars</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-xs text-muted-foreground">Oldest</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-xs text-muted-foreground">Newest</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-xs text-muted-foreground">IV Bars</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-xs text-muted-foreground">Last Sync</th>
+                    <th className="text-center px-4 py-2.5 font-medium text-xs text-muted-foreground">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coverage.tickers.map((t) => (
+                    <tr key={t.ticker} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-2.5 font-mono font-semibold text-xs">{t.ticker}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-xs">
+                        {t.ohlcvBars > 0 ? t.ohlcvBars.toLocaleString() : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">{t.ohlcvOldest ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">{t.ohlcvNewest ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-xs">
+                        {t.ivBars > 0 ? t.ivBars : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">
+                        {t.lastSyncAt ? new Date(Number(t.lastSyncAt)).toLocaleDateString() : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        {t.isHealthy ? (
+                          <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5">✓ Healthy</Badge>
+                        ) : t.ohlcvBars === 0 ? (
+                          <Badge className="bg-red-100 text-red-700 border-red-200 text-[10px] px-1.5">Missing</Badge>
+                        ) : (
+                          <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[10px] px-1.5">Stale</Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <p className="text-xs text-muted-foreground">
+        Auto-sync runs every weekday at 4:30 PM ET. IV is computed from HV20/HV30 using stored price history.
+        Use “Sync Now” to trigger an immediate refresh of the last 10 days for all tracked tickers.
+      </p>
     </div>
   );
 }

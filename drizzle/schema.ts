@@ -4,6 +4,7 @@ import {
   char,
   decimal,
   float,
+  index,
   int,
   json,
   mysqlEnum,
@@ -1025,3 +1026,43 @@ export const userPreferences = mysqlTable("user_preferences", {
 });
 export type UserPreferences = typeof userPreferences.$inferSelect;
 export type InsertUserPreferences = typeof userPreferences.$inferInsert;
+
+// ─── IV History (daily implied volatility per ticker for IVR backtesting) ─────
+export const ivHistory = mysqlTable("iv_history", {
+  id: int("id").primaryKey().autoincrement(),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(),           // YYYY-MM-DD
+  ivClose: decimal("iv_close", { precision: 8, scale: 4 }), // annualized IV (e.g. 0.4500 = 45%)
+  ivHigh: decimal("iv_high", { precision: 8, scale: 4 }),
+  ivLow: decimal("iv_low", { precision: 8, scale: 4 }),
+  ivRank: decimal("iv_rank", { precision: 5, scale: 2 }),    // 0-100 percentile rank vs 52-week range
+  ivPercentile: decimal("iv_percentile", { precision: 5, scale: 2 }), // % of days IV was lower
+  hv20: decimal("hv20", { precision: 8, scale: 4 }),         // 20-day historical vol
+  hv30: decimal("hv30", { precision: 8, scale: 4 }),         // 30-day historical vol
+  source: varchar("source", { length: 32 }).default("computed").notNull(),
+  fetchedAt: bigint("fetched_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  uniqTickerDate: uniqueIndex("uniq_iv_ticker_date").on(t.ticker, t.date),
+  idxTicker: index("idx_iv_ticker").on(t.ticker),
+  idxDate: index("idx_iv_date").on(t.date),
+}));
+export type IvHistoryRow = typeof ivHistory.$inferSelect;
+export type InsertIvHistoryRow = typeof ivHistory.$inferInsert;
+
+// ─── Ticker Data Coverage (fast lookup for data health dashboard) ─────────────
+export const tickerDataCoverage = mysqlTable("ticker_data_coverage", {
+  id: int("id").primaryKey().autoincrement(),
+  ticker: varchar("ticker", { length: 20 }).notNull().unique(),
+  ohlcvBars: int("ohlcv_bars").default(0).notNull(),
+  ohlcvOldest: varchar("ohlcv_oldest", { length: 10 }),
+  ohlcvNewest: varchar("ohlcv_newest", { length: 10 }),
+  ivBars: int("iv_bars").default(0).notNull(),
+  ivOldest: varchar("iv_oldest", { length: 10 }),
+  ivNewest: varchar("iv_newest", { length: 10 }),
+  lastSyncAt: bigint("last_sync_at", { mode: "number" }),
+  lastSyncStatus: varchar("last_sync_status", { length: 16 }).default("never"),
+  lastSyncError: text("last_sync_error"),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type TickerDataCoverage = typeof tickerDataCoverage.$inferSelect;
+export type InsertTickerDataCoverage = typeof tickerDataCoverage.$inferInsert;
