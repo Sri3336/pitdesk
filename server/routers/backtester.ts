@@ -261,6 +261,73 @@ export const backtesterRouter = router({
       };
     }),
 
+  /**
+   * quickProof — fast per-ticker win rate bar for strategy recommendation cards.
+   * Runs a Velez-style pullback backtest on the last 12 months of local data
+   * and returns win rate, avg P&L, max drawdown, and trade count.
+   * Falls back gracefully if no local data exists.
+   */
+  quickProof: protectedProcedure
+    .input(z.object({
+      ticker: z.string().min(1).max(20).toUpperCase(),
+      strategy: z.enum(["velez_pullback", "dux_5filter"]).default("velez_pullback"),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { hasData: false, winRate: 0, totalTrades: 0, avgPnlPct: 0, maxDrawdownPct: 0, dataMonths: 0 };
+
+      // Last 12 months of data
+      const cutoff = new Date();
+      cutoff.setFullYear(cutoff.getFullYear() - 1);
+      const cutoffDate = cutoff.toISOString().split("T")[0];
+
+      const rows = await db
+        .select()
+        .from(priceBars)
+        .where(and(
+          eq(priceBars.ticker, input.ticker),
+          eq(priceBars.interval, "1d"),
+          sql`${priceBars.date} >= ${cutoffDate}`
+        ))
+        .orderBy(priceBars.date);
+
+      if (rows.length < 20) {
+        return { hasData: false, winRate: 0, totalTrades: 0, avgPnlPct: 0, maxDrawdownPct: 0, dataMonths: 0 };
+      }
+
+      const bars: OHLCVBar[] = rows.map(r => ({
+        date: r.date,
+        open: parseFloat(r.open as unknown as string),
+        high: parseFloat(r.high as unknown as string),
+        low: parseFloat(r.low as unknown as string),
+        close: parseFloat(r.close as unknown as string),
+        volume: Number(r.volume),
+      }));
+
+      const signals = input.strategy === "dux_5filter"
+        ? detectDuxSignals(bars, 5, 2)
+        : detectVelezSignals(bars, 20);
+
+      const trades = simulateTrades(input.ticker, bars, signals, 8, 4, 10);
+      const stats = computeStats(trades);
+
+      // Compute data span in months
+      const oldest = new Date(rows[0].date);
+      const newest = new Date(rows[rows.length - 1].date);
+      const dataMonths = Math.round((newest.getTime() - oldest.getTime()) / (1000 * 60 * 60 * 24 * 30));
+
+      return {
+        hasData: true,
+        winRate: stats.winRate,
+        totalTrades: stats.totalTrades,
+        avgPnlPct: stats.totalTrades > 0
+          ? Math.round((stats.totalReturnPct / stats.totalTrades) * 100) / 100
+          : 0,
+        maxDrawdownPct: stats.maxDrawdownPct,
+        dataMonths,
+      };
+    }),
+
   getDataReadiness: protectedProcedure.query(async () => {
     const db = await getDb();
     if (!db) return { tickersWithData: 0, totalBars: 0, oldestDate: null as string | null, newestDate: null as string | null };

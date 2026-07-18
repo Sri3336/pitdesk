@@ -161,7 +161,7 @@ export default function SignIn() {
           {/* Features */}
           <div className="grid grid-cols-2 gap-3 mb-8">
             <Feature icon={Activity}  label="PCR Signal Board"   desc="60 tickers, live COI heat map"    color="#22c55e" />
-            <Feature icon={Target}    label="Options Analyzer"   desc="13 strategies + Black-Scholes"    color="#6366f1" />
+            <Feature icon={Target}    label="Options Analyzer"   desc="15 strategies + Black-Scholes"    color="#6366f1" />
             <Feature icon={BarChart2} label="Velez Scanner"      desc="Daily & intraday Fib signals"     color="#f59e0b" />
             <Feature icon={Zap}       label="Pit Advisor AI"     desc="5-dimension trade coaching"       color="#ec4899" />
           </div>
@@ -169,7 +169,7 @@ export default function SignIn() {
           {/* Stats */}
           <div className="flex gap-6">
             {[
-              { label: "Strategies", value: "13+" },
+              { label: "Strategies", value: "15+" },
               { label: "PCR Tickers", value: "60" },
               { label: "Scan Criteria", value: "9" },
               { label: "Fib Levels", value: "8" },

@@ -5,6 +5,7 @@ import { lazy, Suspense } from "react";
 import { Route, Switch, useLocation } from "wouter";
 
 import AuthGuard from "./components/AuthGuard";
+import { CommandPalette, useCommandPalette } from "./components/CommandPalette";
 import OwnerOnlyGuard from "./components/OwnerOnlyGuard";
 import DashboardLayout from "./components/DashboardLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -96,6 +97,7 @@ const Backtester = lazy(() => import("./pages/Backtester"));
 const PositionSizer = lazy(() => import("./pages/PositionSizer"));
 const SriPlaybook = lazy(() => import("./pages/SriPlaybook"));
 const MyPlaybook = lazy(() => import("./pages/MyPlaybook"));
+const ScanHub = lazy(() => import("./pages/ScanHub"));
 const ExtensionSettings = lazy(() => import("./pages/ExtensionSettings"));
 
 const PageLoader = () => (
@@ -206,6 +208,7 @@ function Router() {
                 <Route path="/dashboard" component={PitDeskHome} />
 
                 {/* Scanners */}
+                <Route path="/scan" component={ScanHub} />
                 <Route path="/velez-scanner" component={VelezScanner} />
                 <Route path="/intraday-scanner" component={IntradayScanner} />
                 <Route path="/intraday-scanner/:ticker">{(params) => <IntradayTickerDetail ticker={params.ticker ?? ""} onClose={() => window.history.back()} />}</Route>
@@ -295,13 +298,23 @@ function ComingSoon({ title }: { title: string }) {
   );
 }
 
+function AppWithPalette() {
+  const { open, setOpen } = useCommandPalette();
+  return (
+    <>
+      <Toaster />
+      <CommandPalette open={open} onOpenChange={setOpen} />
+      <Router />
+    </>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable>
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <AppWithPalette />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
