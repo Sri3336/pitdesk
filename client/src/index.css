@@ -137,6 +137,64 @@
 }
 
 @layer utilities {
+  /* ── Premium typography ── */
+  .font-trading {
+    font-feature-settings: 'tnum' 1, 'kern' 1;
+    letter-spacing: -0.01em;
+  }
+  .text-number {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* ── Premium card styles ── */
+  .card-premium {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    transition: box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1), transform 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms ease;
+  }
+  .card-premium:hover {
+    box-shadow: 0 8px 30px oklch(0 0 0 / 8%), 0 2px 8px oklch(0 0 0 / 4%);
+    transform: translateY(-2px);
+  }
+  .dark .card-premium:hover {
+    box-shadow: 0 8px 30px oklch(0 0 0 / 30%), 0 2px 8px oklch(0 0 0 / 15%);
+  }
+
+  /* ── Signal badges ── */
+  .badge-bullish  { background: oklch(0.95 0.04 145); color: oklch(0.38 0.12 145); border: 1px solid oklch(0.85 0.08 145); }
+  .badge-bearish  { background: oklch(0.97 0.04 25);  color: oklch(0.45 0.18 25);  border: 1px solid oklch(0.88 0.08 25);  }
+  .badge-neutral  { background: oklch(0.97 0 0);      color: oklch(0.50 0.01 0);   border: 1px solid oklch(0.90 0 0);      }
+  .dark .badge-bullish { background: oklch(0.25 0.06 145); color: oklch(0.75 0.15 145); border-color: oklch(0.35 0.10 145); }
+  .dark .badge-bearish { background: oklch(0.25 0.06 25);  color: oklch(0.75 0.15 25);  border-color: oklch(0.35 0.10 25);  }
+  .dark .badge-neutral { background: oklch(0.25 0 0);      color: oklch(0.65 0.01 0);   border-color: oklch(0.35 0 0);      }
+
+  /* ── Glow effects ── */
+  .glow-green { box-shadow: 0 0 0 3px oklch(0.60 0.175 145 / 15%), 0 0 20px oklch(0.60 0.175 145 / 10%); }
+  .glow-red   { box-shadow: 0 0 0 3px oklch(0.60 0.22 25 / 15%),  0 0 20px oklch(0.60 0.22 25 / 10%);  }
+
+  /* ── Animated gradient text ── */
+  .text-gradient-green {
+    background: linear-gradient(135deg, oklch(0.55 0.175 145), oklch(0.72 0.18 160));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Subtle noise texture for cards ── */
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: oklch(0.80 0.004 286); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: oklch(0.65 0.006 286); }
+  .dark ::-webkit-scrollbar-thumb { background: oklch(0.35 0.006 286); }
+  .dark ::-webkit-scrollbar-thumb:hover { background: oklch(0.45 0.006 286); }
+
   .bg-dot-grid {
     background-color: oklch(0.975 0.004 240);
     background-image: radial-gradient(circle, oklch(0.85 0.006 240) 1px, transparent 1px);
