@@ -30,7 +30,7 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 
 // ── Quick-pick tickers ────────────────────────────────────────────────────────
@@ -97,6 +97,7 @@ export default function TickerAnalysis() {
   const [inputValue, setInputValue] = useState(initialTicker);
   const [activeTicker, setActiveTicker] = useState(initialTicker);
   const [, navigate] = useLocation();
+  const autoRanRef = useRef(false);
 
   // PCR data
   const { data: pcrBatch, isLoading: pcrLoading } = trpc.pcr.getBatch.useQuery(
@@ -109,6 +110,15 @@ export default function TickerAnalysis() {
   const analysisMutation = trpc.analysis.run.useMutation();
   const analysisData = analysisMutation.data;
   const analysisLoading = analysisMutation.isPending;
+
+  // Auto-run analysis when ticker is passed via URL on mount
+  useEffect(() => {
+    if (initialTicker && !autoRanRef.current) {
+      autoRanRef.current = true;
+      analysisMutation.mutate({ ticker: initialTicker });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleSearch(ticker?: string) {
     const t = (ticker ?? inputValue).toUpperCase().trim();

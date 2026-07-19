@@ -831,6 +831,40 @@ const pcrRouter = router({
       );
       return results.map((r, i) => r.status === "fulfilled" ? r.value : { ticker: input.tickers[i], pcr: 0, pcrOI: 0, signal: "NEUTRAL", signalStrength: 0, recommendation: "N/A", strategyHint: "N/A", totalCallVolume: 0, totalPutVolume: 0, ivSkew: 0, lastPrice: 0, error: "failed" });
     }),
+  // scanBatch: scan a custom list of tickers with real options chain data
+  scanBatch: protectedProcedure
+    .input(z.object({ tickers: z.array(z.string().min(1).max(10)).min(1).max(50) }))
+    .query(async ({ input }) => {
+      const results: Array<{ ticker: string; pcr: number; callVolume: number; putVolume: number; signal: string; lastPrice: number; error?: string }> = [];
+      await Promise.allSettled(
+        input.tickers.map(async (ticker) => {
+          try {
+            const result = await callDataApi("YahooFinance/get_options", { query: { ticker } });
+            const data: any = result;
+            const chain = data?.optionChain?.result?.[0];
+            if (!chain) return;
+            const options = chain.options?.[0];
+            if (!options) return;
+            const callVol = (options.calls ?? []).reduce((s: number, c: any) => s + (c.volume ?? 0), 0);
+            const putVol = (options.puts ?? []).reduce((s: number, p: any) => s + (p.volume ?? 0), 0);
+            const pcr = callVol > 0 ? putVol / callVol : 0;
+            const lastPrice = chain.quote?.regularMarketPrice ?? 0;
+            let signal: string;
+            if (pcr < 0.5) signal = "EXTREME_GREED";
+            else if (pcr < 0.7) signal = "GREED";
+            else if (pcr > 1.5) signal = "EXTREME_FEAR";
+            else if (pcr > 1.0) signal = "FEAR";
+            else signal = "NEUTRAL";
+            results.push({ ticker, pcr: Math.round(pcr * 100) / 100, callVolume: callVol, putVolume: putVol, signal, lastPrice });
+          } catch (e: any) {
+            results.push({ ticker, pcr: 0, callVolume: 0, putVolume: 0, signal: "NEUTRAL", lastPrice: 0, error: e.message });
+          }
+        })
+      );
+      // Sort: EXTREME first, then FEAR/GREED, NEUTRAL last
+      const order: Record<string, number> = { EXTREME_FEAR: 0, EXTREME_GREED: 1, FEAR: 2, GREED: 3, NEUTRAL: 4 };
+      return results.sort((a, b) => (order[a.signal] ?? 5) - (order[b.signal] ?? 5));
+    }),
   scan: protectedProcedure.query(async () => {
     const results: Array<{ ticker: string; pcr: number; callVolume: number; putVolume: number; signal: string }> = [];
     await Promise.allSettled(

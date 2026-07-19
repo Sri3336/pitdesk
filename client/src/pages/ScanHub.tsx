@@ -80,8 +80,8 @@ export default function ScanHub() {
   const [filter, setFilter] = useState<SignalType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // PCR batch scan on watchlist
-  const { data: pcrData, isLoading: pcrLoading, refetch: refetchPcr } = trpc.pcr.getBatch.useQuery(
+  // PCR batch scan on watchlist — uses real options chain data (not randomized)
+  const { data: pcrData, isLoading: pcrLoading, refetch: refetchPcr } = trpc.pcr.scanBatch.useQuery(
     { tickers: SCAN_TICKERS },
     { staleTime: 5 * 60 * 1000 }
   );
