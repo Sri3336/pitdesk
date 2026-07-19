@@ -98,6 +98,7 @@ const PositionSizer = lazy(() => import("./pages/PositionSizer"));
 const SriPlaybook = lazy(() => import("./pages/SriPlaybook"));
 const MyPlaybook = lazy(() => import("./pages/MyPlaybook"));
 const ScanHub = lazy(() => import("./pages/ScanHub"));
+const GoalScan = lazy(() => import("./pages/GoalScan"));
 const ExtensionSettings = lazy(() => import("./pages/ExtensionSettings"));
 
 const PageLoader = () => (
@@ -209,6 +210,9 @@ function Router() {
 
                 {/* Scanners */}
                 <Route path="/scan" component={ScanHub} />
+                <Route path="/goal-scan">
+                  <ScrollableRoute><GoalScan /></ScrollableRoute>
+                </Route>
                 <Route path="/velez-scanner" component={VelezScanner} />
                 <Route path="/intraday-scanner" component={IntradayScanner} />
                 <Route path="/intraday-scanner/:ticker">{(params) => <IntradayTickerDetail ticker={params.ticker ?? ""} onClose={() => window.history.back()} />}</Route>

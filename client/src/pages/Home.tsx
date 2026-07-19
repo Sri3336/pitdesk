@@ -288,7 +288,7 @@ function GoalEntryCard() {
           const Icon = goal.icon;
           return (
             <button key={goal.key}
-              onClick={() => navigate(`/ticker-analysis?goal=${goal.key}`)}
+              onClick={() => navigate(`/goal-scan?goal=${goal.key}`)}
               className="group flex flex-col items-start gap-2.5 p-3.5 rounded-xl border-2 bg-white hover:shadow-sm transition-all duration-150 active:scale-95 text-left"
               style={{ borderColor: goal.color + "25" }}
               onMouseEnter={e => {
