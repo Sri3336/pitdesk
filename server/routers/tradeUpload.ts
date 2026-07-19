@@ -141,6 +141,101 @@ function parseCsvText(csvText: string) {
   return { headers, columnMap, rows, preview, unmappedColumns };
 }
 
+// ─── FIFO Round-Trip P&L Matching Engine ────────────────────────────────────
+
+export interface RoundTrip {
+  ticker: string;
+  accountId: string | null;
+  accountLabel: string | null;
+  assetType: string;
+  openDate: string;
+  closeDate: string;
+  qty: number;
+  entryPrice: number;
+  exitPrice: number;
+  pnl: number;         // realized P&L in dollars
+  pnlPct: number;      // percentage return
+  isWin: boolean;
+}
+
+/**
+ * FIFO round-trip matching:
+ * Groups all trades by (ticker, accountId), sorts by date ASC,
+ * then pairs BUY lots with SELL lots in FIFO order.
+ * Handles partial fills (e.g., buy 10, sell 5, sell 5 → 2 round trips).
+ */
+export function computeRoundTrips(trades: Array<{
+  ticker: string;
+  tradeDate: string;
+  side: string;
+  qty: string | number;
+  entryPrice: string | number;
+  accountId: string | null;
+  accountLabel: string | null;
+  assetType: string;
+}>): RoundTrip[] {
+  // Group by (ticker, accountId)
+  const groups = new Map<string, typeof trades>();
+  for (const t of trades) {
+    const key = `${t.ticker}::${t.accountId ?? ""}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(t);
+  }
+
+  const roundTrips: RoundTrip[] = [];
+
+  for (const [, group] of Array.from(groups)) {
+    // Sort chronologically
+    const sorted = [...group].sort((a, b) => a.tradeDate.localeCompare(b.tradeDate));
+
+    // FIFO queue of open lots: { date, price, qty }
+    const openLots: Array<{ date: string; price: number; qty: number }> = [];
+
+    for (const trade of sorted) {
+      const side = trade.side.toUpperCase();
+      const qty = Math.abs(parseFloat(String(trade.qty)));
+      const price = parseFloat(String(trade.entryPrice));
+      if (!qty || !price || isNaN(qty) || isNaN(price)) continue;
+
+      if (side === "BUY" || side === "LONG") {
+        openLots.push({ date: trade.tradeDate, price, qty });
+      } else if (side === "SELL" || side === "SHORT") {
+        // Match against open lots (FIFO)
+        let remaining = qty;
+        while (remaining > 0 && openLots.length > 0) {
+          const lot = openLots[0];
+          const matched = Math.min(remaining, lot.qty);
+          const pnlPerShare = price - lot.price;
+          const pnl = pnlPerShare * matched;
+          const pnlPct = lot.price !== 0 ? (pnlPerShare / lot.price) * 100 : 0;
+
+          roundTrips.push({
+            ticker: trade.ticker,
+            accountId: trade.accountId,
+            accountLabel: trade.accountLabel,
+            assetType: trade.assetType,
+            openDate: lot.date,
+            closeDate: trade.tradeDate,
+            qty: matched,
+            entryPrice: lot.price,
+            exitPrice: price,
+            pnl: Math.round(pnl * 100) / 100,
+            pnlPct: Math.round(pnlPct * 100) / 100,
+            isWin: pnl > 0,
+          });
+
+          lot.qty -= matched;
+          remaining -= matched;
+          if (lot.qty <= 0.0001) openLots.shift();
+        }
+        // If remaining > 0 after all lots, it's a short-sell open position — skip
+      }
+    }
+  }
+
+  return roundTrips;
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const tradeUploadRouter = router({
@@ -358,5 +453,87 @@ export const tradeUploadRouter = router({
         totalPnl: r.totalPnl !== null ? Number(r.totalPnl) : null,
         avgPnlPct: r.avgPnlPct !== null ? Number(r.avgPnlPct) : null,
       }));
+    }),
+
+  /**
+   * FIFO round-trip P&L analysis.
+   * Matches BUY rows with SELL rows in chronological order per (ticker, account).
+   * Returns matched round trips with realized P&L, plus a performance summary.
+   */
+  myRoundTrips: protectedProcedure
+    .input(z.object({
+      accountId: z.string().optional(),
+      ticker: z.string().optional(),
+      limit: z.number().min(1).max(2000).default(500),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { roundTrips: [], summary: null };
+
+      const conditions = [eq(uploadedTrades.userId, ctx.user.id)];
+      if (input.accountId) conditions.push(eq(uploadedTrades.accountId, input.accountId));
+      if (input.ticker) conditions.push(eq(uploadedTrades.ticker, input.ticker.toUpperCase()));
+
+      // Fetch all trades (no limit — we need all rows for FIFO matching)
+      const trades = await db
+        .select()
+        .from(uploadedTrades)
+        .where(and(...conditions))
+        .orderBy(uploadedTrades.tradeDate);
+
+      const roundTrips = computeRoundTrips(trades);
+
+      // Sort by closeDate desc, limit for display
+      const sorted = roundTrips
+        .sort((a, b) => b.closeDate.localeCompare(a.closeDate))
+        .slice(0, input.limit);
+
+      // Summary stats
+      const wins = roundTrips.filter(r => r.isWin);
+      const losses = roundTrips.filter(r => !r.isWin);
+      const totalPnl = roundTrips.reduce((s, r) => s + r.pnl, 0);
+      const avgWin = wins.length > 0 ? wins.reduce((s, r) => s + r.pnl, 0) / wins.length : 0;
+      const avgLoss = losses.length > 0 ? losses.reduce((s, r) => s + r.pnl, 0) / losses.length : 0;
+      const winRate = roundTrips.length > 0 ? (wins.length / roundTrips.length) * 100 : 0;
+      const expectancy = roundTrips.length > 0 ? totalPnl / roundTrips.length : 0;
+      const profitFactor = losses.length > 0 && Math.abs(avgLoss) > 0
+        ? Math.abs(wins.reduce((s, r) => s + r.pnl, 0) / losses.reduce((s, r) => s + r.pnl, 0))
+        : wins.length > 0 ? Infinity : 0;
+
+      // Best/worst trades
+      const bestTrade = roundTrips.length > 0 ? roundTrips.reduce((a, b) => b.pnl > a.pnl ? b : a) : null;
+      const worstTrade = roundTrips.length > 0 ? roundTrips.reduce((a, b) => b.pnl < a.pnl ? b : a) : null;
+
+      // Per-ticker breakdown
+      const byTicker = new Map<string, { ticker: string; trades: number; wins: number; totalPnl: number }>();
+      for (const rt of roundTrips) {
+        const existing = byTicker.get(rt.ticker) ?? { ticker: rt.ticker, trades: 0, wins: 0, totalPnl: 0 };
+        existing.trades++;
+        if (rt.isWin) existing.wins++;
+        existing.totalPnl += rt.pnl;
+        byTicker.set(rt.ticker, existing);
+      }
+      const tickerBreakdown = Array.from(byTicker.values())
+        .map(t => ({ ...t, winRate: t.trades > 0 ? (t.wins / t.trades) * 100 : 0, totalPnl: Math.round(t.totalPnl * 100) / 100 }))
+        .sort((a, b) => b.totalPnl - a.totalPnl)
+        .slice(0, 20);
+
+      return {
+        roundTrips: sorted,
+        summary: {
+          totalRoundTrips: roundTrips.length,
+          wins: wins.length,
+          losses: losses.length,
+          winRate: Math.round(winRate * 10) / 10,
+          totalPnl: Math.round(totalPnl * 100) / 100,
+          avgWin: Math.round(avgWin * 100) / 100,
+          avgLoss: Math.round(avgLoss * 100) / 100,
+          expectancy: Math.round(expectancy * 100) / 100,
+          profitFactor: isFinite(profitFactor) ? Math.round(profitFactor * 100) / 100 : null,
+          bestTrade: bestTrade ? { ticker: bestTrade.ticker, pnl: bestTrade.pnl, date: bestTrade.closeDate } : null,
+          worstTrade: worstTrade ? { ticker: worstTrade.ticker, pnl: worstTrade.pnl, date: worstTrade.closeDate } : null,
+          tickerBreakdown,
+        },
+      };
     }),
 });

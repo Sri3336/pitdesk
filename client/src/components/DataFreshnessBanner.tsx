@@ -8,10 +8,18 @@ interface DataFreshnessBannerProps {
 }
 
 export function DataFreshnessBanner({ latestDate, dataAge, className }: DataFreshnessBannerProps) {
+  // 999 is a sentinel value from the backend meaning "data unavailable" — show a neutral message
+  if (dataAge >= 999 || !latestDate) {
+    return (
+      <div className={cn("flex items-center gap-2 text-sm px-3 py-2 rounded-md border bg-gray-50 border-gray-200 text-gray-500", className)}>
+        <Clock className="h-4 w-4 shrink-0" />
+        <span>CFTC data unavailable — will update when next report is released.</span>
+      </div>
+    );
+  }
+
   const isStale = dataAge > 10;
   const isVeryStale = dataAge > 21;
-
-  if (!latestDate) return null;
 
   const formattedDate = new Date(latestDate).toLocaleDateString("en-US", {
     year: "numeric",

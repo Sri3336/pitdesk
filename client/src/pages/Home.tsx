@@ -67,10 +67,17 @@ function CrosshairCandleIcon({ size = 18, color = "currentColor" }: { size?: num
 
 // ─── Market Pulse Banner ──────────────────────────────────────────────────────
 function MarketPulseBanner() {
-  const hour = new Date().getHours();
-  const isPreMarket = hour < 9 || (hour === 9 && new Date().getMinutes() < 30);
-  const isAfterHours = hour >= 16;
-  const isMarketOpen = !isPreMarket && !isAfterHours;
+  // Always use Eastern Time (ET) for market hours — NYSE/NASDAQ operate on ET
+  const now = new Date();
+  const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "numeric", hour12: false });
+  const [etHourStr, etMinStr] = etStr.split(":");
+  const etHour = parseInt(etHourStr, 10);
+  const etMin = parseInt(etMinStr, 10);
+  const dayOfWeek = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" })).getDay();
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const isPreMarket = !isWeekend && (etHour < 9 || (etHour === 9 && etMin < 30));
+  const isAfterHours = isWeekend || etHour >= 16;
+  const isMarketOpen = !isWeekend && !isPreMarket && !isAfterHours;
 
   const session = isPreMarket ? "Pre-Market" : isAfterHours ? "After Hours" : "Market Open";
   const sessionColor = isMarketOpen ? "#22c55e" : "#f59e0b";

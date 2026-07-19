@@ -943,7 +943,20 @@ export default function IntradayScanner() {
     setTimeout(() => void refetchSingle(), 50);
   }
 
-  const singleCard = singleData as IntradayScorecard | undefined;
+  // Normalize single-ticker response from server shape (price/weightedScore) to client shape (currentPrice/score)
+  const singleCard: IntradayScorecard | undefined = singleData ? {
+    ...singleData,
+    ticker: singleData.ticker ?? singleTicker.toUpperCase(),
+    currentPrice: parseFloat(String((singleData as any).price ?? (singleData as any).currentPrice ?? 0)),
+    score: parseFloat(String((singleData as any).weightedScore ?? (singleData as any).score ?? 0)),
+    maxScore: parseFloat(String((singleData as any).maxScore ?? 11)),
+    vwap: parseFloat(String((singleData as any).vwap ?? 0)),
+    atr: parseFloat(String((singleData as any).atr ?? 0)),
+    direction: normalizeDirection((singleData as any).direction ?? "neutral"),
+    criteria: (singleData as any).criteria ?? {},
+    grade: (singleData as any).grade ?? "F",
+    error: (singleData as any).error ?? null,
+  } as IntradayScorecard : undefined;
 
   // Decide which results to show: live scan takes priority over last DB scan
   const displayResults = liveResults ?? (lastScan?.results as IntradayScorecard[] | undefined) ?? [];

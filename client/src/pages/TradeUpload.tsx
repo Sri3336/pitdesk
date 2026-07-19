@@ -206,6 +206,7 @@ function AccountSelector({ value, onChange, placeholder = "Select account" }: {
 function MyTradesTab() {
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [selectedBatch, setSelectedBatch] = useState<number | undefined>(undefined);
+  const [activeView, setActiveView] = useState<"roundtrips" | "raw">("roundtrips");
 
   const batchesQuery = trpc.tradeUpload.myBatches.useQuery(
     selectedAccount !== "all" ? { accountId: selectedAccount } : {}
@@ -214,12 +215,16 @@ function MyTradesTab() {
     batchId: selectedBatch,
     accountId: selectedAccount !== "all" ? selectedAccount : undefined,
   });
+  const roundTripsQuery = trpc.tradeUpload.myRoundTrips.useQuery({
+    accountId: selectedAccount !== "all" ? selectedAccount : undefined,
+  });
   const deleteMutation = trpc.tradeUpload.deleteBatch.useMutation({
     onSuccess: () => {
       toast.success("Batch deleted");
       setSelectedBatch(undefined);
       batchesQuery.refetch();
       tradesQuery.refetch();
+      roundTripsQuery.refetch();
     },
     onError: (e) => toast.error(e.message),
   });
@@ -227,6 +232,8 @@ function MyTradesTab() {
   if (batchesQuery.isLoading) return <div className="flex items-center justify-center h-48"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   const batches = batchesQuery.data ?? [];
+  const rtSummary = roundTripsQuery.data?.summary;
+  const roundTrips = roundTripsQuery.data?.roundTrips ?? [];
 
   return (
     <div className="space-y-4">
@@ -273,77 +280,223 @@ function MyTradesTab() {
         </div>
       )}
 
-      {/* Summary */}
-      <SummaryCards summary={tradesQuery.data?.summary ?? null} />
-
-      {/* Delete batch */}
-      {selectedBatch !== undefined && (
-        <div className="flex justify-end">
-          <Button variant="outline" size="sm" className="text-xs h-8 text-red-500 border-red-200 hover:bg-red-50"
+      {/* View toggle */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setActiveView("roundtrips")}
+          className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${activeView === "roundtrips" ? "bg-green-600 text-white border-green-600" : "border-border hover:border-green-400"}`}
+        >
+          <Sparkles className="inline h-3 w-3 mr-1" />FIFO P&amp;L Analysis
+        </button>
+        <button
+          onClick={() => setActiveView("raw")}
+          className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${activeView === "raw" ? "bg-foreground text-background border-foreground" : "border-border hover:border-foreground/40"}`}
+        >
+          Raw Rows
+        </button>
+        {selectedBatch !== undefined && (
+          <Button variant="outline" size="sm" className="text-xs h-7 text-red-500 border-red-200 hover:bg-red-50 ml-auto"
             onClick={() => { if (confirm("Delete this batch and all its trades?")) deleteMutation.mutate({ batchId: selectedBatch }); }}
             disabled={deleteMutation.isPending}>
             {deleteMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Trash2 className="h-3.5 w-3.5 mr-1" />}
             Delete Batch
           </Button>
-        </div>
-      )}
-
-      {/* ── Streak Analysis ── */}
-      <div className="rounded-xl border border-border p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <BarChart2 className="h-4 w-4 text-purple-500" />
-          <span className="font-semibold text-sm">Streak Analysis</span>
-          <span className="text-xs text-muted-foreground ml-1">(Rajan Daal 33% Rule)</span>
-        </div>
-        <LosingStreakAnalyzer accountId={selectedAccount !== "all" ? selectedAccount : undefined} />
+        )}
       </div>
 
-      {/* Trades table */}
-      {tradesQuery.isLoading ? (
-        <div className="flex items-center justify-center h-32"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-      ) : (tradesQuery.data?.trades ?? []).length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground border border-dashed border-border rounded-xl">
-          <Upload className="h-8 w-8 text-green-400" />
-          <div className="text-sm font-medium">No trades found</div>
-          <div className="text-xs">Upload a CSV to see your trade history here</div>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/50">
-              <tr>
-                {["Account", "Ticker", "Date", "Side", "Qty", "Entry", "Exit", "P&L", "P&L%", "Strategy", "Type"].map(h => (
-                  <th key={h} className="px-3 py-2 text-left font-semibold text-muted-foreground">{h}</th>
+      {activeView === "roundtrips" && (
+        <>
+          {/* FIFO P&L Summary Cards */}
+          {roundTripsQuery.isLoading ? (
+            <div className="flex items-center justify-center h-24"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : !rtSummary || rtSummary.totalRoundTrips === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground border border-dashed border-border rounded-xl">
+              <Upload className="h-8 w-8 text-green-400" />
+              <div className="text-sm font-medium">No completed round trips found</div>
+              <div className="text-xs">Upload CSVs with both BUY and SELL rows for the same ticker to see P&amp;L</div>
+            </div>
+          ) : (
+            <>
+              {/* KPI row */}
+              <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                {[
+                  { label: "Round Trips", value: rtSummary.totalRoundTrips.toString(), icon: <BarChart2 className="h-3.5 w-3.5 text-blue-500" /> },
+                  { label: "Win Rate", value: `${rtSummary.winRate.toFixed(1)}%`, icon: <TrendingUp className="h-3.5 w-3.5 text-green-500" />, pnl: rtSummary.winRate - 50 },
+                  { label: "Total P&L", value: fmt(rtSummary.totalPnl), icon: rtSummary.totalPnl >= 0 ? <TrendingUp className="h-3.5 w-3.5 text-green-500" /> : <TrendingDown className="h-3.5 w-3.5 text-red-500" />, pnl: rtSummary.totalPnl },
+                  { label: "Expectancy", value: fmt(rtSummary.expectancy), icon: <Sparkles className="h-3.5 w-3.5 text-purple-500" />, pnl: rtSummary.expectancy },
+                  { label: "Avg Win", value: fmt(rtSummary.avgWin), icon: <Flame className="h-3.5 w-3.5 text-orange-500" />, pnl: rtSummary.avgWin },
+                  { label: "Avg Loss", value: fmt(rtSummary.avgLoss), icon: <AlertTriangle className="h-3.5 w-3.5 text-red-400" />, pnl: rtSummary.avgLoss },
+                  { label: "Profit Factor", value: rtSummary.profitFactor != null ? rtSummary.profitFactor.toFixed(2) : "∞", icon: <BarChart2 className="h-3.5 w-3.5 text-indigo-500" />, pnl: (rtSummary.profitFactor ?? 0) - 1 },
+                  { label: "Wins / Losses", value: `${rtSummary.wins} / ${rtSummary.losses}`, icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> },
+                ].map(c => (
+                  <Card key={c.label} className="shadow-none">
+                    <CardContent className="pt-2 pb-2 px-3">
+                      <div className="flex items-center gap-1 mb-0.5">{c.icon}<span className="text-[9px] text-muted-foreground uppercase tracking-wide">{c.label}</span></div>
+                      <div className={`text-sm font-bold ${c.pnl != null ? pnlColor(c.pnl) : ""}`}>{c.value}</div>
+                    </CardContent>
+                  </Card>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(tradesQuery.data?.trades ?? []).map((t) => (
-                <tr key={t.id} className="border-t border-border hover:bg-accent/30">
-                  <td className="px-3 py-2">
-                    {t.accountLabel ? (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: accountColor(t.accountId ?? "") + "22", color: accountColor(t.accountId ?? "") }}>
-                        {t.accountLabel}
-                      </span>
-                    ) : <span className="text-muted-foreground">—</span>}
-                  </td>
-                  <td className="px-3 py-2 font-bold">{t.ticker}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{t.tradeDate}</td>
-                  <td className="px-3 py-2">
-                    <Badge variant="outline" className={`text-[10px] ${t.side === "BUY" || t.side === "LONG" ? "border-green-400 text-green-700" : "border-red-400 text-red-600"}`}>{t.side}</Badge>
-                  </td>
-                  <td className="px-3 py-2">{t.qty}</td>
-                  <td className="px-3 py-2">{fmt(parseFloat(t.entryPrice as string))}</td>
-                  <td className="px-3 py-2">{t.exitPrice ? fmt(parseFloat(t.exitPrice as string)) : "—"}</td>
-                  <td className={`px-3 py-2 ${pnlColor(t.pnl ? parseFloat(t.pnl as string) : null)}`}>{t.pnl ? fmt(parseFloat(t.pnl as string)) : "—"}</td>
-                  <td className={`px-3 py-2 ${pnlColor(t.pnlPct ? parseFloat(t.pnlPct as string) : null)}`}>{t.pnlPct ? fmtPct(parseFloat(t.pnlPct as string)) : "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{t.strategy || "—"}</td>
-                  <td className="px-3 py-2"><Badge variant="secondary" className="text-[10px]">{t.assetType}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </div>
+
+              {/* Best/Worst */}
+              {(rtSummary.bestTrade || rtSummary.worstTrade) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {rtSummary.bestTrade && (
+                    <div className="rounded-xl border border-green-200 bg-green-50 p-3">
+                      <div className="text-[10px] text-green-700 font-semibold uppercase tracking-wide mb-1">🏆 Best Trade</div>
+                      <div className="font-bold text-green-800">{rtSummary.bestTrade.ticker}</div>
+                      <div className="text-sm font-semibold text-green-700">{fmt(rtSummary.bestTrade.pnl)}</div>
+                      <div className="text-[10px] text-green-600">{rtSummary.bestTrade.date}</div>
+                    </div>
+                  )}
+                  {rtSummary.worstTrade && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                      <div className="text-[10px] text-red-700 font-semibold uppercase tracking-wide mb-1">⚠️ Worst Trade</div>
+                      <div className="font-bold text-red-800">{rtSummary.worstTrade.ticker}</div>
+                      <div className="text-sm font-semibold text-red-700">{fmt(rtSummary.worstTrade.pnl)}</div>
+                      <div className="text-[10px] text-red-600">{rtSummary.worstTrade.date}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Per-ticker breakdown */}
+              {rtSummary.tickerBreakdown.length > 0 && (
+                <div className="rounded-xl border border-border p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BarChart2 className="h-4 w-4 text-purple-500" />
+                    <span className="font-semibold text-sm">P&amp;L by Ticker</span>
+                    <span className="text-xs text-muted-foreground ml-1">(top 20)</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          {["Ticker", "Trades", "Win Rate", "Total P&L"].map(h => (
+                            <th key={h} className="px-3 py-2 text-left font-semibold text-muted-foreground">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rtSummary.tickerBreakdown.map(t => (
+                          <tr key={t.ticker} className="border-t border-border hover:bg-accent/30">
+                            <td className="px-3 py-2 font-bold">{t.ticker}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{t.trades}</td>
+                            <td className="px-3 py-2">
+                              <span className={t.winRate >= 50 ? "text-green-700 font-semibold" : "text-red-600 font-semibold"}>{t.winRate.toFixed(0)}%</span>
+                            </td>
+                            <td className={`px-3 py-2 font-semibold ${pnlColor(t.totalPnl)}`}>{fmt(t.totalPnl)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Round trips table */}
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      {["Account", "Ticker", "Open", "Close", "Qty", "Entry", "Exit", "P&L", "P&L%", "Result"].map(h => (
+                        <th key={h} className="px-3 py-2 text-left font-semibold text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roundTrips.map((rt, i) => (
+                      <tr key={i} className="border-t border-border hover:bg-accent/30">
+                        <td className="px-3 py-2">
+                          {rt.accountLabel ? (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: accountColor(rt.accountId ?? "") + "22", color: accountColor(rt.accountId ?? "") }}>
+                              {rt.accountLabel}
+                            </span>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-3 py-2 font-bold">{rt.ticker}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{rt.openDate}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{rt.closeDate}</td>
+                        <td className="px-3 py-2">{rt.qty.toFixed(0)}</td>
+                        <td className="px-3 py-2">{fmt(rt.entryPrice)}</td>
+                        <td className="px-3 py-2">{fmt(rt.exitPrice)}</td>
+                        <td className={`px-3 py-2 font-semibold ${pnlColor(rt.pnl)}`}>{fmt(rt.pnl)}</td>
+                        <td className={`px-3 py-2 ${pnlColor(rt.pnlPct)}`}>{fmtPct(rt.pnlPct)}</td>
+                        <td className="px-3 py-2">
+                          <Badge variant="outline" className={`text-[10px] ${rt.isWin ? "border-green-400 text-green-700" : "border-red-400 text-red-600"}`}>
+                            {rt.isWin ? "WIN" : "LOSS"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {/* Streak Analysis */}
+          <div className="rounded-xl border border-border p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart2 className="h-4 w-4 text-purple-500" />
+              <span className="font-semibold text-sm">Streak Analysis</span>
+              <span className="text-xs text-muted-foreground ml-1">(Rajan Daal 33% Rule)</span>
+            </div>
+            <LosingStreakAnalyzer accountId={selectedAccount !== "all" ? selectedAccount : undefined} />
+          </div>
+        </>
+      )}
+
+      {activeView === "raw" && (
+        <>
+          {/* Raw trades table */}
+          {tradesQuery.isLoading ? (
+            <div className="flex items-center justify-center h-32"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : (tradesQuery.data?.trades ?? []).length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground border border-dashed border-border rounded-xl">
+              <Upload className="h-8 w-8 text-green-400" />
+              <div className="text-sm font-medium">No trades found</div>
+              <div className="text-xs">Upload a CSV to see your trade history here</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50">
+                  <tr>
+                    {["Account", "Ticker", "Date", "Side", "Qty", "Entry", "Exit", "P&L", "P&L%", "Strategy", "Type"].map(h => (
+                      <th key={h} className="px-3 py-2 text-left font-semibold text-muted-foreground">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(tradesQuery.data?.trades ?? []).map((t) => (
+                    <tr key={t.id} className="border-t border-border hover:bg-accent/30">
+                      <td className="px-3 py-2">
+                        {t.accountLabel ? (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: accountColor(t.accountId ?? "") + "22", color: accountColor(t.accountId ?? "") }}>
+                            {t.accountLabel}
+                          </span>
+                        ) : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-3 py-2 font-bold">{t.ticker}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{t.tradeDate}</td>
+                      <td className="px-3 py-2">
+                        <Badge variant="outline" className={`text-[10px] ${t.side === "BUY" || t.side === "LONG" ? "border-green-400 text-green-700" : "border-red-400 text-red-600"}`}>{t.side}</Badge>
+                      </td>
+                      <td className="px-3 py-2">{t.qty}</td>
+                      <td className="px-3 py-2">{fmt(parseFloat(t.entryPrice as string))}</td>
+                      <td className="px-3 py-2">{t.exitPrice ? fmt(parseFloat(t.exitPrice as string)) : "—"}</td>
+                      <td className={`px-3 py-2 ${pnlColor(t.pnl ? parseFloat(t.pnl as string) : null)}`}>{t.pnl ? fmt(parseFloat(t.pnl as string)) : "—"}</td>
+                      <td className={`px-3 py-2 ${pnlColor(t.pnlPct ? parseFloat(t.pnlPct as string) : null)}`}>{t.pnlPct ? fmtPct(parseFloat(t.pnlPct as string)) : "—"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{t.strategy || "—"}</td>
+                      <td className="px-3 py-2"><Badge variant="secondary" className="text-[10px]">{t.assetType}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -219,10 +219,12 @@ export default function PitDeskHome() {
   });
 
   const cotResults = cotScan?.results ?? [];
-  const topCotSignals = cotResults.length > 0
+  // Filter out entries with 999 sentinel (no data) before sorting
+  const validCotResults = cotResults.filter(r => r.dataAge < 999 && r.cotIndex !== null);
+  const topCotSignals = validCotResults.length > 0
     ? [
-        ...cotResults.filter(r => r.cotIndex !== null).sort((a, b) => (b.cotIndex ?? 0) - (a.cotIndex ?? 0)).slice(0, 2),
-        ...cotResults.filter(r => r.cotIndex !== null).sort((a, b) => (a.cotIndex ?? 0) - (b.cotIndex ?? 0)).slice(0, 1),
+        ...validCotResults.sort((a, b) => (b.cotIndex ?? 0) - (a.cotIndex ?? 0)).slice(0, 2),
+        ...validCotResults.sort((a, b) => (a.cotIndex ?? 0) - (b.cotIndex ?? 0)).slice(0, 1),
       ]
     : [];
 
@@ -437,12 +439,12 @@ export default function PitDeskHome() {
               <div className="space-y-2">
                 {topCotSignals.map((r: any) => (
                   <COTSignalCard
-                    key={r.id}
-                    id={r.id}
-                    name={r.name}
+                    key={r.instrument?.id ?? r.id}
+                    id={r.instrument?.id ?? r.id ?? ""}
+                    name={r.instrument?.name ?? r.name ?? "Unknown"}
                     cotIndex={r.cotIndex ?? 0}
                     signal={r.signal ?? "NEUTRAL"}
-                    category={r.category ?? ""}
+                    category={r.instrument?.category ?? r.category ?? ""}
                   />
                 ))}
               </div>

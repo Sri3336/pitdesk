@@ -42,7 +42,7 @@ const DEFAULT_WATCHLIST: Array<{ ticker: string; sector: string; sortOrder: numb
   { ticker: "SNDK",  sector: "Memory/Storage",    sortOrder: 1  },
   { ticker: "WDC",   sector: "Memory/Storage",    sortOrder: 2  },
   { ticker: "MU",    sector: "Memory/Storage",    sortOrder: 3  },
-  { ticker: "DRAM",  sector: "Memory/Storage",    sortOrder: 4  },
+  { ticker: "INTC",  sector: "Memory/Storage",    sortOrder: 4  },
   { ticker: "NVDA",  sector: "Memory/Storage",    sortOrder: 5  },
   { ticker: "ASML",  sector: "Semiconductors",    sortOrder: 6  },
   { ticker: "AMD",   sector: "Semiconductors",    sortOrder: 7  },

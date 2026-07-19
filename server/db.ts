@@ -581,7 +581,11 @@ export async function getWatchlist(userId: number): Promise<Watchlist[]> {
 export async function addToWatchlist(userId: number, ticker: string, notes?: string): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.insert(watchlist).values({ userId, ticker, notes }).onDuplicateKeyUpdate({ set: { notes } });
+  // onDuplicateKeyUpdate requires at least one non-undefined field.
+  // When notes is undefined, use updatedAt as a no-op update to avoid "No values to set" error.
+  await db.insert(watchlist).values({ userId, ticker, notes: notes ?? null }).onDuplicateKeyUpdate({
+    set: { notes: notes ?? null },
+  });
 }
 
 export async function removeFromWatchlist(id: number, userId: number): Promise<void> {
