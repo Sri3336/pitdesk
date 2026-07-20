@@ -147,51 +147,90 @@ export default function GoalScan() {
   const results = useMemo((): TickerResult[] => {
     if (goal === "breakout") {
       if (!vcpQuery.data) return [];
-      return (vcpQuery.data as any[])
-        .filter((r: any) => r && !r.error && (r.stage === "VCP_PIVOT" || r.stage === "VCP_FORMING" || r.stage === "STAGE_2_UPTREND" || (r.vcpScore ?? 0) >= 5))
+      // Include any ticker with a VCP score >= 2 or a meaningful stage — lower bar so results show even outside market hours
+      const valid = (vcpQuery.data as any[]).filter((r: any) => {
+        if (!r) return false;
+        // If data fetch failed entirely, skip
+        if (r.error && r.vcpScore === 0 && r.currentPrice === 0) return false;
+        // Accept any stage except pure decline with no score
+        const stage = r.stage ?? "";
+        if (stage === "STAGE_4_DECLINE" && (r.vcpScore ?? 0) < 2) return false;
+        return true;
+      });
+      return valid
         .map((r: any) => {
           const isAtPivot = r.stage === "VCP_PIVOT";
-          const score = isAtPivot ? 90 : Math.min(85, 50 + (r.vcpScore ?? 0) * 4);
+          const isForming = r.stage === "VCP_FORMING";
+          const isStage2 = r.stage === "STAGE_2_UPTREND";
+          const isExtended = r.stage === "EXTENDED";
+          const score = isAtPivot ? 90
+            : isForming ? Math.min(82, 55 + (r.vcpScore ?? 0) * 3)
+            : isStage2 ? Math.min(75, 45 + (r.vcpScore ?? 0) * 3)
+            : isExtended ? 40
+            : Math.min(50, 20 + (r.vcpScore ?? 0) * 4);
+          const headline = isAtPivot
+            ? `${r.ticker} is at the VCP pivot — breakout ready`
+            : isForming
+            ? `${r.ticker} is forming a VCP (${r.contractions?.length ?? 0} contractions, score ${r.vcpScore ?? 0}/10)`
+            : isStage2
+            ? `${r.ticker} is in a Stage 2 uptrend — watch for VCP setup`
+            : isExtended
+            ? `${r.ticker} is extended above pivot — wait for a pullback`
+            : `${r.ticker} — ${(r.stage ?? "unknown").replace(/_/g, " ").toLowerCase()} (score ${r.vcpScore ?? 0}/10)`;
+          const detail = isAtPivot
+            ? `Volume is drying up at the pivot. A breakout above ${r.pivotLevel ? `$${Number(r.pivotLevel).toFixed(2)}` : "the pivot"} on above-average volume is the entry signal. VCP score: ${r.vcpScore ?? 0}/10.`
+            : isForming
+            ? `Stage: ${r.stage?.replace(/_/g, " ")}. Pattern is contracting — not ready to enter yet. Watch for the pivot setup. VCP score: ${r.vcpScore ?? 0}/10.`
+            : isStage2
+            ? `${r.ticker} is trending above its key moving averages. No VCP pattern yet — add to watchlist and wait for base to form. Score: ${r.vcpScore ?? 0}/10.`
+            : `Stage: ${(r.stage ?? "unknown").replace(/_/g, " ")}. Not a current breakout candidate. VCP score: ${r.vcpScore ?? 0}/10.`;
           return {
             ticker: r.ticker,
             price: r.currentPrice,
             score,
-            headline: isAtPivot
-              ? `${r.ticker} is at the VCP pivot — breakout ready`
-              : `${r.ticker} is forming a VCP pattern (${r.contractions?.length ?? 0} contractions)`,
-            detail: isAtPivot
-              ? `Volume is drying up at the pivot. A breakout above ${r.pivotPrice ? `$${r.pivotPrice.toFixed(2)}` : "the pivot"} on above-average volume is the entry signal. VCP score: ${r.vcpScore ?? 0}/10.`
-              : `Stage: ${r.stage?.replace(/_/g, " ")}. The pattern is contracting — not ready to enter yet. Watch for the pivot setup. VCP score: ${r.vcpScore ?? 0}/10.`,
-            badge: isAtPivot ? "At Pivot" : "Forming",
-            badgeColor: isAtPivot ? "#22c55e" : "#f59e0b",
-            urgency: (isAtPivot ? "high" : "medium") as "high" | "medium" | "low",
+            headline,
+            detail,
+            badge: isAtPivot ? "At Pivot" : isForming ? "VCP Forming" : isStage2 ? "Stage 2" : isExtended ? "Extended" : "Watching",
+            badgeColor: isAtPivot ? "#22c55e" : isForming ? "#f59e0b" : isStage2 ? "#3b82f6" : "#9ca3af",
+            urgency: (isAtPivot ? "high" : isForming ? "medium" : "low") as "high" | "medium" | "low",
           };
         })
         .sort((a, b) => b.score - a.score)
-        .slice(0, 8);
+        .slice(0, 10);
     }
 
     if (goal === "theta") {
       if (!thetaQuery.data) return [];
-      return (thetaQuery.data as any[])
-        .filter((r: any) => r.signal !== "NEUTRAL" && !r.error)
+      // Require actual options volume > 0 to avoid false signals outside market hours
+      const thetaValid = (thetaQuery.data as any[]).filter((r: any) =>
+        !r.error && r.signal !== "NEUTRAL" && (r.callVolume ?? 0) + (r.putVolume ?? 0) > 0
+      );
+      // If no live volume data (market closed), fall back to showing all tickers with a note
+      const thetaAll = (thetaQuery.data as any[]).filter((r: any) => !r.error && r.lastPrice > 0);
+      const thetaList = thetaValid.length > 0 ? thetaValid : thetaAll;
+      return thetaList
         .map((r: any) => {
+          const hasLiveData = (r.callVolume ?? 0) + (r.putVolume ?? 0) > 0;
           const isExtreme = r.signal === "EXTREME_FEAR" || r.signal === "EXTREME_GREED";
           const isBullish = r.signal === "EXTREME_FEAR" || r.signal === "FEAR";
-          const score = isExtreme ? 88 : 65;
+          const score = isExtreme ? 88 : r.signal === "NEUTRAL" ? 50 : 65;
           return {
             ticker: r.ticker,
             price: r.lastPrice,
             score,
-            headline: isBullish
+            headline: !hasLiveData
+              ? `${r.ticker} — options data not available (market closed)`
+              : isBullish
               ? `${r.ticker} — puts are expensive (PCR ${r.pcr.toFixed(2)}). Sell put premium.`
               : `${r.ticker} — calls are expensive (PCR ${r.pcr.toFixed(2)}). Sell call premium.`,
-            detail: isBullish
+            detail: !hasLiveData
+              ? `${r.ticker} is on your watchlist. Options volume data is only available during market hours. Check back when the market opens for live PCR signals.`
+              : isBullish
               ? `Options market is fearful. Put/call ratio of ${r.pcr.toFixed(2)} means puts are trading at a premium. Short puts or bull put spreads collect elevated theta. Put vol: ${r.putVolume.toLocaleString()} vs call vol: ${r.callVolume.toLocaleString()}.`
               : `Options market is greedy. PCR of ${r.pcr.toFixed(2)} means calls are elevated. Bear call spreads or short calls capture this premium. Call vol: ${r.callVolume.toLocaleString()} vs put vol: ${r.putVolume.toLocaleString()}.`,
-            badge: isExtreme ? "Strong Signal" : "Moderate",
-            badgeColor: isExtreme ? "#22c55e" : "#f59e0b",
-            urgency: (isExtreme ? "high" : "medium") as "high" | "medium" | "low",
+            badge: !hasLiveData ? "Market Closed" : isExtreme ? "Strong Signal" : r.signal === "NEUTRAL" ? "Neutral" : "Moderate",
+            badgeColor: !hasLiveData ? "#9ca3af" : isExtreme ? "#22c55e" : r.signal === "NEUTRAL" ? "#6b7280" : "#f59e0b",
+            urgency: (!hasLiveData ? "low" : isExtreme ? "high" : "medium") as "high" | "medium" | "low",
           };
         })
         .sort((a, b) => b.score - a.score)
@@ -223,26 +262,44 @@ export default function GoalScan() {
     }
 
     if (goal === "hedge") {
-      const positions = ((positionsQuery.data as any)?.positions as any[]) ?? [];
+      // positions table uses qty (not quantity), no status field — all rows are current positions
+      const allPositions = ((positionsQuery.data as any)?.positions as any[]) ?? [];
+      // Deduplicate by ticker (keep largest position)
+      const byTicker: Record<string, any> = {};
+      for (const p of allPositions) {
+        const t = p.ticker ?? p.symbol ?? "?";
+        const q = parseFloat(p.qty ?? p.quantity ?? "0");
+        if (!byTicker[t] || Math.abs(q) > Math.abs(parseFloat(byTicker[t].qty ?? "0"))) {
+          byTicker[t] = p;
+        }
+      }
+      const positions = Object.values(byTicker);
+      if (positions.length === 0) return [];
       return positions
-        .filter((p: any) => p.status === "open" || p.status === "OPEN")
         .map((p: any) => {
           const ticker = p.ticker ?? p.symbol ?? "?";
-          const qty = Math.abs(p.quantity ?? p.qty ?? 1);
-          const isLong = (p.quantity ?? p.qty ?? 1) > 0;
+          const qty = Math.abs(parseFloat(p.qty ?? p.quantity ?? "1"));
+          const isLong = parseFloat(p.qty ?? p.quantity ?? "1") > 0;
+          const price = p.currentPrice ? parseFloat(p.currentPrice) : p.avgCost ? parseFloat(p.avgCost) : 0;
+          const marketValue = p.marketValue ? parseFloat(p.marketValue) : price * qty;
+          const unrealizedPnl = p.unrealizedPnl ? parseFloat(p.unrealizedPnl) : null;
+          const pnlStr = unrealizedPnl !== null
+            ? ` Unrealized P&L: ${unrealizedPnl >= 0 ? "+" : ""}$${unrealizedPnl.toFixed(0)}.`
+            : "";
           return {
             ticker,
-            price: p.currentPrice ?? p.avgPrice,
+            price,
             score: 75,
-            headline: `Hedge your ${isLong ? "long" : "short"} ${ticker} position (${qty} shares)`,
+            headline: `Hedge your ${isLong ? "long" : "short"} ${ticker} position (${qty.toFixed(0)} ${p.assetType === "option" ? "contracts" : "shares"})`,
             detail: isLong
-              ? `You're long ${qty} shares of ${ticker}. A protective put or put spread limits downside. A collar (sell call + buy put) is zero-cost and caps both sides.`
-              : `You're short ${qty} shares of ${ticker}. A long call or call spread protects against an upside move.`,
+              ? `You're long ${qty.toFixed(0)} shares of ${ticker} (market value ~$${marketValue.toFixed(0)}).${pnlStr} A protective put or put spread limits downside. A collar (sell call + buy put) is zero-cost and caps both sides.`
+              : `You're short ${qty.toFixed(0)} shares of ${ticker}.${pnlStr} A long call or call spread protects against an upside move.`,
             badge: isLong ? "Long Position" : "Short Position",
             badgeColor: isLong ? "#22c55e" : "#ef4444",
             urgency: "medium" as "high" | "medium" | "low",
           };
-        });
+        })
+        .sort((a, b) => b.score - a.score);
     }
 
     return [];
@@ -312,10 +369,10 @@ export default function GoalScan() {
           </div>
           <div className="font-medium">No matches found right now</div>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            {goal === "breakout" && "No tickers on your watchlist are currently in a VCP or Stage 2 pattern. Check back tomorrow."}
-            {goal === "theta" && "Options market signals are neutral across your watchlist. No elevated premium right now."}
-            {goal === "earnings" && "No tickers on your watchlist have earnings in the next 3 weeks."}
-            {goal === "hedge" && "No open positions found in your trade log. Add a position to get hedge recommendations."}
+            {goal === "breakout" && (vcpQuery.isError ? `Data fetch failed: ${vcpQuery.error?.message ?? "unknown error"}. Try again.` : "No tickers returned data. This can happen outside market hours — try again during market hours.")}
+            {goal === "theta" && (thetaQuery.isError ? `Data fetch failed: ${thetaQuery.error?.message ?? "unknown error"}. Try again.` : "Options market signals are neutral across your watchlist. No elevated premium right now.")}
+            {goal === "earnings" && earningsMutation.isError ? `Scan failed: ${earningsMutation.error?.message ?? "unknown error"}.` : "No tickers on your watchlist have earnings in the next 3 weeks."}
+            {goal === "hedge" && "No open positions found in your portfolio upload. Upload your brokerage positions to get hedge recommendations."}
           </p>
           <Button
             variant="outline"
