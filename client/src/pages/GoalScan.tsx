@@ -22,6 +22,7 @@ import {
   TrendingUp, Zap, Calendar, Shield, ArrowRight,
   RefreshCw, ChevronLeft, Target, BarChart2, AlertCircle,
 } from "lucide-react";
+import { TradeSetupCard } from "@/components/TradeSetupCard";
 
 // ─── Goal definitions ─────────────────────────────────────────────────────────
 
@@ -394,12 +395,12 @@ export default function GoalScan() {
             </Badge>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {results
               .sort((a, b) => (urgencyOrder[a.urgency ?? "low"] - urgencyOrder[b.urgency ?? "low"]) || (b.score - a.score))
               .map((r, idx) => (
+                <div key={r.ticker} className="space-y-2">
                 <Card
-                  key={r.ticker}
                   className="hover:shadow-md transition-all cursor-pointer group border hover:border-border/80"
                   onClick={() => navigate(`/ticker-analysis?ticker=${r.ticker}`)}
                 >
@@ -463,6 +464,8 @@ export default function GoalScan() {
                     </div>
                   </CardContent>
                 </Card>
+                <TradeSetupCard ticker={r.ticker} compact />
+                </div>
               ))}
           </div>
 

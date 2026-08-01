@@ -113,6 +113,7 @@ import { optionsFlowRouter } from "./routers/optionsFlow";
 import { catalystBreakoutRouter } from "./routers/catalystBreakout";
 import { cotRouter } from "./routers/cot";
 import { cotAlertsRouter } from "./routers/cotAlerts";
+import { tradeSetupRouter } from "./routers/tradeSetup";
 import { manualTradesRouter } from "./routers/manualTrades";
 import { pcrAlertsRouter } from "./routers/pcrAlerts";
 import {
@@ -1622,5 +1623,6 @@ export const appRouter = router({
   ictLiquidity: ictLiquidityRouter,
   strategyVisualizer: strategyVisualizerRouter,
   playbookRules: playbookRulesRouter,
+  tradeSetup: tradeSetupRouter,
 });
 export type AppRouter = typeof appRouter;

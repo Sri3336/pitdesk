@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
+import { TradeSetupCard } from "@/components/TradeSetupCard";
 
 // ── Quick-pick tickers ────────────────────────────────────────────────────────
 const QUICK_TICKERS = ["NVDA", "AAPL", "TSLA", "PLTR", "AMD", "META", "SPY", "QQQ", "APP", "SOFI"];
@@ -339,6 +340,13 @@ export default function TickerAnalysis() {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ══ TRADE SETUP CARD ════════════════════════════════════ */}
+            {activeTicker && (
+              <div className="mb-2">
+                <TradeSetupCard ticker={activeTicker} />
               </div>
             )}
 

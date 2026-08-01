@@ -28,6 +28,7 @@ import {
   Activity,
 } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
+import { TradeSetupCard } from "@/components/TradeSetupCard";
 
 // ─── Default watchlist ────────────────────────────────────────────────────────
 const DEFAULT_WATCHLIST = ["SNDK", "NVDA", "WDC", "MU", "TSLA", "AAPL", "AMD", "PLTR"];
@@ -196,6 +197,77 @@ function TopNavBar() {
         </div>
       )}
     </nav>
+  );
+}
+
+// ─── Quick-Look Widget ───────────────────────────────────────────────────────
+function QuickLookWidget({ watchlistTickers }: { watchlistTickers: string[] }) {
+  const [inputTicker, setInputTicker] = useState("");
+  const [previewTicker, setPreviewTicker] = useState("");
+  const [, navigate] = useLocation();
+  const displayTickers = watchlistTickers.length > 0 ? watchlistTickers.slice(0, 6) : DEFAULT_WATCHLIST.slice(0, 6);
+
+  function handlePreview(t?: string) {
+    const sym = (t ?? inputTicker).toUpperCase().trim();
+    if (!sym) return;
+    setPreviewTicker(sym);
+  }
+
+  return (
+    <div className="w-full max-w-4xl mt-5">
+      <div className="rounded-2xl border-2 p-5" style={{ borderColor: "#22c55e30", background: "oklch(0.99 0.003 145)" }}>
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="h-4 w-4" style={{ color: "#22c55e" }} />
+          <span className="text-sm font-black uppercase tracking-wider" style={{ color: "#16a34a" }}>Quick-Look Setup</span>
+          <span className="text-xs text-muted-foreground ml-1">— price action, IVR, ATR, strategy in seconds</span>
+        </div>
+        <div className="flex gap-2 mb-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+            <input
+              value={inputTicker}
+              onChange={e => setInputTicker(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === "Enter" && handlePreview()}
+              placeholder="Enter any ticker (SNDK, NVDA, MU…)"
+              className="w-full pl-9 pr-3 py-2.5 text-sm font-semibold rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:border-green-500 transition-all placeholder:text-muted-foreground/40 placeholder:font-normal"
+              style={{ "--tw-ring-color": "#22c55e40" } as React.CSSProperties}
+            />
+          </div>
+          <button
+            onClick={() => handlePreview()}
+            className="px-4 py-2.5 text-white text-sm font-bold rounded-xl transition-all duration-150 active:scale-95"
+            style={{ background: "oklch(0.55 0.175 145)" }}>
+            Preview
+          </button>
+          {previewTicker && (
+            <button
+              onClick={() => navigate(`/ticker-analysis?ticker=${previewTicker}`)}
+              className="px-4 py-2.5 text-sm font-bold rounded-xl border transition-all duration-150 active:scale-95 flex items-center gap-1.5"
+              style={{ borderColor: "#22c55e40", color: "#16a34a", background: "#22c55e10" }}>
+              Full Analysis <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {/* Watchlist quick-pick */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {displayTickers.map(t => (
+            <button key={t} onClick={() => { setInputTicker(t); setPreviewTicker(t); }}
+              className="px-2.5 py-1 text-xs font-bold rounded-lg border transition-all duration-150 active:scale-95"
+              style={{
+                background: previewTicker === t ? "#22c55e20" : "#22c55e10",
+                color: "#16a34a",
+                borderColor: previewTicker === t ? "#22c55e60" : "#22c55e30",
+              }}>
+              {t}
+            </button>
+          ))}
+        </div>
+        {/* Inline TradeSetupCard */}
+        {previewTicker && (
+          <TradeSetupCard ticker={previewTicker} compact />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -536,6 +608,8 @@ export default function Home() {
 
         {/* ── Market pulse banner ───────────────────────────────────────── */}
         <MarketPulseBanner />
+        {/* u2500u2500 Quick-Look Setup widget u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500 */}
+        <QuickLookWidget watchlistTickers={watchlistTickers} />
 
         {/* ── Dual entry cards ──────────────────────────────────────────── */}
         <div className="w-full max-w-4xl flex flex-col md:flex-row gap-4 mt-5">
