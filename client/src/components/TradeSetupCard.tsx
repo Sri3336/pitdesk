@@ -2,8 +2,10 @@
  * TradeSetupCard.tsx
  * Compact "first-look" card for any ticker.
  * Shows: trend, price vs MA, volume, RSI extremes, ATR strike sizing, IVR, VWAP, strategy suggestion.
+ * Includes a refresh button to re-fetch intraday VWAP + volume without a page reload.
  */
 
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +23,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  RefreshCw,
 } from "lucide-react";
 
 interface TradeSetupCardProps {
@@ -29,11 +32,21 @@ interface TradeSetupCardProps {
 }
 
 export function TradeSetupCard({ ticker, compact = false }: TradeSetupCardProps) {
-  const { data, isLoading, error } = trpc.tradeSetup.getSetup.useQuery(
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+  const { data, isLoading, error, refetch, isFetching } = trpc.tradeSetup.getSetup.useQuery(
     { ticker },
-    { staleTime: 5 * 60 * 1000, retry: 1 }
+    {
+      staleTime: 5 * 60 * 1000,
+      retry: 1,
+    }
   );
 
+  function handleRefresh() {
+    refetch().then(() => setLastRefreshed(new Date()));
+  }
+
+  // ── Loading skeleton ─────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <Card className="border border-gray-200 bg-white">
@@ -50,11 +63,20 @@ export function TradeSetupCard({ ticker, compact = false }: TradeSetupCardProps)
     );
   }
 
+  // ── Error state ──────────────────────────────────────────────────────────────
   if (error || !data) {
     return (
       <Card className="border border-gray-200 bg-white">
-        <CardContent className="p-4">
+        <CardContent className="p-4 flex items-center justify-between">
           <p className="text-sm text-gray-500">Setup data unavailable for {ticker}</p>
+          <button
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", isFetching && "animate-spin")} />
+            Retry
+          </button>
         </CardContent>
       </Card>
     );
@@ -130,11 +152,41 @@ export function TradeSetupCard({ ticker, compact = false }: TradeSetupCardProps)
       ? "bg-red-100 text-red-700 border-red-200"
       : "bg-gray-100 text-gray-500 border-gray-200";
 
+  // ── Formatted last-updated time ─────────────────────────────────────────────
+  const displayTime = lastRefreshed ?? new Date(dataAsOf);
+  const formattedTime = displayTime.toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    day: "numeric",
+  });
+
+  // ── Refresh button (shared across both modes) ────────────────────────────────
+  const RefreshButton = (
+    <button
+      onClick={handleRefresh}
+      disabled={isFetching}
+      title="Refresh intraday VWAP & volume"
+      className={cn(
+        "flex items-center gap-1 text-xs font-medium transition-all duration-150 rounded-md px-1.5 py-0.5",
+        "text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-95",
+        "disabled:opacity-40 disabled:cursor-not-allowed"
+      )}
+    >
+      <RefreshCw className={cn("w-3 h-3", isFetching && "animate-spin")} />
+      {isFetching ? "Refreshing…" : "Refresh"}
+    </button>
+  );
+
   if (compact) {
-    // ── Compact inline mode (for GoalScan list items) ─────────────────────────
+    // ── Compact inline mode (for GoalScan list items + Home Quick-Look) ─────────
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
-        {/* Row 1: Price + Trend + IVR */}
+      <div className={cn(
+        "rounded-lg border border-gray-200 bg-white p-3 space-y-2 transition-opacity duration-200",
+        isFetching && "opacity-70"
+      )}>
+        {/* Row 1: Price + Trend + IVR + Refresh */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold text-gray-900">${currentPrice.toFixed(2)}</span>
           <span className={cn("text-xs font-medium", priceChangeColor)}>
@@ -152,6 +204,7 @@ export function TradeSetupCard({ ticker, compact = false }: TradeSetupCardProps)
               VWAP {vwapSignal}
             </Badge>
           )}
+          <div className="ml-auto">{RefreshButton}</div>
         </div>
         {/* Row 2: MA + Volume + RSI */}
         <div className="flex items-center gap-3 text-xs text-gray-600 flex-wrap">
@@ -169,6 +222,7 @@ export function TradeSetupCard({ ticker, compact = false }: TradeSetupCardProps)
               RSI {rsi} ({rsiLabel})
             </span>
           )}
+          <span className="text-gray-400 ml-auto">{formattedTime} ET</span>
         </div>
         {/* Row 3: Strategy suggestion */}
         <div className={cn("rounded px-2 py-1.5 border text-xs", confidenceColor)}>
@@ -180,9 +234,9 @@ export function TradeSetupCard({ ticker, compact = false }: TradeSetupCardProps)
 
   // ── Full card mode (for Ticker Analysis page) ─────────────────────────────
   return (
-    <Card className="border border-gray-200 bg-white shadow-sm">
+    <Card className={cn("border border-gray-200 bg-white shadow-sm transition-opacity duration-200", isFetching && "opacity-70")}>
       <CardContent className="p-5 space-y-4">
-        {/* Header: ticker + price + trend */}
+        {/* Header: ticker + price + trend + refresh */}
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -194,10 +248,13 @@ export function TradeSetupCard({ ticker, compact = false }: TradeSetupCardProps)
             </div>
             <p className="text-xs text-gray-500 mt-0.5">{trendStructure}</p>
           </div>
-          <Badge variant="outline" className={cn("text-sm px-2 py-1 flex items-center gap-1.5 shrink-0", trendColor)}>
-            <TrendIcon className="w-4 h-4" />
-            {trend}
-          </Badge>
+          <div className="flex items-center gap-2 shrink-0">
+            {RefreshButton}
+            <Badge variant="outline" className={cn("text-sm px-2 py-1 flex items-center gap-1.5", trendColor)}>
+              <TrendIcon className="w-4 h-4" />
+              {trend}
+            </Badge>
+          </div>
         </div>
 
         {/* Signal grid: MA / Volume / RSI / IVR / VWAP / ATR */}
@@ -346,10 +403,18 @@ export function TradeSetupCard({ ticker, compact = false }: TradeSetupCardProps)
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="text-xs text-gray-400">
-          Data as of {new Date(dataAsOf).toLocaleString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })} ET
-        </p>
+        {/* Footer: last updated timestamp */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">
+            {lastRefreshed ? "Refreshed" : "Data as of"} {formattedTime} ET
+          </p>
+          {isFetching && (
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              Updating…
+            </span>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
