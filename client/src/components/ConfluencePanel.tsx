@@ -196,7 +196,7 @@ interface ConfluencePanelProps {
 }
 
 export function ConfluencePanel({ ticker }: ConfluencePanelProps) {
-  const [expandedTiers, setExpandedTiers] = useState<Set<number>>(new Set([1, 2]));
+  const [expandedTiers, setExpandedTiers] = useState<Set<number>>(new Set([1, 2, 3, 4]));
   const [showNarrative, setShowNarrative] = useState(true);
 
   const { data, isLoading, error, refetch, isFetching } = trpc.confluence.getConfluence.useQuery(
@@ -250,10 +250,10 @@ export function ConfluencePanel({ ticker }: ConfluencePanelProps) {
             {vc.label}
           </span>
           <span className="text-sm font-semibold text-gray-700">
-            Signal Score: {data.verdictScore} / 8
+            Signal Score: {Math.round(data.verdictScore * 10 / 8)} / 10
           </span>
           <div className="w-24 hidden sm:block">
-            <ScoreBar score={data.verdictScore} max={8} barCls={vc.barCls} />
+            <ScoreBar score={Math.round(data.verdictScore * 10 / 8)} max={10} barCls={vc.barCls} />
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
