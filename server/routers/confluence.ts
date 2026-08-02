@@ -43,6 +43,11 @@ interface ConfluenceResult {
   suggestedStrategy: string;
   eventRisk: string | null;
   dataAsOf: string;
+  // Theta Machine
+  thetaCandidate: boolean;
+  thetaScore: number;         // 0-5
+  thetaLabel: string | null;
+  thetaReason: string | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -459,7 +464,51 @@ function synthesize(tiers: TierResult[], ticker: string): Omit<ConfluenceResult,
     ? `If you trade, use ${suggestedStrategy} at 50% normal size. Wait for ${t1.status === "NEUTRAL" ? "CTA/COT to confirm direction" : t2.status === "NEUTRAL" ? "trend to clarify" : "volume confirmation above VWAP"} before adding. ${eventRisk ? `Event risk: ${eventRisk}.` : ""}`
     : `Do not enter. Sit on hands until at least 2 tiers align. ${ivrRich ? "If you must trade, sell an Iron Condor to collect premium while the range-bound action plays out." : "No premium-selling edge either — just wait."}`;
 
-  return { verdict, verdictScore: totalScore, confidence, whatWeLookFor, whatWeFound, whatToDo, suggestedStrategy, eventRisk };
+  // -- Theta Machine Detection --
+  // Core condition: IVR rich + no imminent earnings
+  // Bonus: neutral trend (range-bound), neutral PCR, neutral VWAP
+  const tier3Signals = tiers[2].signals;
+  const tier2Signals = tiers[1].signals;
+  const ivrSignal = tier3Signals.find(s => s.name === "IV Rank");
+  const vwapSig = tier3Signals.find(s => s.name === "VWAP");
+  const pcrSig = tier2Signals.find(s => s.name === "PCR Sentiment");
+  const priceActionSig = tier2Signals.find(s => s.name === "Price Action");
+
+  const ivrRichForTheta = ivrSignal?.value.includes("RICH") ?? false;
+  const trendNeutral = priceActionSig?.value === "CONSOLIDATION" || tiers[1].status === "NEUTRAL";
+  const vwapNeutralOrAbove = vwapSig?.status === "green" || vwapSig?.status === "yellow" || vwapSig?.status === "gray";
+  const pcrNeutral = pcrSig?.status === "yellow" || pcrSig?.status === "gray";
+  const noEarningsRisk = !eventRisk;
+
+  let thetaScore = 0;
+  if (ivrRichForTheta) thetaScore += 2;
+  if (trendNeutral) thetaScore += 1;
+  if (noEarningsRisk) thetaScore += 1;
+  if (pcrNeutral) thetaScore += 1;
+  if (vwapNeutralOrAbove) thetaScore += 0.5;
+  thetaScore = Math.round(thetaScore);
+
+  const thetaCandidate = ivrRichForTheta && noEarningsRisk && thetaScore >= 3;
+
+  let thetaLabel: string | null = null;
+  let thetaReason: string | null = null;
+  if (thetaCandidate) {
+    if (trendNeutral && thetaScore >= 4) {
+      thetaLabel = "Iron Condor";
+      thetaReason = `IV is rich + price is range-bound + no earnings risk. Iron Condor collects theta from both sides. Size: 1x ATR spread width.`;
+    } else if (trendNeutral) {
+      thetaLabel = "Short Strangle";
+      thetaReason = `IV is elevated + consolidation pattern. Short Strangle captures decay if price stays range-bound. Use 1.5x ATR for strike width.`;
+    } else if (direction === "BULLISH") {
+      thetaLabel = "Cash-Secured Put";
+      thetaReason = `IV is rich + bullish bias. Sell a put below support to collect premium with directional edge. Roll down if tested.`;
+    } else {
+      thetaLabel = "Bear Call Spread";
+      thetaReason = `IV is rich + bearish bias. Sell calls above resistance to collect premium. Defined risk with bearish edge.`;
+    }
+  }
+
+  return { verdict, verdictScore: totalScore, confidence, whatWeLookFor, whatWeFound, whatToDo, suggestedStrategy, eventRisk, thetaCandidate, thetaScore, thetaLabel, thetaReason };
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import {
   TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2,
   XCircle, Clock, RefreshCw, ChevronDown, ChevronUp, Info,
-  Zap, BarChart3, Target, Calendar
+  Zap, BarChart3, Target, Calendar, Flame
 } from "lucide-react";
 import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,11 @@ interface ConfluenceResult {
   suggestedStrategy: string;
   eventRisk: string | null;
   dataAsOf: string;
+  // Theta Machine
+  thetaCandidate: boolean;
+  thetaScore: number;
+  thetaLabel: string | null;
+  thetaReason: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -293,6 +298,25 @@ export function ConfluencePanel({ ticker }: ConfluencePanelProps) {
             />
           ))}
         </div>
+
+        {/* ── Theta Machine Badge ── */}
+        {data.thetaCandidate && data.thetaLabel && (
+          <div className="flex items-start gap-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl px-4 py-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center">
+                <Flame className="w-4 h-4 text-purple-600" />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className="text-xs font-bold text-purple-700 uppercase tracking-wide">Theta Machine Candidate</span>
+                <span className="text-xs font-bold text-white bg-purple-600 px-2 py-0.5 rounded-full">{data.thetaLabel}</span>
+                <span className="text-xs text-purple-500 font-medium">Score {data.thetaScore}/5</span>
+              </div>
+              <p className="text-xs text-purple-800 leading-relaxed">{data.thetaReason}</p>
+            </div>
+          </div>
+        )}
 
         {/* ── Plain-English Narrative ── */}
         <div className="rounded-xl border border-gray-200 overflow-hidden">
