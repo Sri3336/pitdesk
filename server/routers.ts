@@ -114,6 +114,7 @@ import { catalystBreakoutRouter } from "./routers/catalystBreakout";
 import { cotRouter } from "./routers/cot";
 import { cotAlertsRouter } from "./routers/cotAlerts";
 import { tradeSetupRouter } from "./routers/tradeSetup";
+import { confluenceRouter } from "./routers/confluence";
 import { manualTradesRouter } from "./routers/manualTrades";
 import { pcrAlertsRouter } from "./routers/pcrAlerts";
 import {
@@ -1624,5 +1625,6 @@ export const appRouter = router({
   strategyVisualizer: strategyVisualizerRouter,
   playbookRules: playbookRulesRouter,
   tradeSetup: tradeSetupRouter,
+  confluence: confluenceRouter,
 });
 export type AppRouter = typeof appRouter;

@@ -33,6 +33,7 @@ import {
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import { TradeSetupCard } from "@/components/TradeSetupCard";
+import { ConfluencePanel } from "@/components/ConfluencePanel";
 
 // ── Quick-pick tickers ────────────────────────────────────────────────────────
 const QUICK_TICKERS = ["NVDA", "AAPL", "TSLA", "PLTR", "AMD", "META", "SPY", "QQQ", "APP", "SOFI"];
@@ -343,6 +344,16 @@ export default function TickerAnalysis() {
               </div>
             )}
 
+            {/* ══ CONFLUENCE PANEL ═════════════════════════════════════════════════ */}
+            {activeTicker && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Unified Signal Confluence</span>
+                  <div className="flex-1 h-px bg-gray-100" />
+                </div>
+                <ConfluencePanel ticker={activeTicker} />
+              </div>
+            )}
             {/* ══ TRADE SETUP CARD ════════════════════════════════════ */}
             {activeTicker && (
               <div className="mb-2">

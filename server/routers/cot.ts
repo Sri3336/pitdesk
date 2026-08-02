@@ -78,7 +78,7 @@ function cotSignal(index: number): CotSignal {
 }
 
 // ─── Single instrument analysis ───────────────────────────────────────────────
-async function analyzeCotInstrument(cftcCode: string): Promise<CotIndexResult> {
+export async function analyzeCotInstrument(cftcCode: string): Promise<CotIndexResult> {
   const instrument = COT_INSTRUMENTS.find((i) => i.cftcCode === cftcCode);
   if (!instrument) throw new Error(`Unknown CFTC code: ${cftcCode}`);
 
