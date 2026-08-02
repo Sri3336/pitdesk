@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, Minus, Activity, BarChart2, Zap, Target,
   Lightbulb, AlertTriangle, CheckCircle2, XCircle, Clock, RefreshCw,
-  ChevronRight, Info,
+  ChevronRight, Info, Play,
 } from "lucide-react";
 
 interface TradeSetupCardProps {
@@ -139,6 +139,22 @@ export function TradeSetupCard({ ticker, compact = false }: TradeSetupCardProps)
     timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", month: "short", day: "numeric",
   });
 
+  const TutorialButton = (
+    <a
+      href="https://youtu.be/SLp6xOHDiEA"
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Watch step-by-step tutorial (4:36)"
+      className={cn(
+        "flex items-center gap-1 text-xs font-medium transition-all duration-150 rounded-md px-1.5 py-0.5",
+        "text-green-600 hover:text-green-700 hover:bg-green-50 active:scale-95"
+      )}
+    >
+      <Play className="w-3 h-3" />
+      Tutorial
+    </a>
+  );
+
   const RefreshButton = (
     <button onClick={handleRefresh} disabled={isFetching} title="Refresh intraday VWAP & volume"
       className={cn(
@@ -234,6 +250,7 @@ export function TradeSetupCard({ ticker, compact = false }: TradeSetupCardProps)
             <p className="text-xs text-gray-500 mt-0.5">{trendStructure}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {TutorialButton}
             {RefreshButton}
             <Badge variant="outline" className={cn("text-sm px-2 py-1 flex items-center gap-1.5", trendColor)}>
               <TrendIcon className="w-4 h-4" />

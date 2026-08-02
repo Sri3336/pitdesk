@@ -26,6 +26,7 @@ import {
   Target,
   BarChart3,
   Activity,
+  Play,
 } from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { TradeSetupCard } from "@/components/TradeSetupCard";
@@ -610,6 +611,37 @@ export default function Home() {
         <MarketPulseBanner />
         {/* u2500u2500 Quick-Look Setup widget u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500 */}
         <QuickLookWidget watchlistTickers={watchlistTickers} />
+
+        {/* ── Getting Started tutorial banner ───────────────────────────── */}
+        <div className="w-full max-w-4xl">
+          <div className="rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-4 flex items-center gap-4">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-600 flex items-center justify-center shadow-sm">
+              <Play className="w-5 h-5 text-white ml-0.5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-green-900">New: Trade Setup Card — Step-by-Step Tutorial</p>
+              <p className="text-xs text-green-700 mt-0.5">Price action + CTA flow + GO/CAUTION/NO-GO verdict. 4 minutes.</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href="https://youtu.be/SLp6xOHDiEA"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg px-3 py-1.5 transition-colors active:scale-95"
+              >
+                <Play className="w-3 h-3" />
+                Watch (4:36)
+              </a>
+              <a
+                href="/how-to"
+                className="flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-900 transition-colors"
+              >
+                Full Guide
+                <ChevronRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
 
         {/* ── Dual entry cards ──────────────────────────────────────────── */}
         <div className="w-full max-w-4xl flex flex-col md:flex-row gap-4 mt-5">
