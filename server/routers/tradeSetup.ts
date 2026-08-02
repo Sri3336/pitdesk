@@ -9,21 +9,42 @@ import { callDataApi } from "../_core/dataApi";
 
 interface PriceBar { date: string; open: number; high: number; low: number; close: number; volume: number; }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseBarsFromResult(result: unknown): PriceBar[] {
+  const data = result as any;
+  const chart = data?.chart?.result?.[0];
+  if (!chart) return [];
+  const timestamps: number[] = chart.timestamp ?? [];
+  const q = chart.indicators?.quote?.[0] ?? {};
+  return timestamps.map((ts: number, i: number) => ({
+    date: new Date(ts * 1000).toISOString(),
+    open: q.open?.[i] ?? 0, high: q.high?.[i] ?? 0,
+    low: q.low?.[i] ?? 0, close: q.close?.[i] ?? 0, volume: q.volume?.[i] ?? 0,
+  })).filter((b) => b.close > 0);
+}
+
 async function fetchBars(ticker: string, interval: "1d" | "5m", range: string): Promise<PriceBar[]> {
-  try {
-    const result = await callDataApi("YahooFinance/get_stock_chart", { query: { ticker, interval, range } });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = result;
-    const chart = data?.chart?.result?.[0];
-    if (!chart) return [];
-    const timestamps: number[] = chart.timestamp ?? [];
-    const q = chart.indicators?.quote?.[0] ?? {};
-    return timestamps.map((ts: number, i: number) => ({
-      date: new Date(ts * 1000).toISOString(),
-      open: q.open?.[i] ?? 0, high: q.high?.[i] ?? 0,
-      low: q.low?.[i] ?? 0, close: q.close?.[i] ?? 0, volume: q.volume?.[i] ?? 0,
-    })).filter((b) => b.close > 0);
-  } catch { return []; }
+  // Retry up to 3 times with delay to handle Yahoo Finance throttling
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const result = await callDataApi("YahooFinance/get_stock_chart", { query: { ticker, interval, range } });
+      const bars = parseBarsFromResult(result);
+      if (bars.length > 0) return bars;
+    } catch { /* retry */ }
+    if (attempt < 2) await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+  }
+  // Fallback: try a longer range for daily bars to ensure enough history for MA50
+  if (interval === "1d") {
+    const fallbackRange = range === "3mo" ? "6mo" : range === "6mo" ? "1y" : null;
+    if (fallbackRange) {
+      try {
+        const result = await callDataApi("YahooFinance/get_stock_chart", { query: { ticker, interval, range: fallbackRange } });
+        const bars = parseBarsFromResult(result);
+        if (bars.length > 0) return bars;
+      } catch { /* ignore */ }
+    }
+  }
+  return [];
 }
 
 function calcRSI(bars: PriceBar[], period = 14): number | null {
@@ -167,7 +188,8 @@ function computeVerdict(params: {
   const vwapScore = vwapSignal === "ABOVE" ? 1 : vwapSignal === "N/A" ? 0.5 : 0;
   const rsiScore = rsiLabel === "NEUTRAL" ? 1 : 0.5;
   const ivrScore = ivrLabel === "NORMAL" ? 1 : 0.5;
-  const score = Math.round((trendScore + ctaScore + volScore + vwapScore + rsiScore + ivrScore) * 10) / 10;
+  // Round to nearest integer so the score bar renders cleanly (no fractional bars)
+  const score = Math.round(trendScore + ctaScore + volScore + vwapScore + rsiScore + ivrScore);
   const verdict: "GO" | "CAUTION" | "NO-GO" = score >= 7 ? "GO" : score >= 4 ? "CAUTION" : "NO-GO";
 
   const signals: Array<{ label: string; value: string; status: "green" | "yellow" | "red" | "gray" }> = [
