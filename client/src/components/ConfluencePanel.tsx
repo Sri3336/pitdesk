@@ -52,6 +52,14 @@ interface ConfluenceResult {
   thetaScore: number;
   thetaLabel: string | null;
   thetaReason: string | null;
+  // Backtest Classification
+  backtestTier: string | null;
+  backtestTierLabel: string | null;
+  backtestBestStrategy: string | null;
+  backtestWinRate: number | null;
+  backtestAvgPnl: number | null;
+  backtestSizeGuidance: string | null;
+  backtestNAligned: number | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -314,6 +322,69 @@ export function ConfluencePanel({ ticker }: ConfluencePanelProps) {
                 <span className="text-xs text-purple-500 font-medium">Score {data.thetaScore}/5</span>
               </div>
               <p className="text-xs text-purple-800 leading-relaxed">{data.thetaReason}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Backtest Classification Badge ── */}
+        {data.backtestTier && (
+          <div className={cn(
+            "flex items-start gap-3 rounded-xl px-4 py-3 border",
+            data.backtestTier === "A" ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
+            : data.backtestTier === "B" ? "bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200"
+            : data.backtestTier === "C" ? "bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200"
+            : "bg-gradient-to-r from-red-50 to-rose-50 border-red-200"
+          )}>
+            <div className="flex-shrink-0 mt-0.5">
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center font-black text-sm",
+                data.backtestTier === "A" ? "bg-green-100 text-green-700"
+                : data.backtestTier === "B" ? "bg-blue-100 text-blue-700"
+                : data.backtestTier === "C" ? "bg-yellow-100 text-yellow-700"
+                : "bg-red-100 text-red-700"
+              )}>
+                {data.backtestTier}
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className={cn(
+                  "text-xs font-bold uppercase tracking-wide",
+                  data.backtestTier === "A" ? "text-green-700"
+                  : data.backtestTier === "B" ? "text-blue-700"
+                  : data.backtestTier === "C" ? "text-yellow-700"
+                  : "text-red-700"
+                )}>Backtest Tier {data.backtestTier} — {data.backtestTierLabel}</span>
+                {data.backtestBestStrategy && (
+                  <span className={cn(
+                    "text-xs font-bold text-white px-2 py-0.5 rounded-full",
+                    data.backtestTier === "A" ? "bg-green-600"
+                    : data.backtestTier === "B" ? "bg-blue-600"
+                    : data.backtestTier === "C" ? "bg-yellow-600"
+                    : "bg-red-600"
+                  )}>{data.backtestBestStrategy}</span>
+                )}
+                {data.backtestWinRate != null && (
+                  <span className="text-xs font-semibold text-gray-600">{data.backtestWinRate.toFixed(0)}% win rate</span>
+                )}
+                {data.backtestAvgPnl != null && (
+                  <span className={cn("text-xs font-semibold", data.backtestAvgPnl >= 0 ? "text-green-600" : "text-red-600")}>
+                    avg {data.backtestAvgPnl >= 0 ? "+" : ""}{data.backtestAvgPnl.toFixed(1)}% P&L
+                  </span>
+                )}
+              </div>
+              {data.backtestSizeGuidance && (
+                <p className={cn(
+                  "text-xs leading-relaxed",
+                  data.backtestTier === "A" ? "text-green-800"
+                  : data.backtestTier === "B" ? "text-blue-800"
+                  : data.backtestTier === "C" ? "text-yellow-800"
+                  : "text-red-800"
+                )}>{data.backtestSizeGuidance}</p>
+              )}
+              {data.backtestNAligned != null && (
+                <p className="text-xs text-gray-400 mt-0.5">Based on {data.backtestNAligned} ALIGNED signals over 2 years</p>
+              )}
             </div>
           </div>
         )}

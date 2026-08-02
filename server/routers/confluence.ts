@@ -14,6 +14,7 @@ import { callDataApi } from "../_core/dataApi";
 import { fetchPCR } from "../pcrStrategy";
 import { COT_INSTRUMENTS } from "../../shared/cotTypes";
 import { analyzeCotInstrument } from "./cot";
+import { getTickerClassification, getTierSizeGuidance } from "../../shared/tickerClassification";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type TierStatus = "BULLISH" | "BEARISH" | "NEUTRAL" | "N/A";
@@ -48,6 +49,14 @@ interface ConfluenceResult {
   thetaScore: number;         // 0-5
   thetaLabel: string | null;
   thetaReason: string | null;
+  // Backtest Classification
+  backtestTier: string | null;
+  backtestTierLabel: string | null;
+  backtestBestStrategy: string | null;
+  backtestWinRate: number | null;
+  backtestAvgPnl: number | null;
+  backtestSizeGuidance: string | null;
+  backtestNAligned: number | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -406,7 +415,7 @@ async function buildTier4(ticker: string): Promise<TierResult> {
 
 // ── Synthesis ─────────────────────────────────────────────────────────────────
 
-function synthesize(tiers: TierResult[], ticker: string): Omit<ConfluenceResult, "ticker" | "tiers" | "dataAsOf"> {
+function synthesize(tiers: TierResult[], ticker: string): Omit<ConfluenceResult, "ticker" | "tiers" | "dataAsOf" | "backtestTier" | "backtestTierLabel" | "backtestBestStrategy" | "backtestWinRate" | "backtestAvgPnl" | "backtestSizeGuidance" | "backtestNAligned"> {
   const totalScore = tiers.reduce((a, t) => a + t.score, 0); // 0–8
   const bullishTiers = tiers.filter(t => t.status === "BULLISH").length;
   const bearishTiers = tiers.filter(t => t.status === "BEARISH").length;
@@ -535,12 +544,19 @@ export const confluenceRouter = router({
 
       const tiers = [tier1, tier2, tier3, tier4];
       const synthesis = synthesize(tiers, ticker);
-
+      const classification = getTickerClassification(ticker);
       return {
         ticker,
         tiers,
         ...synthesis,
         dataAsOf: new Date().toISOString(),
+        backtestTier: classification?.tier ?? null,
+        backtestTierLabel: classification?.tierLabel ?? null,
+        backtestBestStrategy: classification?.bestStrategy ?? null,
+        backtestWinRate: classification?.winRate ?? null,
+        backtestAvgPnl: classification?.avgPnl ?? null,
+        backtestSizeGuidance: classification ? getTierSizeGuidance(classification.tier) : null,
+        backtestNAligned: classification?.nAligned ?? null,
       };
     }),
 });
