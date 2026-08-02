@@ -28,9 +28,12 @@ async function fetchBars(ticker: string, interval: "1d" | "5m", range: string): 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const result = await callDataApi("YahooFinance/get_stock_chart", { query: { symbol: ticker, interval, range } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dbg = result as any;
+      console.log(`[tradeSetup] fetchBars ${ticker} ${interval} attempt=${attempt} chart=${!!dbg?.chart?.result?.[0]} timestamps=${dbg?.chart?.result?.[0]?.timestamp?.length ?? 0} error=${JSON.stringify(dbg?.chart?.error ?? null)}`);
       const bars = parseBarsFromResult(result);
       if (bars.length > 0) return bars;
-    } catch { /* retry */ }
+    } catch (e) { console.log(`[tradeSetup] fetchBars ${ticker} attempt=${attempt} EXCEPTION:`, e); }
     if (attempt < 2) await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
   }
   // Fallback: try a longer range for daily bars to ensure enough history for MA50
@@ -312,7 +315,9 @@ export const tradeSetupRouter = router({
         ctaRecentCross: ctaData.recentCross, ctaCrossDirection: ctaData.crossDirection, ctaDistanceFromMa50Pct: ctaData.distanceFromMa50Pct,
         verdict: verdictData.verdict, verdictScore: verdictData.score, verdictMaxScore: verdictData.maxScore,
         verdictSignals: verdictData.signals, executionSummary: verdictData.executionSummary, conflictWarning: verdictData.conflictWarning,
-        suggestedStrategy: suggestion.strategy, strategyRationale: suggestion.rationale, strategyConfidence: suggestion.confidence,
+        suggestedStrategy: suggestion.strategy, strategyRationale: suggestion.rationale,
+        // Cap strategy confidence by overall verdict — can't be HIGH when overall is CAUTION/NO-GO
+        strategyConfidence: (verdictData.verdict === "GO" ? suggestion.confidence : verdictData.verdict === "CAUTION" ? (suggestion.confidence === "HIGH" ? "MEDIUM" : suggestion.confidence) : "LOW") as "HIGH" | "MEDIUM" | "LOW",
         dataAsOf: new Date().toISOString(),
       };
     }),
