@@ -27,7 +27,7 @@ async function fetchBars(ticker: string, interval: "1d" | "5m", range: string): 
   // Retry up to 3 times with delay to handle Yahoo Finance throttling
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const result = await callDataApi("YahooFinance/get_stock_chart", { query: { ticker, interval, range } });
+      const result = await callDataApi("YahooFinance/get_stock_chart", { query: { symbol: ticker, interval, range } });
       const bars = parseBarsFromResult(result);
       if (bars.length > 0) return bars;
     } catch { /* retry */ }
@@ -38,7 +38,7 @@ async function fetchBars(ticker: string, interval: "1d" | "5m", range: string): 
     const fallbackRange = range === "3mo" ? "6mo" : range === "6mo" ? "1y" : null;
     if (fallbackRange) {
       try {
-        const result = await callDataApi("YahooFinance/get_stock_chart", { query: { ticker, interval, range: fallbackRange } });
+        const result = await callDataApi("YahooFinance/get_stock_chart", { query: { symbol: ticker, interval, range: fallbackRange } });
         const bars = parseBarsFromResult(result);
         if (bars.length > 0) return bars;
       } catch { /* ignore */ }
