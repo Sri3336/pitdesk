@@ -60,6 +60,10 @@ interface ConfluenceResult {
   backtestAvgPnl: number | null;
   backtestSizeGuidance: string | null;
   backtestNAligned: number | null;
+  // Market Phase
+  marketPhase?: "TRENDING" | "CONSOLIDATING" | "COILING";
+  marketPhaseDetail?: string;
+  marketPhaseSuggestedStructure?: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -384,6 +388,55 @@ export function ConfluencePanel({ ticker }: ConfluencePanelProps) {
               )}
               {data.backtestNAligned != null && (
                 <p className="text-xs text-gray-400 mt-0.5">Based on {data.backtestNAligned} ALIGNED signals over 2 years</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Market Phase Badge ── */}
+        {data.marketPhase && (
+          <div className={cn(
+            "flex items-start gap-3 rounded-xl px-4 py-3 border",
+            data.marketPhase === "TRENDING"
+              ? "bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200"
+              : data.marketPhase === "COILING"
+              ? "bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200"
+              : "bg-gradient-to-r from-slate-50 to-gray-50 border-slate-200"
+          )}>
+            <div className="flex-shrink-0">
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center text-base font-bold",
+                data.marketPhase === "TRENDING" ? "bg-indigo-100 text-indigo-700"
+                : data.marketPhase === "COILING" ? "bg-orange-100 text-orange-700"
+                : "bg-slate-100 text-slate-600"
+              )}>
+                {data.marketPhase === "TRENDING" ? "↗" : data.marketPhase === "COILING" ? "⟳" : "↔"}
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                <span className={cn(
+                  "text-xs font-bold uppercase tracking-wider",
+                  data.marketPhase === "TRENDING" ? "text-indigo-700"
+                  : data.marketPhase === "COILING" ? "text-orange-700"
+                  : "text-slate-600"
+                )}>Phase: {data.marketPhase}</span>
+                {data.marketPhaseSuggestedStructure && (
+                  <span className={cn(
+                    "text-xs font-semibold px-2 py-0.5 rounded-full text-white",
+                    data.marketPhase === "TRENDING" ? "bg-indigo-600"
+                    : data.marketPhase === "COILING" ? "bg-orange-500"
+                    : "bg-slate-500"
+                  )}>{data.marketPhaseSuggestedStructure}</span>
+                )}
+              </div>
+              {data.marketPhaseDetail && (
+                <p className={cn(
+                  "text-xs leading-relaxed",
+                  data.marketPhase === "TRENDING" ? "text-indigo-800"
+                  : data.marketPhase === "COILING" ? "text-orange-800"
+                  : "text-slate-600"
+                )}>{data.marketPhaseDetail}</p>
               )}
             </div>
           </div>

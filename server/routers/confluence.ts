@@ -57,6 +57,10 @@ interface ConfluenceResult {
   backtestAvgPnl: number | null;
   backtestSizeGuidance: string | null;
   backtestNAligned: number | null;
+  // Market Phase
+  marketPhase: "TRENDING" | "CONSOLIDATING" | "COILING";
+  marketPhaseDetail: string;
+  marketPhaseSuggestedStructure: string;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -117,6 +121,63 @@ function computeVWAP(bars: { close: number; volume: number; high: number; low: n
     cumVol += b.volume;
   }
   return cumVol > 0 ? cumPV / cumVol : null;
+}
+
+/** Detect market phase: TRENDING / CONSOLIDATING / COILING
+ *  Uses ATR contraction ratio + trend structure:
+ *  - COILING:       ATR(14) is ≤ 60% of its 20-bar average → volatility squeeze, breakout imminent
+ *  - TRENDING:      Clear MA20 > MA50 (up) or MA20 < MA50 (down) structure
+ *  - CONSOLIDATING: Everything else — range-bound, no squeeze yet
+ */
+function detectPhase(
+  bars: { close: number; high: number; low: number }[]
+): { phase: "TRENDING" | "CONSOLIDATING" | "COILING"; atrRatio: number; detail: string; suggestedStructure: string } {
+  if (bars.length < 20) return { phase: "CONSOLIDATING", atrRatio: 1, detail: "Insufficient data", suggestedStructure: "Iron Condor" };
+
+  // ATR(14) for each bar over last 20 bars
+  const atrValues: number[] = [];
+  for (let i = Math.max(1, bars.length - 20); i < bars.length; i++) {
+    const tr = Math.max(
+      bars[i].high - bars[i].low,
+      Math.abs(bars[i].high - bars[i - 1].close),
+      Math.abs(bars[i].low - bars[i - 1].close)
+    );
+    atrValues.push(tr);
+  }
+  const currentATR = atrValues.slice(-14).reduce((s, v) => s + v, 0) / Math.min(14, atrValues.length);
+  const avgATR = atrValues.reduce((s, v) => s + v, 0) / atrValues.length;
+  const atrRatio = avgATR > 0 ? Math.round((currentATR / avgATR) * 100) / 100 : 1;
+
+  // Trend structure
+  const closes = bars.map(b => b.close);
+  const ma20 = sma(closes, 20);
+  const ma50 = sma(closes, Math.min(50, closes.length));
+  const current = closes[closes.length - 1];
+  const isTrending = (current > ma20 && ma20 > ma50) || (current < ma20 && ma20 < ma50);
+  const direction = current > ma20 ? "up" : "down";
+
+  if (atrRatio <= 0.60) {
+    return {
+      phase: "COILING",
+      atrRatio,
+      detail: `ATR is ${Math.round((1 - atrRatio) * 100)}% below its 20-day avg — volatility squeeze. Breakout imminent.`,
+      suggestedStructure: "Wait for breakout, then enter directional spread",
+    };
+  }
+  if (isTrending) {
+    return {
+      phase: "TRENDING",
+      atrRatio,
+      detail: `Clear ${direction === "up" ? "uptrend" : "downtrend"} structure (MA20 ${direction === "up" ? ">" : "<"} MA50). ATR normal at ${Math.round(atrRatio * 100)}% of avg.`,
+      suggestedStructure: direction === "up" ? "Bull Put Spread" : "Bear Call Spread",
+    };
+  }
+  return {
+    phase: "CONSOLIDATING",
+    atrRatio,
+    detail: `Price is range-bound between MA20 and MA50. ATR at ${Math.round(atrRatio * 100)}% of avg — no directional commitment.`,
+    suggestedStructure: "Iron Condor",
+  };
 }
 
 /** Detect price trend from daily bars */
@@ -415,7 +476,7 @@ async function buildTier4(ticker: string): Promise<TierResult> {
 
 // ── Synthesis ─────────────────────────────────────────────────────────────────
 
-function synthesize(tiers: TierResult[], ticker: string): Omit<ConfluenceResult, "ticker" | "tiers" | "dataAsOf" | "backtestTier" | "backtestTierLabel" | "backtestBestStrategy" | "backtestWinRate" | "backtestAvgPnl" | "backtestSizeGuidance" | "backtestNAligned"> {
+function synthesize(tiers: TierResult[], ticker: string): Omit<ConfluenceResult, "ticker" | "tiers" | "dataAsOf" | "backtestTier" | "backtestTierLabel" | "backtestBestStrategy" | "backtestWinRate" | "backtestAvgPnl" | "backtestSizeGuidance" | "backtestNAligned" | "marketPhase" | "marketPhaseDetail" | "marketPhaseSuggestedStructure"> {
   const totalScore = tiers.reduce((a, t) => a + t.score, 0); // 0–8
   const bullishTiers = tiers.filter(t => t.status === "BULLISH").length;
   const bearishTiers = tiers.filter(t => t.status === "BEARISH").length;
@@ -545,6 +606,7 @@ export const confluenceRouter = router({
       const tiers = [tier1, tier2, tier3, tier4];
       const synthesis = synthesize(tiers, ticker);
       const classification = getTickerClassification(ticker);
+      const phaseResult = detectPhase(dailyBars);
       return {
         ticker,
         tiers,
@@ -557,6 +619,9 @@ export const confluenceRouter = router({
         backtestAvgPnl: classification?.avgPnl ?? null,
         backtestSizeGuidance: classification ? getTierSizeGuidance(classification.tier) : null,
         backtestNAligned: classification?.nAligned ?? null,
+        marketPhase: phaseResult.phase,
+        marketPhaseDetail: phaseResult.detail,
+        marketPhaseSuggestedStructure: phaseResult.suggestedStructure,
       };
     }),
 });
