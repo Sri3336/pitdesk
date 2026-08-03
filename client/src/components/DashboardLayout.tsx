@@ -74,6 +74,7 @@ import {
   Search,
   Command,
   ShieldAlert,
+  CalendarDays,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
@@ -119,6 +120,7 @@ const NAV_SECTIONS = [
       { icon: Flame,           label: "Catalyst Watch",   path: "/catalyst-watch",    desc: "BCOS breakout signals" },
       { icon: BarChart2,       label: "PCR Dashboard",    path: "/pcr-dashboard",     desc: "Put/Call ratio signals" },
       { icon: Radio,           label: "Earnings Calendar",path: "/earnings-calendar", desc: "Upcoming earnings events" },
+      { icon: CalendarDays,    label: "Earnings Watch",   path: "/earnings-watch",    desc: "Calendar view of all ticker earnings" },
       { icon: ClipboardList,   label: "Watchlist",        path: "/watchlist",         desc: "Your tracked tickers" },
     ],
   },

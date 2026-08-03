@@ -68,6 +68,7 @@ const Analyzer = lazy(() => import("./pages/Analyzer"));
 const PCRDashboard = lazy(() => import("./pages/PCRDashboard"));
 const PCRStrategy = lazy(() => import("./pages/PCRStrategy"));
 const EarningsCalendar = lazy(() => import("./pages/EarningsCalendar"));
+const EarningsWatch = lazy(() => import("./pages/EarningsWatch"));
 const History = lazy(() => import("./pages/History"));
 
 // Intelligence / Execution pages
@@ -254,6 +255,7 @@ function Router() {
                 <Route path="/pcr-dashboard" component={PCRDashboard} />
                 <Route path="/pcr-strategy" component={PCRStrategy} />
                 <Route path="/earnings-calendar" component={EarningsCalendar} />
+                <Route path="/earnings-watch" component={EarningsWatch} />
                 <Route path="/fib-ema-alerts" component={FibEmaAlerts} />
 
                 {/* Intelligence / Execution */}
