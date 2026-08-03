@@ -215,10 +215,15 @@ interface ConfluencePanelProps {
 export function ConfluencePanel({ ticker }: ConfluencePanelProps) {
   const [expandedTiers, setExpandedTiers] = useState<Set<number>>(new Set([1, 2, 3, 4]));
   const [showNarrative, setShowNarrative] = useState(true);
+  const [showNewsPulse, setShowNewsPulse] = useState(true);
 
   const { data, isLoading, error, refetch, isFetching } = trpc.confluence.getConfluence.useQuery(
     { ticker },
     { enabled: !!ticker, staleTime: 2 * 60 * 1000 }
+  );
+  const { data: newsPulse, isLoading: newsLoading } = trpc.confluence.getNewsPulse.useQuery(
+    { ticker },
+    { enabled: !!ticker, staleTime: 5 * 60 * 1000 }
   );
 
   const toggleTier = useCallback((tier: number) => {
@@ -489,6 +494,109 @@ export function ConfluencePanel({ ticker }: ConfluencePanelProps) {
           )}
         </div>
 
+        {/* ── News Pulse ── */}
+        <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <button
+            onClick={() => setShowNewsPulse(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              <Flame className="w-4 h-4 text-orange-500" />
+              <span className="text-sm font-semibold text-gray-700">News Pulse</span>
+              {newsPulse && (
+                <span className={cn(
+                  "text-xs font-bold px-2 py-0.5 rounded-full border",
+                  newsPulse.overallSentiment === "BULLISH" ? "bg-green-100 text-green-700 border-green-200"
+                  : newsPulse.overallSentiment === "BEARISH" ? "bg-red-100 text-red-700 border-red-200"
+                  : "bg-gray-100 text-gray-500 border-gray-200"
+                )}>{newsPulse.overallSentiment}</span>
+              )}
+              {newsPulse?.catalystRisk && (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full border bg-orange-100 text-orange-700 border-orange-200">⚡ CATALYST RISK</span>
+              )}
+            </div>
+            {showNewsPulse ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          </button>
+          {showNewsPulse && (
+            <div className="p-4 space-y-3 bg-white">
+              {newsLoading ? (
+                <div className="space-y-2 animate-pulse">
+                  <div className="h-4 bg-gray-100 rounded w-3/4" />
+                  <div className="h-4 bg-gray-100 rounded w-1/2" />
+                  <div className="h-12 bg-gray-100 rounded" />
+                </div>
+              ) : newsPulse ? (
+                <>
+                  {/* Analyst + Technical Outlook row */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {newsPulse.analystRating !== "N/A" && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-gray-500">Analyst:</span>
+                        <span className={cn(
+                          "text-xs font-bold px-2 py-0.5 rounded-full border",
+                          newsPulse.analystRating === "BUY" || newsPulse.analystRating === "STRONG BUY" ? "bg-green-100 text-green-700 border-green-200"
+                          : newsPulse.analystRating === "SELL" || newsPulse.analystRating === "STRONG SELL" ? "bg-red-100 text-red-700 border-red-200"
+                          : "bg-yellow-100 text-yellow-700 border-yellow-200"
+                        )}>{newsPulse.analystRating}</span>
+                        {newsPulse.analystTarget && (
+                          <span className="text-xs text-gray-600 font-semibold">${newsPulse.analystTarget} target</span>
+                        )}
+                        {newsPulse.analystProvider && (
+                          <span className="text-xs text-gray-400">({newsPulse.analystProvider})</span>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-gray-500">Tech:</span>
+                      <span className={cn(
+                        "text-xs font-semibold",
+                        newsPulse.shortOutlook === "Bullish" ? "text-green-600"
+                        : newsPulse.shortOutlook === "Bearish" ? "text-red-600"
+                        : "text-gray-500"
+                      )}>ST {newsPulse.shortOutlook}</span>
+                      <span className="text-gray-300">·</span>
+                      <span className={cn(
+                        "text-xs font-semibold",
+                        newsPulse.midOutlook === "Bullish" ? "text-green-600"
+                        : newsPulse.midOutlook === "Bearish" ? "text-red-600"
+                        : "text-gray-500"
+                      )}>MT {newsPulse.midOutlook}</span>
+                    </div>
+                  </div>
+                  {/* Trade implication */}
+                  <div className={cn(
+                    "rounded-lg px-3 py-2.5 border text-sm font-medium leading-relaxed",
+                    newsPulse.overallSentiment === "BULLISH" ? "bg-green-50 border-green-200 text-green-800"
+                    : newsPulse.overallSentiment === "BEARISH" ? "bg-red-50 border-red-200 text-red-800"
+                    : "bg-gray-50 border-gray-200 text-gray-700"
+                  )}>
+                    {newsPulse.tradeImplication}
+                  </div>
+                  {/* Headlines */}
+                  {newsPulse.headlines.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Recent Headlines</p>
+                      {newsPulse.headlines.map((h, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className={cn(
+                            "text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 mt-0.5",
+                            h.type === "news" ? "bg-blue-100 text-blue-600" : "bg-purple-100 text-purple-600"
+                          )}>{h.type === "news" ? "NEWS" : "RPT"}</span>
+                          <div className="min-w-0">
+                            <p className="text-xs text-gray-700 leading-relaxed line-clamp-2">{h.text}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{h.date}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-gray-400">News data unavailable.</p>
+              )}
+            </div>
+          )}
+        </div>
         {/* ── Footer ── */}
         <div className="flex items-center justify-between text-xs text-gray-400">
           <div className="flex items-center gap-1">

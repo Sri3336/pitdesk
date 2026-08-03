@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { callDataApi } from "../_core/dataApi";
+import { invokeLLM } from "../_core/llm";
 import { fetchPCR } from "../pcrStrategy";
 import { COT_INSTRUMENTS } from "../../shared/cotTypes";
 import { analyzeCotInstrument } from "./cot";
@@ -623,5 +624,144 @@ export const confluenceRouter = router({
         marketPhaseDetail: phaseResult.detail,
         marketPhaseSuggestedStructure: phaseResult.suggestedStructure,
       };
+    }),
+
+  // ── News Pulse ─────────────────────────────────────────────────────────────
+  // Fetches live headlines + analyst signals for a ticker and runs LLM sentiment
+  getNewsPulse: publicProcedure
+    .input(z.object({ ticker: z.string().min(1).max(10).toUpperCase() }))
+    .query(async ({ input }) => {
+      const { ticker } = input;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const raw: any = await callDataApi("YahooFinance/get_stock_insights", {
+          query: { symbol: ticker },
+        });
+        const r = raw?.finance?.result ?? {};
+
+        // Significant developments (news headlines)
+        const sigDevs: { headline: string; date: string }[] = (r.sigDevs ?? []).slice(0, 8);
+
+        // Analyst reports (recent headings)
+        const reports: { title: string; date: string }[] = (r.reports ?? [])
+          .slice(0, 6)
+          .map((rpt: { headHtml?: string; reportDate?: string }) => ({
+            title: rpt.headHtml ?? "",
+            date: (rpt.reportDate ?? "").slice(0, 10),
+          }))
+          .filter((rpt: { title: string }) => rpt.title.length > 0);
+
+        // Analyst recommendation
+        const rec = r.recommendation ?? {};
+        const analystRating: string = rec.rating ?? "N/A";
+        const analystTarget: number | null = rec.targetPrice ?? null;
+        const analystProvider: string = rec.provider ?? "";
+
+        // Technical outlook from Trading Central
+        const techEvents = r.instrumentInfo?.technicalEvents ?? {};
+        const shortOutlook: string = techEvents.shortTermOutlook?.direction ?? "N/A";
+        const midOutlook: string = techEvents.intermediateTermOutlook?.direction ?? "N/A";
+        const shortDesc: string = techEvents.shortTermOutlook?.stateDescription ?? "";
+
+        // Build context for LLM sentiment analysis
+        const headlineText = [
+          ...sigDevs.map(s => `[${s.date}] ${s.headline}`),
+          ...reports.slice(0, 3).map(rpt => `[${rpt.date}] ${rpt.title}`),
+        ].join("\n");
+
+        if (!headlineText.trim()) {
+          return {
+            ticker,
+            headlines: [],
+            analystRating,
+            analystTarget,
+            analystProvider,
+            shortOutlook,
+            midOutlook,
+            overallSentiment: "NEUTRAL" as const,
+            tradeImplication: "No recent news found. Proceed based on technical signals only.",
+            catalystRisk: false,
+            dataAsOf: new Date().toISOString(),
+          };
+        }
+
+        // LLM sentiment classification
+        const llmResult = await invokeLLM({
+          messages: [
+            {
+              role: "system",
+              content: `You are a professional options trader's pre-trade news analyst. Analyze the following stock news and signals, then respond with a JSON object containing exactly these three fields:
+- sentiment: one of "BULLISH", "BEARISH", or "NEUTRAL" based on the overall news tone
+- catalystRisk: true if there is a major catalyst (earnings surprise, M&A, FDA decision, regulatory action, guidance change) in the last 7 days, false otherwise
+- tradeImplication: a 1-2 sentence plain-English statement telling the trader whether the news confirms or contradicts a directional options trade`,
+            },
+            {
+              role: "user",
+              content: `Ticker: ${ticker}\nAnalyst Rating: ${analystRating}${analystTarget ? ` (target $${analystTarget})` : ""}\nTechnical Outlook: Short-term=${shortOutlook}, Mid-term=${midOutlook}\nTechnical Detail: ${shortDesc}\n\nRecent Headlines and Reports:\n${headlineText}\n\nRespond with JSON only.`,
+            },
+          ],
+          maxTokens: 300,
+          responseFormat: {
+            type: "json_schema",
+            json_schema: {
+              name: "news_sentiment",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  sentiment: { type: "string", enum: ["BULLISH", "BEARISH", "NEUTRAL"] },
+                  catalystRisk: { type: "boolean" },
+                  tradeImplication: { type: "string" },
+                },
+                required: ["sentiment", "catalystRisk", "tradeImplication"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+
+        const content = typeof llmResult.choices[0]?.message?.content === "string"
+          ? llmResult.choices[0].message.content : "{}";
+
+        let parsed: { sentiment?: string; catalystRisk?: boolean; tradeImplication?: string } = {};
+        try { parsed = JSON.parse(content); } catch { /* fallback */ }
+
+        const overallSentiment = (["BULLISH", "BEARISH", "NEUTRAL"].includes(parsed.sentiment ?? "")
+          ? parsed.sentiment : "NEUTRAL") as "BULLISH" | "BEARISH" | "NEUTRAL";
+
+        // Build headline list for UI
+        const headlines = [
+          ...sigDevs.map(s => ({ text: s.headline, date: s.date, type: "news" as const })),
+          ...reports.slice(0, 3).map(rpt => ({ text: rpt.title, date: rpt.date, type: "report" as const })),
+        ];
+
+        return {
+          ticker,
+          headlines,
+          analystRating,
+          analystTarget,
+          analystProvider,
+          shortOutlook,
+          midOutlook,
+          overallSentiment,
+          tradeImplication: parsed.tradeImplication ?? "Insufficient data for trade implication.",
+          catalystRisk: parsed.catalystRisk ?? false,
+          dataAsOf: new Date().toISOString(),
+        };
+      } catch (err) {
+        return {
+          ticker,
+          headlines: [],
+          analystRating: "N/A",
+          analystTarget: null,
+          analystProvider: "",
+          shortOutlook: "N/A",
+          midOutlook: "N/A",
+          overallSentiment: "NEUTRAL" as const,
+          tradeImplication: "News data temporarily unavailable.",
+          catalystRisk: false,
+          dataAsOf: new Date().toISOString(),
+        };
+      }
     }),
 });
