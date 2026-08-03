@@ -5,6 +5,7 @@ import { lazy, Suspense } from "react";
 import { Route, Switch, useLocation } from "wouter";
 
 import AuthGuard from "./components/AuthGuard";
+import { useAuth } from "./_core/hooks/useAuth";
 import { CommandPalette, useCommandPalette } from "./components/CommandPalette";
 import OwnerOnlyGuard from "./components/OwnerOnlyGuard";
 import DashboardLayout from "./components/DashboardLayout";
@@ -36,6 +37,7 @@ const SwingTradingPicks = lazy(() => import("./pages/SwingTradingPicks"));
 
 // Core pages
 const Home = lazy(() => import("./pages/Home"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 const PitDeskHome = lazy(() => import("./pages/PitDeskHome"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -109,6 +111,14 @@ const PageLoader = () => (
   </div>
 );
 
+// Shows public landing page for guests, dashboard for logged-in users
+function RootRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  if (!user) return <LandingPage />;
+  return <Home />;
+}
+
 function Router() {
   return (
     <Switch>
@@ -134,13 +144,11 @@ function Router() {
         </Suspense>
       </Route>
 
-      {/* ── Home landing page (no sidebar) ────────────────────────────── */}
+      {/* ── Root: public landing for guests, dashboard for logged-in users ── */}
       <Route path="/">
-        <AuthGuard>
-          <Suspense fallback={<PageLoader />}>
-            <Home />
-          </Suspense>
-        </AuthGuard>
+        <Suspense fallback={<PageLoader />}>
+          <RootRoute />
+        </Suspense>
       </Route>
 
       {/* ── My Playbook ───────────────────────────────────────────────── */}
