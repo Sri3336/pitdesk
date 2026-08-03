@@ -46,6 +46,7 @@ const IntradayScanner = lazy(() => import("./pages/IntradayScanner"));
 const IntradayTickerDetail = lazy(() => import("./pages/IntradayTickerDetail"));
 const ScanAll = lazy(() => import("./pages/ScanAll"));
 const DailyScan = lazy(() => import("./pages/DailyScan"));
+const ActiveTradeMonitor = lazy(() => import("./pages/ActiveTradeMonitor"));
 const CandlestickChart = lazy(() => import("./pages/CandlestickChart"));
 const CatalystBreakoutWatch = lazy(() => import("./pages/CatalystBreakoutWatch"));
 const VCPStrategy = lazy(() => import("./pages/VCPStrategy"));
@@ -219,6 +220,7 @@ function Router() {
                 <Route path="/intraday-scanner/:ticker">{(params) => <IntradayTickerDetail ticker={params.ticker ?? ""} onClose={() => window.history.back()} />}</Route>
                 <Route path="/scan-all" component={ScanAll} />
                 <Route path="/daily-scan" component={DailyScan} />
+                <Route path="/active-monitor" component={ActiveTradeMonitor} />
                 <Route path="/charts" component={CandlestickChart} />
 
                 {/* Strategies */}

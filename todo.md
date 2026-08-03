@@ -626,3 +626,15 @@
 - [ ] Record PitDesk UI screens covering all current features
 - [ ] Generate narration audio synced to screens
 - [ ] Produce final video with audio/video in sync
+
+## Active Trade Monitor
+- [ ] Add activeTradeMonitor tRPC procedure — fetch open trades from trade_log, run confluence check on each, detect degradation (score drop, phase change, catalyst approaching)
+- [ ] Add alert logic — send owner notification when confluence drops below threshold or phase changes
+- [ ] Add ActiveTradeMonitor page/component — open positions list with live confluence health badge, score delta, exit recommendation
+- [ ] Wire nav entry for Active Trade Monitor
+- [ ] Add to Daily Scan page as a top banner when any open trade has degraded confluence
+
+## Doodle Video (6-Step Decision Loop)
+- [ ] Generate 8 doodle-style whiteboard frames covering the 6-step loop
+- [ ] Generate focused narration audio (60-90 seconds)
+- [ ] Compose final doodle video with audio sync

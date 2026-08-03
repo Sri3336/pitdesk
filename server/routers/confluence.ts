@@ -9,7 +9,7 @@
  * Final verdict: ALIGNED | PARTIAL | CONFLICTED
  */
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { callDataApi } from "../_core/dataApi";
 import { invokeLLM } from "../_core/llm";
 import { fetchPCR } from "../pcrStrategy";
@@ -17,6 +17,10 @@ import { COT_INSTRUMENTS } from "../../shared/cotTypes";
 import { analyzeCotInstrument } from "./cot";
 import { getTickerClassification, getTierSizeGuidance } from "../../shared/tickerClassification";
 import { PCR_TICKERS } from "../../shared/tickers";
+import { getDb } from "../db";
+import { tradeLog } from "../../drizzle/schema";
+import { eq, and } from "drizzle-orm";
+import { notifyOwner } from "../_core/notification";
 
 // ── Batch scan cache (5-min TTL) ─────────────────────────────────────────────
 let batchScanCache: { results: ScanResult[]; ts: number } | null = null;
@@ -873,5 +877,95 @@ export const confluenceRouter = router({
           dataAsOf: new Date().toISOString(),
         };
       }
+    }),
+
+  // ── Active Trade Monitor ────────────────────────────────────────────────────
+  // Watches all open trades for the authenticated user.
+  // For each open trade, re-runs the confluence scan and compares current
+  // score vs the score at entry (approximated as 6/8 ALIGNED baseline).
+  // Returns an exit recommendation when confluence degrades.
+  activeMonitor: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+
+      // Fetch all open trades for this user
+      const openTrades = await db
+        .select()
+        .from(tradeLog)
+        .where(and(eq(tradeLog.userId, ctx.user.id), eq(tradeLog.status, "open")))
+        .orderBy(tradeLog.executedAt);
+
+      if (openTrades.length === 0) return [];
+
+      // Run confluence scan on each open trade's ticker (deduplicated)
+      const uniqueTickers = Array.from(new Set(openTrades.map(t => t.ticker)));
+      const scanMap = new Map<string, ScanResult>();
+      await Promise.all(
+        uniqueTickers.map(async (ticker) => {
+          const result = await scanOneTicker(ticker);
+          scanMap.set(ticker, result);
+        })
+      );
+
+      // Build monitor result for each trade
+      const results = openTrades.map((trade) => {
+        const scan = scanMap.get(trade.ticker);
+        if (!scan) return null;
+
+        const currentScore = scan.verdictScore;
+        // Entry baseline: assume ALIGNED entry = 6/8. If score has dropped significantly, flag it.
+        const ENTRY_BASELINE = 6;
+        const scoreDelta = currentScore - ENTRY_BASELINE;
+        const degraded = currentScore <= 3;
+        const phaseChanged = scan.marketPhase === "COILING"; // coiling = uncertainty, consider exit
+
+        // Exit recommendation logic
+        let exitRecommendation: "HOLD" | "REVIEW" | "EXIT" = "HOLD";
+        let exitReason = "Confluence remains strong. Hold position.";
+
+        if (scan.verdict === "CONFLICTED" || currentScore <= 2) {
+          exitRecommendation = "EXIT";
+          exitReason = `Confluence collapsed to ${currentScore}/8 (${scan.verdict}). Edge is gone — exit now.`;
+        } else if (degraded || phaseChanged) {
+          exitRecommendation = "REVIEW";
+          exitReason = phaseChanged
+            ? `Phase shifted to COILING — volatility squeeze detected. Review before expiry.`
+            : `Score dropped to ${currentScore}/8. Monitor closely, consider early exit at 50% profit.`;
+        } else if (scan.verdict === "ALIGNED" && currentScore >= 6) {
+          exitReason = `Confluence still ALIGNED at ${currentScore}/8. Let theta decay work.`;
+        } else {
+          exitReason = `Score at ${currentScore}/8 (${scan.verdict}). No immediate action needed.`;
+        }
+
+        return {
+          tradeId: trade.id,
+          ticker: trade.ticker,
+          strategy: trade.strategy,
+          executedAt: trade.executedAt?.toISOString() ?? null,
+          maxLoss: trade.maxLoss,
+          currentVerdict: scan.verdict,
+          currentScore,
+          scoreDelta,
+          currentPhase: scan.marketPhase,
+          suggestedStrategy: scan.suggestedStrategy,
+          exitRecommendation,
+          exitReason,
+          backtestTier: scan.backtestTier,
+          dataAsOf: scan.dataAsOf,
+        };
+      }).filter(Boolean);
+
+      // Fire owner notification if any trade needs EXIT action
+      const exitTrades = results.filter(r => r?.exitRecommendation === "EXIT");
+      if (exitTrades.length > 0) {
+        const tickers = exitTrades.map(r => r!.ticker).join(", ");
+        await notifyOwner({
+          title: `⚠️ PitDesk: Exit Signal on ${tickers}`,
+          content: `Confluence has collapsed on ${exitTrades.length} open trade(s): ${tickers}. Check Active Trade Monitor immediately.`,
+        }).catch(() => {/* non-blocking */});
+      }
+
+      return results;
     }),
 });

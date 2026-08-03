@@ -73,6 +73,7 @@ import {
   BarChart3,
   Search,
   Command,
+  ShieldAlert,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
@@ -110,6 +111,7 @@ const NAV_SECTIONS = [
     items: [
       { icon: LayoutDashboard, label: "Dashboard",        path: "/dashboard",         desc: "Daily briefing & open positions" },
       { icon: BarChart3,       label: "Daily Scan",       path: "/daily-scan",        desc: "60 tickers ranked by confluence score" },
+      { icon: ShieldAlert,     label: "Trade Monitor",    path: "/active-monitor",   desc: "Live confluence health on open trades" },
       { icon: Search,          label: "Scan All",         path: "/scan",              desc: "Multi-strategy unified scanner" },
       { icon: LineChart,       label: "Velez Scanner",    path: "/velez-scanner",     desc: "Daily Fib+EMA pullback signals" },
       { icon: Activity,        label: "Intraday Scanner", path: "/intraday-scanner",  desc: "5-min Grade-A intraday setups" },
