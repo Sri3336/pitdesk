@@ -613,3 +613,16 @@
 - [x] UI: PerformanceExplorer panel — setup stats cards, win rate bar chart, trade history list with filters
 - [x] Wire /strategy-visualizer route in App.tsx
 - [x] Add "Strategy Visualizer" to sidebar nav under Strategies (GitBranch icon)
+
+## Daily Scan Page
+- [ ] Add batchScan tRPC procedure to scan all 60 PCR tickers and return ranked confluence results
+- [ ] Build DailyScan.tsx page with ranked cards (verdict, score, phase, backtest tier, strategy)
+- [ ] Add filter controls: ALIGNED only, by phase, by backtest tier
+- [ ] Add auto-refresh on load + manual Refresh button with progress indicator
+- [ ] Wire "Daily Scan" nav entry in DashboardLayout sidebar
+- [ ] Save checkpoint and verify live
+
+## Demo Video Rebuild
+- [ ] Record PitDesk UI screens covering all current features
+- [ ] Generate narration audio synced to screens
+- [ ] Produce final video with audio/video in sync

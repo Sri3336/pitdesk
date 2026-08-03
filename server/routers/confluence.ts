@@ -16,6 +16,104 @@ import { fetchPCR } from "../pcrStrategy";
 import { COT_INSTRUMENTS } from "../../shared/cotTypes";
 import { analyzeCotInstrument } from "./cot";
 import { getTickerClassification, getTierSizeGuidance } from "../../shared/tickerClassification";
+import { PCR_TICKERS } from "../../shared/tickers";
+
+// ── Batch scan cache (5-min TTL) ─────────────────────────────────────────────
+let batchScanCache: { results: ScanResult[]; ts: number } | null = null;
+const BATCH_SCAN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+interface ScanResult {
+  ticker: string;
+  verdict: Verdict;
+  verdictScore: number;
+  confidence: Confidence;
+  suggestedStrategy: string;
+  marketPhase: "TRENDING" | "CONSOLIDATING" | "COILING";
+  marketPhaseSuggestedStructure: string;
+  backtestTier: string | null;
+  backtestWinRate: number | null;
+  backtestAvgPnl: number | null;
+  thetaCandidate: boolean;
+  thetaLabel: string | null;
+  whatToDo: string;
+  dataAsOf: string;
+  error?: string;
+}
+
+async function scanOneTicker(ticker: string): Promise<ScanResult> {
+  try {
+    const [dailyBars, intradayBars] = await Promise.all([
+      fetchDailyBars(ticker),
+      fetchIntradayBars(ticker),
+    ]);
+    const [tier1, tier2, tier3, tier4] = await Promise.all([
+      buildTier1(ticker, dailyBars),
+      buildTier2(ticker, dailyBars),
+      buildTier3(ticker, dailyBars, intradayBars),
+      buildTier4(ticker),
+    ]);
+    const tiers = [tier1, tier2, tier3, tier4];
+    const synthesis = synthesize(tiers, ticker);
+    const classification = getTickerClassification(ticker);
+    const phaseResult = detectPhase(dailyBars);
+    return {
+      ticker,
+      verdict: synthesis.verdict,
+      verdictScore: synthesis.verdictScore,
+      confidence: synthesis.confidence,
+      suggestedStrategy: synthesis.suggestedStrategy,
+      marketPhase: phaseResult.phase,
+      marketPhaseSuggestedStructure: phaseResult.suggestedStructure,
+      backtestTier: classification?.tier ?? null,
+      backtestWinRate: classification?.winRate ?? null,
+      backtestAvgPnl: classification?.avgPnl ?? null,
+      thetaCandidate: synthesis.thetaCandidate,
+      thetaLabel: synthesis.thetaLabel,
+      whatToDo: synthesis.whatToDo,
+      dataAsOf: new Date().toISOString(),
+    };
+  } catch (err) {
+    return {
+      ticker,
+      verdict: "CONFLICTED",
+      verdictScore: 0,
+      confidence: "LOW",
+      suggestedStrategy: "N/A",
+      marketPhase: "CONSOLIDATING",
+      marketPhaseSuggestedStructure: "Iron Condor",
+      backtestTier: null,
+      backtestWinRate: null,
+      backtestAvgPnl: null,
+      thetaCandidate: false,
+      thetaLabel: null,
+      whatToDo: "Data unavailable",
+      dataAsOf: new Date().toISOString(),
+      error: (err as Error).message,
+    };
+  }
+}
+
+async function runBatchScan(): Promise<ScanResult[]> {
+  const tickers = [...PCR_TICKERS];
+  const BATCH_SIZE = 8;
+  const results: ScanResult[] = [];
+  for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
+    const batch = tickers.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(scanOneTicker));
+    results.push(...batchResults);
+    if (i + BATCH_SIZE < tickers.length) {
+      await new Promise(r => setTimeout(r, 300)); // brief pause between batches
+    }
+  }
+  // Sort: ALIGNED first, then PARTIAL, then CONFLICTED; within each group by verdictScore desc
+  const ORDER: Record<Verdict, number> = { ALIGNED: 0, PARTIAL: 1, CONFLICTED: 2 };
+  results.sort((a, b) => {
+    const vo = ORDER[a.verdict] - ORDER[b.verdict];
+    if (vo !== 0) return vo;
+    return b.verdictScore - a.verdictScore;
+  });
+  return results;
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type TierStatus = "BULLISH" | "BEARISH" | "NEUTRAL" | "N/A";
@@ -628,6 +726,18 @@ export const confluenceRouter = router({
 
   // ── News Pulse ─────────────────────────────────────────────────────────────
   // Fetches live headlines + analyst signals for a ticker and runs LLM sentiment
+  batchScan: publicProcedure
+    .input(z.object({ forceRefresh: z.boolean().optional() }))
+    .query(async ({ input }) => {
+      const now = Date.now();
+      if (!input.forceRefresh && batchScanCache && (now - batchScanCache.ts) < BATCH_SCAN_TTL_MS) {
+        return { results: batchScanCache.results, fromCache: true, scannedAt: new Date(batchScanCache.ts).toISOString() };
+      }
+      const results = await runBatchScan();
+      batchScanCache = { results, ts: now };
+      return { results, fromCache: false, scannedAt: new Date(now).toISOString() };
+    }),
+
   getNewsPulse: publicProcedure
     .input(z.object({ ticker: z.string().min(1).max(10).toUpperCase() }))
     .query(async ({ input }) => {

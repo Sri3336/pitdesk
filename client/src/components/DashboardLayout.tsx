@@ -109,7 +109,8 @@ const NAV_SECTIONS = [
     color: "#22c55e",
     items: [
       { icon: LayoutDashboard, label: "Dashboard",        path: "/dashboard",         desc: "Daily briefing & open positions" },
-            { icon: Search,          label: "Scan All",         path: "/scan",              desc: "Multi-strategy unified scanner" },
+      { icon: BarChart3,       label: "Daily Scan",       path: "/daily-scan",        desc: "60 tickers ranked by confluence score" },
+      { icon: Search,          label: "Scan All",         path: "/scan",              desc: "Multi-strategy unified scanner" },
       { icon: LineChart,       label: "Velez Scanner",    path: "/velez-scanner",     desc: "Daily Fib+EMA pullback signals" },
       { icon: Activity,        label: "Intraday Scanner", path: "/intraday-scanner",  desc: "5-min Grade-A intraday setups" },
       { icon: GitMerge,        label: "VCP Strategy",     path: "/vcp-strategy",      desc: "Volatility contraction patterns" },
