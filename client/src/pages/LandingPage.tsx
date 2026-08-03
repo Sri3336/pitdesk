@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
-import { getLoginUrl } from "@/const";
+// Login goes to the custom email/password sign-in page
+const LOGIN_PATH = "/signin";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -193,8 +194,6 @@ function StepCard({ step, index }: { step: typeof STEPS[0]; index: number }) {
 
 // ── Main Landing Page ────────────────────────────────────────────────────────
 export default function LandingPage() {
-  const loginUrl = getLoginUrl();
-
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">
       {/* ── Top Nav ──────────────────────────────────────────────────────── */}
@@ -204,7 +203,7 @@ export default function LandingPage() {
             <img src="/brand-assets/pitdesk-icon-v2.png" alt="PitDesk" className="h-7 w-7" />
             <span className="font-black text-lg tracking-tight text-gray-900">PitDesk</span>
           </div>
-          <a href={loginUrl}>
+          <a href={LOGIN_PATH}>
             <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white font-semibold">
               Open PitDesk <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </Button>
@@ -235,7 +234,7 @@ export default function LandingPage() {
             Six questions. If all six point the same direction, you enter.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <a href={loginUrl}>
+            <a href={LOGIN_PATH}>
               <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white font-bold px-8 h-12 text-base shadow-lg shadow-green-200">
                 Open PitDesk <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
@@ -300,7 +299,7 @@ export default function LandingPage() {
             Two years of backtest data. 8,521 signals. 60 tickers.<br />
             The edge is in the filter, not the feeling.
           </p>
-          <a href={loginUrl}>
+          <a href={LOGIN_PATH}>
             <Button
               size="lg"
               className="bg-green-500 hover:bg-green-400 text-white font-bold px-10 h-13 text-lg shadow-xl shadow-green-900/30 mt-2"
