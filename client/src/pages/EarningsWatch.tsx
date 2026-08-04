@@ -66,7 +66,7 @@ const EARNINGS: EarningsEntry[] = [
   { ticker: "CAT",   date: "2026-10-28", time: "BMO", confirmed: false },
   { ticker: "MA",    date: "2026-10-29", time: "AMC", confirmed: false },
   { ticker: "PFE",   date: "2026-10-29", time: "BMO", confirmed: false },
-  { ticker: "WDC",   date: "2026-10-29", time: "AMC", confirmed: false, inPortfolio: true },
+  { ticker: "WDC",   date: "2026-08-05", time: "AMC", confirmed: true,  inPortfolio: true },
   { ticker: "XOM",   date: "2026-10-31", time: "BMO", confirmed: false },
   { ticker: "CVX",   date: "2026-10-31", time: "BMO", confirmed: false },
   { ticker: "MRNA",  date: "2026-10-31", time: "AMC", confirmed: false },
