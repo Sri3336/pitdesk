@@ -115,6 +115,7 @@ import { cotRouter } from "./routers/cot";
 import { cotAlertsRouter } from "./routers/cotAlerts";
 import { tradeSetupRouter } from "./routers/tradeSetup";
 import { confluenceRouter } from "./routers/confluence";
+import { earningsWatchRouter } from "./routers/earningsWatch";
 import { manualTradesRouter } from "./routers/manualTrades";
 import { pcrAlertsRouter } from "./routers/pcrAlerts";
 import {
@@ -1626,5 +1627,6 @@ export const appRouter = router({
   playbookRules: playbookRulesRouter,
   tradeSetup: tradeSetupRouter,
   confluence: confluenceRouter,
+  earningsWatch: earningsWatchRouter,
 });
 export type AppRouter = typeof appRouter;
