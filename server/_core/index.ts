@@ -45,6 +45,12 @@ async function startServer() {
   // Cookie parser — required for reading session JWT cookies in req.cookies
   app.use(cookieParser());
 
+  // Lightweight deployment health check. This deliberately does not call external
+  // services so an otherwise healthy instance can pass its startup check quickly.
+  app.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok", service: "pitdesk" });
+  });
+
   // Domain redirect: trading.akulaz.ai -> www.pitdesk.ai (301 permanent)
   app.use((req, res, next) => {
     const host = (req.hostname || req.headers.host || "").split(":")[0];

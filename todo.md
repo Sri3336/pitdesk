@@ -530,6 +530,18 @@
 - [x] Backfill July 2026 existing snapshots with locked baseline from earliest July snapshot
 
 ## Phase 42 — EMA Pullback Scanner + Landing Page Nav
+
+## Phase 43 — External Hosting Migration
+- [x] Audit PitDesk runtime dependencies, database, secrets, external APIs, and scheduled jobs for portability
+- [x] Select Railway as the external hosting target with documented cost, reliability, and operational tradeoffs
+- [ ] Prepare production environment configuration, portable deployment artifacts, and data export/import procedure
+- [ ] Provision external hosting and database services without touching the current live deployment
+- [ ] Deploy a staging copy, run end-to-end tests, and validate scheduled scans, alerts, custom auth, and storage
+- [ ] Cut over trading.akulaz.ai only after written rollback steps and post-cutover validation are complete
+- [ ] Deliver an external-hosting operating runbook, backup policy, and credentials ownership checklist
+- [x] Add a lightweight `/health` endpoint for Railway deployment activation checks
+- [x] Add a secret-free external environment-variable inventory and Railway staging runbook
+- [x] Record verified Railway deployment, database, backup, region, scheduling, and pricing research in-project
 - [x] Build emaPullback.ts server router (200/50 EMA + RSI + reversal candle + options bias)
 - [x] Register emaPullbackRouter in routers.ts
 - [x] Add EMA Pullback nav item to DashboardLayout sidebar (Strategies section)
