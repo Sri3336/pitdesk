@@ -543,6 +543,13 @@
 - [x] Add a secret-free external environment-variable inventory and Railway staging runbook
 - [x] Record verified Railway deployment, database, backup, region, scheduling, and pricing research in-project
 - [x] Add and validate the `build:external` path for Railway staging (external build and TypeScript checks pass)
+- [x] Create the owner-controlled private GitHub source repository (`Sri3336/pitdesk`) and verify the initial source push
+- [x] Provision unexposed Railway staging services for PitDesk and isolated MySQL without touching the current live deployment
+- [ ] Replace managed market-data, AI, notification, and storage dependencies with externally owned providers or adapters
+- [ ] Configure Railway staging service settings: US East region, external build/start commands, health check, secure session secret, and private MySQL reference
+- [ ] Create a portable database export/import process and perform a staging-only data-copy rehearsal
+- [x] Add backward-compatible external OpenAI-compatible AI, Resend email, external asset-base, and configurable OAuth callback adapters
+- [x] Add and pass unit tests for external AI endpoint, storage-path, and email transport selection
 - [x] Build emaPullback.ts server router (200/50 EMA + RSI + reversal candle + options bias)
 - [x] Register emaPullbackRouter in routers.ts
 - [x] Add EMA Pullback nav item to DashboardLayout sidebar (Strategies section)

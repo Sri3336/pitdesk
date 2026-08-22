@@ -31,3 +31,11 @@
 - Current database: 56 tables; approximately 27 MB. `price_bars` is largest (225,139 rows / 23.83 MB), followed by `intraday_scan_results` (12,473 rows / 2.08 MB) and `uploaded_trades` (8,328 rows / 1.22 MB).
 - Current active jobs: 15-minute intraday scanner on weekdays; two weekday post-close data jobs; Sunday weekly briefing.
 - Current repository assets reference Manus-hosted storage in: `PitDeskLogo.tsx`, `Analyzer.tsx`, `COTReference.tsx`, and `LandingPage.tsx`; copy these to independent object storage before production cutover.
+
+## Railway staging project state — Aug. 22, 2026
+
+- Owner created private source repository: `https://github.com/Sri3336/pitdesk`.
+- The `main` branch has 154 commits; source push verified at commit `4c2f9eaae621f173120cad70718d026ac4adc850` before subsequent external-build preparation updates are pushed.
+- A temporary repository-specific SSH deploy key was used for that one source push and removed from both GitHub and the migration environment immediately afterward.
+- Railway project created by source selection: `adaptable-creation` (project ID `025dc8de-4531-4f78-b411-dcb3fbd23050`). It contains a single service, `pitdesk`, in the initial environment currently named `production` (this remains staging-only; no production DNS or database connection has been changed).
+- The initial Railway service uses Railpack with Node 24.19.0, is currently building the pre-external-build source commit, starts unexposed, has a default US West / California region, 1 replica, and plan limits of 2 vCPU / 1 GB. Before exposure it must be switched to US East / Virginia, receive `PITDESK_EXTERNAL_HOST=true`, `build:external`, `pnpm start`, and health-check `/health` configuration.

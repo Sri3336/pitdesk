@@ -212,14 +212,34 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
+const normalizeApiBase = (baseUrl: string): string => baseUrl.replace(/\/$/, "");
+
+/**
+ * Produces an OpenAI-compatible endpoint from either a provider root URL or a
+ * URL that already ends in `/v1`. External hosting uses this path, while the
+ * current managed deployment continues to use its existing Forge endpoint.
+ */
+export const buildOpenAiCompatibleUrl = (
+  baseUrl: string,
+  resource: "chat/completions" | "models"
+): string => {
+  const normalized = normalizeApiBase(baseUrl);
+  const apiBase = normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
+  return `${apiBase}/${resource}`;
+};
+
 const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+  ENV.externalLlmBaseUrl.trim().length > 0
+    ? buildOpenAiCompatibleUrl(ENV.externalLlmBaseUrl, "chat/completions")
+    : ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
+      ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
+      : "https://forge.manus.im/v1/chat/completions";
+
+const resolveApiKey = () => ENV.externalLlmApiKey || ENV.forgeApiKey;
 
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+  if (!resolveApiKey()) {
+    throw new Error("EXTERNAL_LLM_API_KEY or BUILT_IN_FORGE_API_KEY is not configured");
   }
 };
 
@@ -405,7 +425,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${resolveApiKey()}`,
     },
     body: JSON.stringify(payload),
   });
@@ -435,12 +455,14 @@ export type ModelsResponse = {
 export async function listLLMModels(): Promise<ModelsResponse> {
   assertApiKey();
 
-  const url = ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/models`
-    : "https://forge.manus.im/v1/models";
+  const url = ENV.externalLlmBaseUrl.trim().length > 0
+    ? buildOpenAiCompatibleUrl(ENV.externalLlmBaseUrl, "models")
+    : ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
+      ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/models`
+      : "https://forge.manus.im/v1/models";
 
   const response = await fetchWithBackoff(url, {
-    headers: { authorization: `Bearer ${ENV.forgeApiKey}` },
+    headers: { authorization: `Bearer ${resolveApiKey()}` },
   });
 
   if (!response.ok) {

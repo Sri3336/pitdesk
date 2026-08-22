@@ -33,6 +33,9 @@ export function getGoogleAuthUrl(baseUrl?: string, state?: string): string {
 }
 
 function getGoogleCallbackUrl(): string {
+  if (ENV.appUrl) {
+    return `${ENV.appUrl.replace(/\/$/, "")}/api/auth/google/callback`;
+  }
   if (ENV.isProduction) {
     return "https://trading.akulaz.ai/api/auth/google/callback";
   }

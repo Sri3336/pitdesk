@@ -1,5 +1,6 @@
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
+  appUrl: process.env.APP_URL ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
@@ -7,6 +8,11 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  externalLlmBaseUrl: process.env.EXTERNAL_LLM_BASE_URL ?? "",
+  externalLlmApiKey: process.env.EXTERNAL_LLM_API_KEY ?? "",
+  externalAssetBaseUrl: process.env.EXTERNAL_ASSET_BASE_URL ?? "",
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  emailFrom: process.env.EMAIL_FROM ?? "",
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   tradierApiKey: process.env.TRADIER_API_KEY ?? "",

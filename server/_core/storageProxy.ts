@@ -1,11 +1,31 @@
 import type { Express } from "express";
 import { ENV } from "./env";
 
+export function buildExternalAssetUrl(baseUrl: string, key: string): string {
+  const normalizedKey = key.replace(/^\/+/, "");
+  if (!normalizedKey || normalizedKey.split("/").some(segment => segment === "..")) {
+    throw new Error("Invalid storage key");
+  }
+
+  const base = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  return new URL(normalizedKey, base).toString();
+}
+
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*", async (req, res) => {
     const key = (req.params as Record<string, string>)[0];
     if (!key) {
       res.status(400).send("Missing storage key");
+      return;
+    }
+
+    if (ENV.externalAssetBaseUrl) {
+      try {
+        res.set("Cache-Control", "public, max-age=86400");
+        res.redirect(307, buildExternalAssetUrl(ENV.externalAssetBaseUrl, key));
+      } catch {
+        res.status(400).send("Invalid storage key");
+      }
       return;
     }
 
