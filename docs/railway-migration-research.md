@@ -39,3 +39,9 @@
 - A temporary repository-specific SSH deploy key was used for that one source push and removed from both GitHub and the migration environment immediately afterward.
 - Railway project created by source selection: `adaptable-creation` (project ID `025dc8de-4531-4f78-b411-dcb3fbd23050`). It contains a single service, `pitdesk`, in the initial environment currently named `production` (this remains staging-only; no production DNS or database connection has been changed).
 - The initial Railway service uses Railpack with Node 24.19.0, is currently building the pre-external-build source commit, starts unexposed, has a default US West / California region, 1 replica, and plan limits of 2 vCPU / 1 GB. Before exposure it must be switched to US East / Virginia, receive `PITDESK_EXTERNAL_HOST=true`, `build:external`, `pnpm start`, and health-check `/health` configuration.
+
+## Market-data portability validation — Aug. 22, 2026
+
+- The direct Yahoo-compatible endpoint adapter is implemented strictly as a staging fallback. A live validation request to both `v8/finance/chart` and `ws/insights/v1/finance/insights` returned `Edge: Too Many Requests`; it must not be the sole production source.
+- Tradier is the approved credentialed fallback because PitDesk already has a brokerage integration and the official market-data API provides historical OHLCV data, quote data, and 1/5/15-minute time-and-sales bars. Official limits documented as of this review: 1-minute data up to 20 open-market days / 10 all-market days; 5-minute and 15-minute data up to 40 open-market days / 18 all-market days.
+- Integrate Tradier first for chart and quote requests under `MARKET_DATA_MODE=tradier`; retain direct Yahoo only as non-critical fallback. News/insights and X data remain separate product capabilities and must be disabled gracefully or moved to an additional provider before external production cutover.

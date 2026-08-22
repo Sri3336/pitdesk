@@ -550,6 +550,10 @@
 - [ ] Create a portable database export/import process and perform a staging-only data-copy rehearsal
 - [x] Add backward-compatible external OpenAI-compatible AI, Resend email, external asset-base, and configurable OAuth callback adapters
 - [x] Add and pass unit tests for external AI endpoint, storage-path, and email transport selection
+- [ ] Implement and validate the approved direct Yahoo-compatible market-data adapter for Railway staging
+- [ ] Add a credentialed market-data fallback because direct Yahoo endpoints returned rate-limit responses during live validation
+- [ ] Add owner-controlled OpenAI, Resend, and Cloudflare R2 staging credentials with capped use and no production cutover
+- [ ] Add independent nightly encrypted MySQL-backup export to Cloudflare R2 and a restore-validation procedure
 - [x] Build emaPullback.ts server router (200/50 EMA + RSI + reversal candle + options bias)
 - [x] Register emaPullbackRouter in routers.ts
 - [x] Add EMA Pullback nav item to DashboardLayout sidebar (Strategies section)
