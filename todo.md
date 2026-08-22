@@ -542,6 +542,7 @@
 - [x] Add a lightweight `/health` endpoint for Railway deployment activation checks
 - [x] Add a secret-free external environment-variable inventory and Railway staging runbook
 - [x] Record verified Railway deployment, database, backup, region, scheduling, and pricing research in-project
+- [x] Add and validate the `build:external` path for Railway staging (external build and TypeScript checks pass)
 - [x] Build emaPullback.ts server router (200/50 EMA + RSI + reversal candle + options bias)
 - [x] Register emaPullbackRouter in routers.ts
 - [x] Add EMA Pullback nav item to DashboardLayout sidebar (Strategies section)

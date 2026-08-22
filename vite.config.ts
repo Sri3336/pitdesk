@@ -150,7 +150,13 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+// Railway and other external hosts do not provide the managed runtime or local
+// debug-collector endpoints. Keep current hosting behavior unchanged while
+// allowing a portable production build through `pnpm run build:external`.
+const isExternalHostBuild = process.env.PITDESK_EXTERNAL_HOST === "true";
+const plugins = isExternalHostBuild
+  ? [react(), tailwindcss(), jsxLocPlugin()]
+  : [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
 export default defineConfig({
   plugins,

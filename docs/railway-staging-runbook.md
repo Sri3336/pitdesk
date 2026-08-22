@@ -10,7 +10,7 @@ Create a Railway project named `pitdesk-external-migration` in **US East Metal /
 
 | Service | Purpose | Deployment type | Initial configuration |
 |---|---|---|---|
-| `pitdesk-web` | React client, Express API, tRPC, custom authentication | GitHub repository deploy | `pnpm run build` then `pnpm start`; health check `/health` |
+| `pitdesk-web` | React client, Express API, tRPC, custom authentication | GitHub repository deploy | `pnpm run build:external` then `pnpm start`; health check `/health` |
 | `pitdesk-mysql` | MySQL-compatible application database | Railway MySQL template with persistent volume | Private networking only; daily, weekly, and monthly volume backups enabled |
 | `pitdesk-intraday-scan` | Market-hours 15-minute scan | Scheduled clone of repository | Command and refactor to be finalised before enabling |
 | `pitdesk-eod-sync` | Post-close pricing, IV, and PCR refresh | Scheduled clone of repository | Command and refactor to be finalised before enabling |
