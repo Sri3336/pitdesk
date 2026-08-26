@@ -3,6 +3,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import { sql } from "drizzle-orm";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerGoogleAuthRoutes } from "./googleAuth";
@@ -58,6 +59,9 @@ async function startServer() {
       res.status(503).json({ status: "unavailable", service: "pitdesk", database: "unavailable" });
     }
   });
+
+  // Keep the Railway deployment independent of Manus storage for core branding.
+  app.use("/brand-assets", express.static(path.join(process.cwd(), "brand-assets")));
 
   // Domain redirect: trading.akulaz.ai -> www.pitdesk.ai (301 permanent)
   app.use((req, res, next) => {

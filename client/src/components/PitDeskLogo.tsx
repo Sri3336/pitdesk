@@ -4,7 +4,7 @@
 export function PitDeskLogo({ size = 32, className = "" }: { size?: number; className?: string }) {
   return (
     <img
-      src="/manus-storage/pitdesk-logo-v3_7453c57c.png"
+      src="/brand-assets/pitdesk-icon-v3.png"
       width={size}
       height={size}
       alt="PitDesk logo"
