@@ -63,11 +63,12 @@ async function startServer() {
   // Keep the Railway deployment independent of Manus storage for core branding.
   app.use("/brand-assets", express.static(path.join(process.cwd(), "brand-assets")));
 
-  // Domain redirect: trading.akulaz.ai -> www.pitdesk.ai (301 permanent)
+  // Railway currently serves the apex custom domain; avoid routing legacy
+  // traffic to the unattached www subdomain during the migration.
   app.use((req, res, next) => {
     const host = (req.hostname || req.headers.host || "").split(":")[0];
     if (host === "trading.akulaz.ai") {
-      return res.redirect(301, `https://www.pitdesk.ai${req.originalUrl}`);
+      return res.redirect(301, `https://pitdesk.ai${req.originalUrl}`);
     }
     next();
   });
