@@ -3,11 +3,12 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import net from "net";
+import { sql } from "drizzle-orm";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
 import { registerGoogleAuthRoutes } from "./googleAuth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
+import { getDb } from "../db";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { intradayScanHandler } from "../scheduledIntradayScan";
@@ -39,16 +40,23 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
+  const externalHosting = process.env.PITDESK_EXTERNAL_HOST?.trim().toLowerCase() === "true";
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // Cookie parser — required for reading session JWT cookies in req.cookies
   app.use(cookieParser());
 
-  // Lightweight deployment health check. This deliberately does not call external
-  // services so an otherwise healthy instance can pass its startup check quickly.
-  app.get("/health", (_req, res) => {
-    res.status(200).json({ status: "ok", service: "pitdesk" });
+  // Railway readiness checks must verify that the app can reach its configured MySQL database.
+  app.get("/health", async (_req, res) => {
+    try {
+      const db = await getDb();
+      if (!db) throw new Error("Database client is unavailable");
+      await db.execute(sql`SELECT 1`);
+      res.status(200).json({ status: "ok", service: "pitdesk", database: "ready" });
+    } catch (error) {
+      console.warn("[Health] Database probe failed", error instanceof Error ? error.message : error);
+      res.status(503).json({ status: "unavailable", service: "pitdesk", database: "unavailable" });
+    }
   });
 
   // Domain redirect: trading.akulaz.ai -> www.pitdesk.ai (301 permanent)
@@ -61,19 +69,21 @@ async function startServer() {
   });
 
   registerStorageProxy(app);
-  registerOAuthRoutes(app);
+  if (externalHosting) {
+    console.info("[Auth] Legacy Manus OAuth routes disabled for external hosting");
+  } else {
+    const { registerOAuthRoutes } = await import("./oauth");
+    registerOAuthRoutes(app);
+  }
   registerGoogleAuthRoutes(app);
-  // Scheduled heartbeat handlers — must be before tRPC and Vite fallthrough
-  // Chrome extension sync endpoint — REST (not tRPC) to avoid batch format issues
+
   app.options("/api/extension/sync", extensionSyncHandler);
   app.post("/api/extension/sync", extensionSyncHandler);
   app.post("/api/scheduled/intraday-scan", intradayScanHandler);
   app.post("/api/scheduled/weekly-briefing", weeklyBriefingHandler);
   app.post("/api/scheduled/post-market-debrief", postMarketDebriefHandler);
   app.post("/api/scheduled/price-sync", priceSyncHandler);
-  // Schwab OAuth routes
   app.use("/api/schwab", schwabRouter);
-  // tRPC API
   app.use(
     "/api/trpc",
     createExpressMiddleware({
@@ -81,7 +91,7 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
+
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
