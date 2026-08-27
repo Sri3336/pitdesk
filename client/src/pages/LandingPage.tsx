@@ -16,16 +16,16 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-// ── CDN URLs ────────────────────────────────────────────────────────────────
+// ── Railway-served visual assets ─────────────────────────────────────────────
 const DOODLE_IMAGES = [
-  "/manus-storage/doodle_01_intro_b7892226.png",
-  "/manus-storage/doodle_02_daily_scan_ed1b1543.png",
-  "/manus-storage/doodle_03_phase_aaac6656.png",
-  "/manus-storage/doodle_04_confluence_1a2b5d08.png",
-  "/manus-storage/doodle_05_backtest_8582c938.png",
-  "/manus-storage/doodle_06_news_exit_56b06782.png",
+  "/brand-assets/landing/doodle_01_intro_b7892226.png",
+  "/brand-assets/landing/doodle_02_daily_scan_ed1b1543.png",
+  "/brand-assets/landing/doodle_03_phase_aaac6656.png",
+  "/brand-assets/landing/doodle_04_confluence_1a2b5d08.png",
+  "/brand-assets/landing/doodle_05_backtest_8582c938.png",
+  "/brand-assets/landing/doodle_06_news_exit_56b06782.png",
 ];
-const VIDEO_URL = "/manus-storage/pitdesk_synced_final_6c504b6d.mp4";
+const VIDEO_URL = "/brand-assets/landing/pitdesk_synced_final_6c504b6d.mp4";
 
 // ── 6-Step data ─────────────────────────────────────────────────────────────
 const STEPS = [
@@ -200,7 +200,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 inset-x-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/brand-assets/pitdesk-icon-v2.png" alt="PitDesk" className="h-7 w-7" />
+            <img src="/brand-assets/pitdesk-icon-v3.png" alt="PitDesk" className="h-7 w-7" />
             <span className="font-black text-lg tracking-tight text-gray-900">PitDesk</span>
           </div>
           <a href={LOGIN_PATH}>
@@ -288,7 +288,7 @@ export default function LandingPage() {
       <section className="py-20 px-4 bg-gray-900 text-white">
         <div className="max-w-2xl mx-auto text-center space-y-6">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <img src="/brand-assets/pitdesk-icon-v2.png" alt="PitDesk" className="h-10 w-10" />
+            <img src="/brand-assets/pitdesk-icon-v3.png" alt="PitDesk" className="h-10 w-10" />
             <span className="font-black text-2xl tracking-tight">PitDesk</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-black leading-tight">
